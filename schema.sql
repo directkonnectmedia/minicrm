@@ -8,6 +8,7 @@ create table if not exists public.clients (
   phone text,
   link text,
   notes text,
+  manager text,
   status text not null default 'Prospect'
     check (status in ('Finished', 'In Progress', 'Prospect')),
   created_at timestamptz not null default now(),
@@ -36,3 +37,4 @@ for each row execute function public.set_updated_at();
 
 -- Migrations (safe to re-run): add new columns to existing tables.
 alter table public.clients add column if not exists business_type text;
+alter table public.clients add column if not exists manager text;

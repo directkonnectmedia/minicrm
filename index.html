@@ -15,6 +15,7 @@
     }
     h1 { margin: 0 0 4px; font-size: 24px; }
     .sub { color: #666; margin-bottom: 24px; font-size: 14px; }
+    .header-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
     .card {
       background: #fff;
       border: 1px solid #e5e7eb;
@@ -22,16 +23,6 @@
       padding: 16px;
       margin-bottom: 16px;
     }
-    .row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 8px; }
-    .row input, .row select, .row textarea {
-      padding: 8px 10px;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      font-size: 14px;
-      font-family: inherit;
-      width: 100%;
-    }
-    .row textarea { resize: vertical; min-height: 36px; }
     button {
       padding: 8px 14px;
       background: #111827;
@@ -42,10 +33,12 @@
       cursor: pointer;
     }
     button:hover { background: #374151; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
     button.ghost { background: transparent; color: #374151; border: 1px solid #d1d5db; }
     button.ghost:hover { background: #f3f4f6; }
     button.danger { background: #dc2626; }
     button.danger:hover { background: #b91c1c; }
+    button.primary-lg { font-size: 15px; padding: 10px 18px; }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
     th, td {
       text-align: left;
@@ -77,11 +70,115 @@
     .empty { text-align: center; color: #999; padding: 32px; font-size: 14px; }
     .error { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
     a { color: #2563eb; }
+
+    /* Wizard modal */
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(17, 24, 39, 0.5);
+      display: none;
+      align-items: center; justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+    .overlay.open { display: flex; }
+    .modal {
+      background: #fff;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      max-height: 90vh;
+    }
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-title { font-size: 16px; font-weight: 600; }
+    .modal-close {
+      background: transparent; color: #6b7280; border: none;
+      font-size: 22px; padding: 4px 8px; line-height: 1;
+    }
+    .modal-close:hover { background: #f3f4f6; }
+    .progress {
+      height: 4px;
+      background: #e5e7eb;
+      position: relative;
+    }
+    .progress-bar {
+      height: 100%;
+      background: #111827;
+      transition: width 200ms ease;
+    }
+    .step-meta { padding: 16px 20px 4px; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .step-body { padding: 4px 20px 16px; overflow-y: auto; flex: 1; }
+    .step-title { font-size: 18px; font-weight: 600; margin: 0 0 6px; }
+    .step-desc { color: #6b7280; font-size: 14px; margin: 0 0 16px; }
+    .field { margin-bottom: 12px; }
+    .field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 4px;
+      color: #374151;
+    }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      outline: none;
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+    }
+    .field textarea { min-height: 100px; resize: vertical; }
+    .field-error {
+      color: #991b1b;
+      font-size: 13px;
+      background: #fee2e2;
+      padding: 8px 10px;
+      border-radius: 6px;
+      margin-top: 8px;
+    }
+    .modal-footer {
+      padding: 14px 20px;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      background: #f9fafb;
+    }
+    .review-row {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid #f3f4f6;
+      font-size: 14px;
+    }
+    .review-row:last-child { border-bottom: none; }
+    .review-row .k { color: #6b7280; font-weight: 500; }
+    .review-row .v { color: #1f2937; word-break: break-word; }
+    .review-row .v.muted { color: #9ca3af; font-style: italic; }
   </style>
 </head>
 <body>
-  <h1>Mini CRM</h1>
-  <div class="sub">Hello Mini CRM</div>
+  <div class="header-bar">
+    <div>
+      <h1>Mini CRM</h1>
+      <div class="sub">Hello Mini CRM</div>
+    </div>
+    <button class="primary-lg" id="openWizard">+ Add New Client</button>
+  </div>
 
   <div id="configError" class="error" style="display:none;"></div>
 
@@ -147,48 +244,44 @@
   </datalist>
 
   <div class="card">
-    <form id="addForm">
-      <div class="row">
-        <input name="company_name" placeholder="Company name *" required>
-        <input name="business_type" list="business_types" placeholder="Business type">
-        <input name="client_name" placeholder="Client name">
-        <input name="phone" placeholder="Phone">
-        <input name="link" placeholder="Link (URL)">
-        <select name="status">
-          <option>Prospect</option>
-          <option>In Progress</option>
-          <option>Finished</option>
-        </select>
-        <button type="submit">Add</button>
-      </div>
-      <div class="row" style="grid-template-columns: 1fr;">
-        <textarea name="notes" placeholder="Notes"></textarea>
-      </div>
-    </form>
-  </div>
-
-  <div class="card">
     <table>
       <thead>
         <tr>
-          <th style="width: 13%;">Company</th>
-          <th style="width: 11%;">Business Type</th>
-          <th style="width: 11%;">Client</th>
-          <th style="width: 11%;">Phone</th>
-          <th style="width: 13%;">Link</th>
-          <th style="width: 17%;">Notes</th>
-          <th style="width: 14%;">Status</th>
+          <th style="width: 12%;">Company</th>
+          <th style="width: 10%;">Business Type</th>
+          <th style="width: 10%;">Client</th>
+          <th style="width: 10%;">Phone</th>
+          <th style="width: 12%;">Link</th>
+          <th style="width: 15%;">Notes</th>
+          <th style="width: 9%;">Manager</th>
+          <th style="width: 12%;">Status</th>
           <th style="width: 10%;"></th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
     </table>
-    <div id="empty" class="empty" style="display:none;">No entries yet. Add one above.</div>
+    <div id="empty" class="empty" style="display:none;">No entries yet. Click "+ Add New Client" to start.</div>
+  </div>
+
+  <!-- Wizard modal -->
+  <div class="overlay" id="wizardOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wizardTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="wizardTitle">Add New Client</div>
+        <button class="modal-close" id="closeWizard" aria-label="Close">×</button>
+      </div>
+      <div class="progress"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
+      <div class="step-meta" id="stepMeta">Step 1 of 6</div>
+      <div class="step-body" id="stepBody"></div>
+      <div class="modal-footer">
+        <button class="ghost" id="backBtn">Back</button>
+        <button id="nextBtn">Next</button>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    // ⚠️ Replace these with your Supabase project URL + anon key.
     const SUPABASE_URL = "https://ljghuyeugzmduzzvngkc.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqZ2h1eWV1Z3ptZHV6enZuZ2tjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MTIzOTIsImV4cCI6MjA5MjI4ODM5Mn0.aoeOD1Xvm_q_ZYlJ_x72J_WvmODkwvbNQ7dwbCa5bTY";
 
@@ -205,9 +298,10 @@
     const esc = (s) => (s ?? "").toString().replace(/[&<>"']/g, (c) => (
       { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
     ));
-
     const statusClass = (s) => "status-" + (s || "Prospect").replace(/\s/g, "");
+    const normPhone = (s) => (s || "").replace(/\D+/g, "");
 
+    // ---------- Table render ----------
     function render(rows) {
       tbody.innerHTML = "";
       if (!rows || rows.length === 0) {
@@ -218,9 +312,6 @@
       for (const r of rows) {
         const tr = document.createElement("tr");
         tr.dataset.id = r.id;
-        const linkHtml = r.link
-          ? `<a href="${esc(r.link)}" target="_blank" rel="noopener">${esc(r.link)}</a>`
-          : "";
         tr.innerHTML = `
           <td><input data-field="company_name" value="${esc(r.company_name)}"></td>
           <td><input data-field="business_type" list="business_types" value="${esc(r.business_type)}"></td>
@@ -228,6 +319,13 @@
           <td><input data-field="phone" value="${esc(r.phone)}"></td>
           <td><input data-field="link" value="${esc(r.link)}" placeholder="https://..."></td>
           <td><textarea data-field="notes">${esc(r.notes)}</textarea></td>
+          <td>
+            <select data-field="manager">
+              <option value=""${!r.manager ? " selected" : ""}>—</option>
+              <option${r.manager === "Ivan" ? " selected" : ""}>Ivan</option>
+              <option${r.manager === "Hector" ? " selected" : ""}>Hector</option>
+            </select>
+          </td>
           <td>
             <select data-field="status" class="badge ${statusClass(r.status)}">
               <option${r.status === "Prospect" ? " selected" : ""}>Prospect</option>
@@ -244,24 +342,16 @@
       }
     }
 
+    let allClients = [];
     async function load() {
       const { data, error } = await sb
         .from("clients")
         .select("*")
         .order("created_at", { ascending: false });
       if (error) { alert("Load failed: " + error.message); return; }
-      render(data);
+      allClients = data || [];
+      render(allClients);
     }
-
-    document.getElementById("addForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const fd = new FormData(e.target);
-      const row = Object.fromEntries(fd.entries());
-      const { error } = await sb.from("clients").insert(row);
-      if (error) { alert("Insert failed: " + error.message); return; }
-      e.target.reset();
-      load();
-    });
 
     tbody.addEventListener("click", async (e) => {
       const btn = e.target.closest("button");
@@ -292,6 +382,271 @@
         e.target.className = "badge " + statusClass(e.target.value);
       }
     });
+
+    // ---------- Wizard ----------
+    const steps = [
+      {
+        title: "Company Info",
+        desc: "Who is the business?",
+        fields: [
+          { name: "company_name", label: "Company name *", type: "text", required: true, placeholder: "Acme Paving Co." },
+          { name: "business_type", label: "Business type", type: "datalist", list: "business_types", placeholder: "Pick one or type your own" },
+        ],
+      },
+      {
+        title: "Contact",
+        desc: "Who's the point of contact?",
+        fields: [
+          { name: "client_name", label: "Client name", type: "text", placeholder: "Jane Doe" },
+          { name: "phone", label: "Phone", type: "tel", placeholder: "(555) 123-4567" },
+        ],
+        validate: async (data) => {
+          const p = normPhone(data.phone);
+          if (!p) return null;
+          const existing = allClients.find((c) => normPhone(c.phone) === p);
+          if (existing) {
+            return `This contact already exists — registered under "${existing.company_name}".`;
+          }
+          return null;
+        },
+      },
+      {
+        title: "Link",
+        desc: "Website, Google Drive folder, anything relevant.",
+        fields: [
+          { name: "link", label: "Link", type: "url", placeholder: "https://..." },
+        ],
+      },
+      {
+        title: "Assignment",
+        desc: "Who's handling this and where does it stand?",
+        fields: [
+          { name: "manager", label: "Manager", type: "select", options: ["", "Ivan", "Hector"], optionLabels: { "": "— Unassigned —" } },
+          { name: "status", label: "Status", type: "select", options: ["Prospect", "In Progress", "Finished"] },
+        ],
+      },
+      {
+        title: "Notes",
+        desc: "Anything else worth remembering?",
+        fields: [
+          { name: "notes", label: "Notes", type: "textarea", placeholder: "Met at trade show, interested in Q2 project..." },
+        ],
+      },
+      {
+        title: "Review",
+        desc: "Double-check before saving.",
+        review: true,
+      },
+    ];
+
+    const overlay = document.getElementById("wizardOverlay");
+    const stepMeta = document.getElementById("stepMeta");
+    const stepBody = document.getElementById("stepBody");
+    const progressBar = document.getElementById("progressBar");
+    const backBtn = document.getElementById("backBtn");
+    const nextBtn = document.getElementById("nextBtn");
+
+    let stepIndex = 0;
+    let formData = {};
+
+    function openWizard() {
+      stepIndex = 0;
+      formData = { status: "Prospect", manager: "" };
+      renderStep();
+      overlay.classList.add("open");
+    }
+
+    function closeWizard() {
+      overlay.classList.remove("open");
+    }
+
+    function renderStep() {
+      const step = steps[stepIndex];
+      stepMeta.textContent = `Step ${stepIndex + 1} of ${steps.length}`;
+      progressBar.style.width = `${((stepIndex + 1) / steps.length) * 100}%`;
+
+      if (step.review) {
+        stepBody.innerHTML = `
+          <h2 class="step-title">${step.title}</h2>
+          <p class="step-desc">${step.desc}</p>
+          ${renderReview()}
+        `;
+      } else {
+        const fieldsHtml = step.fields.map(renderField).join("");
+        stepBody.innerHTML = `
+          <h2 class="step-title">${step.title}</h2>
+          <p class="step-desc">${step.desc}</p>
+          ${fieldsHtml}
+          <div class="field-error" id="stepError" style="display:none;"></div>
+        `;
+        // Focus first input
+        const firstInput = stepBody.querySelector("input, select, textarea");
+        if (firstInput) setTimeout(() => firstInput.focus(), 50);
+      }
+
+      backBtn.disabled = stepIndex === 0;
+      nextBtn.textContent = stepIndex === steps.length - 1 ? "Save Client" : "Next";
+    }
+
+    function renderField(f) {
+      const v = esc(formData[f.name] ?? "");
+      if (f.type === "select") {
+        const opts = f.options.map((o) => {
+          const label = (f.optionLabels && f.optionLabels[o] != null) ? f.optionLabels[o] : o;
+          return `<option value="${esc(o)}"${formData[f.name] === o ? " selected" : ""}>${esc(label)}</option>`;
+        }).join("");
+        return `
+          <div class="field">
+            <label>${esc(f.label)}</label>
+            <select name="${f.name}">${opts}</select>
+          </div>`;
+      }
+      if (f.type === "textarea") {
+        return `
+          <div class="field">
+            <label>${esc(f.label)}</label>
+            <textarea name="${f.name}" placeholder="${esc(f.placeholder || "")}">${v}</textarea>
+          </div>`;
+      }
+      if (f.type === "datalist") {
+        return `
+          <div class="field">
+            <label>${esc(f.label)}</label>
+            <input type="text" name="${f.name}" list="${esc(f.list)}" value="${v}" placeholder="${esc(f.placeholder || "")}">
+          </div>`;
+      }
+      return `
+        <div class="field">
+          <label>${esc(f.label)}</label>
+          <input type="${esc(f.type || "text")}" name="${f.name}" value="${v}" placeholder="${esc(f.placeholder || "")}"${f.required ? " required" : ""}>
+        </div>`;
+    }
+
+    function renderReview() {
+      const rows = [
+        ["Company", formData.company_name],
+        ["Business Type", formData.business_type],
+        ["Client", formData.client_name],
+        ["Phone", formData.phone],
+        ["Link", formData.link],
+        ["Manager", formData.manager],
+        ["Status", formData.status],
+        ["Notes", formData.notes],
+      ];
+      return rows.map(([k, v]) => {
+        const shown = v && v.toString().trim() ? esc(v) : '<span class="v muted">—</span>';
+        const isMuted = !(v && v.toString().trim());
+        return `
+          <div class="review-row">
+            <div class="k">${k}</div>
+            <div class="v">${isMuted ? '<span class="muted">—</span>' : shown}</div>
+          </div>`;
+      }).join("");
+    }
+
+    function collectStepData() {
+      const step = steps[stepIndex];
+      if (!step.fields) return;
+      for (const f of step.fields) {
+        const el = stepBody.querySelector(`[name="${f.name}"]`);
+        if (el) formData[f.name] = el.value.trim();
+      }
+    }
+
+    function showStepError(msg) {
+      const el = document.getElementById("stepError");
+      if (!el) { alert(msg); return; }
+      el.textContent = msg;
+      el.style.display = "block";
+    }
+
+    async function goNext() {
+      const step = steps[stepIndex];
+      if (!step.review) {
+        collectStepData();
+
+        // Required field check
+        for (const f of (step.fields || [])) {
+          if (f.required && !formData[f.name]) {
+            showStepError(`${f.label.replace(" *", "")} is required.`);
+            return;
+          }
+        }
+
+        // Step-level async validator (e.g. duplicate phone)
+        if (step.validate) {
+          nextBtn.disabled = true;
+          nextBtn.textContent = "Checking...";
+          const err = await step.validate(formData);
+          nextBtn.disabled = false;
+          nextBtn.textContent = stepIndex === steps.length - 1 ? "Save Client" : "Next";
+          if (err) { showStepError(err); return; }
+        }
+      }
+
+      if (stepIndex === steps.length - 1) {
+        await submitWizard();
+        return;
+      }
+      stepIndex++;
+      renderStep();
+    }
+
+    function goBack() {
+      if (stepIndex === 0) return;
+      // Preserve current fields before stepping back
+      collectStepData();
+      stepIndex--;
+      renderStep();
+    }
+
+    async function submitWizard() {
+      nextBtn.disabled = true;
+      nextBtn.textContent = "Saving...";
+
+      // Final duplicate check (in case allClients changed since step 2)
+      const p = normPhone(formData.phone);
+      if (p) {
+        const existing = allClients.find((c) => normPhone(c.phone) === p);
+        if (existing) {
+          nextBtn.disabled = false;
+          nextBtn.textContent = "Save Client";
+          alert(`This contact already exists — registered under "${existing.company_name}".`);
+          return;
+        }
+      }
+
+      const row = {
+        company_name: formData.company_name || null,
+        business_type: formData.business_type || null,
+        client_name: formData.client_name || null,
+        phone: formData.phone || null,
+        link: formData.link || null,
+        notes: formData.notes || null,
+        manager: formData.manager || null,
+        status: formData.status || "Prospect",
+      };
+      const { error } = await sb.from("clients").insert(row);
+      nextBtn.disabled = false;
+      nextBtn.textContent = "Save Client";
+      if (error) { alert("Insert failed: " + error.message); return; }
+      closeWizard();
+      load();
+    }
+
+    document.getElementById("openWizard").addEventListener("click", openWizard);
+    document.getElementById("closeWizard").addEventListener("click", closeWizard);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeWizard(); });
+    document.addEventListener("keydown", (e) => {
+      if (!overlay.classList.contains("open")) return;
+      if (e.key === "Escape") closeWizard();
+      if (e.key === "Enter" && e.target.tagName !== "TEXTAREA") {
+        e.preventDefault();
+        goNext();
+      }
+    });
+    backBtn.addEventListener("click", goBack);
+    nextBtn.addEventListener("click", goNext);
 
     load();
   </script>
