@@ -4,8 +4,232 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mini CRM</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: #f6f7f9;
+      color: #1a1a1a;
+    }
+    h1 { margin: 0 0 4px; font-size: 24px; }
+    .sub { color: #666; margin-bottom: 24px; font-size: 14px; }
+    .card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 8px; }
+    .row input, .row select, .row textarea {
+      padding: 8px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      width: 100%;
+    }
+    .row textarea { resize: vertical; min-height: 36px; }
+    button {
+      padding: 8px 14px;
+      background: #111827;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button:hover { background: #374151; }
+    button.ghost { background: transparent; color: #374151; border: 1px solid #d1d5db; }
+    button.ghost:hover { background: #f3f4f6; }
+    button.danger { background: #dc2626; }
+    button.danger:hover { background: #b91c1c; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td {
+      text-align: left;
+      padding: 10px 8px;
+      border-bottom: 1px solid #e5e7eb;
+      vertical-align: top;
+    }
+    th { font-weight: 600; color: #555; background: #f9fafb; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    td input, td select, td textarea {
+      padding: 6px 8px;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      font-size: 14px;
+      font-family: inherit;
+      width: 100%;
+      background: transparent;
+    }
+    td input:focus, td select:focus, td textarea:focus {
+      outline: none;
+      border-color: #d1d5db;
+      background: #fff;
+    }
+    td textarea { resize: vertical; min-height: 28px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+    .status-Prospect { background: #fef3c7; color: #92400e; }
+    .status-InProgress { background: #dbeafe; color: #1e40af; }
+    .status-Finished { background: #d1fae5; color: #065f46; }
+    .actions { white-space: nowrap; }
+    .empty { text-align: center; color: #999; padding: 32px; font-size: 14px; }
+    .error { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
+    a { color: #2563eb; }
+  </style>
 </head>
 <body>
-  <h1>Hello Mini CRM</h1>
+  <h1>Mini CRM</h1>
+  <div class="sub">Hello Mini CRM</div>
+
+  <div id="configError" class="error" style="display:none;"></div>
+
+  <div class="card">
+    <form id="addForm">
+      <div class="row">
+        <input name="company_name" placeholder="Company name *" required>
+        <input name="client_name" placeholder="Client name">
+        <input name="phone" placeholder="Phone">
+        <input name="link" placeholder="Link (URL)">
+        <select name="status">
+          <option>Prospect</option>
+          <option>In Progress</option>
+          <option>Finished</option>
+        </select>
+        <button type="submit">Add</button>
+      </div>
+      <div class="row" style="grid-template-columns: 1fr;">
+        <textarea name="notes" placeholder="Notes"></textarea>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 15%;">Company</th>
+          <th style="width: 13%;">Client</th>
+          <th style="width: 12%;">Phone</th>
+          <th style="width: 15%;">Link</th>
+          <th style="width: 22%;">Notes</th>
+          <th style="width: 13%;">Status</th>
+          <th style="width: 10%;"></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div id="empty" class="empty" style="display:none;">No entries yet. Add one above.</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // ⚠️ Replace these with your Supabase project URL + anon key.
+    const SUPABASE_URL = "https://ljghuyeugzmduzzvngkc.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqZ2h1eWV1Z3ptZHV6enZuZ2tjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MTIzOTIsImV4cCI6MjA5MjI4ODM5Mn0.aoeOD1Xvm_q_ZYlJ_x72J_WvmODkwvbNQ7dwbCa5bTY";
+
+    const errEl = document.getElementById("configError");
+    if (SUPABASE_URL.startsWith("__") || SUPABASE_ANON_KEY.startsWith("__")) {
+      errEl.style.display = "block";
+      errEl.textContent = "Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in index.html.";
+    }
+
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const tbody = document.getElementById("rows");
+    const emptyEl = document.getElementById("empty");
+
+    const esc = (s) => (s ?? "").toString().replace(/[&<>"']/g, (c) => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+    ));
+
+    const statusClass = (s) => "status-" + (s || "Prospect").replace(/\s/g, "");
+
+    function render(rows) {
+      tbody.innerHTML = "";
+      if (!rows || rows.length === 0) {
+        emptyEl.style.display = "block";
+        return;
+      }
+      emptyEl.style.display = "none";
+      for (const r of rows) {
+        const tr = document.createElement("tr");
+        tr.dataset.id = r.id;
+        const linkHtml = r.link
+          ? `<a href="${esc(r.link)}" target="_blank" rel="noopener">${esc(r.link)}</a>`
+          : "";
+        tr.innerHTML = `
+          <td><input data-field="company_name" value="${esc(r.company_name)}"></td>
+          <td><input data-field="client_name" value="${esc(r.client_name)}"></td>
+          <td><input data-field="phone" value="${esc(r.phone)}"></td>
+          <td><input data-field="link" value="${esc(r.link)}" placeholder="https://..."></td>
+          <td><textarea data-field="notes">${esc(r.notes)}</textarea></td>
+          <td>
+            <select data-field="status" class="badge ${statusClass(r.status)}">
+              <option${r.status === "Prospect" ? " selected" : ""}>Prospect</option>
+              <option${r.status === "In Progress" ? " selected" : ""}>In Progress</option>
+              <option${r.status === "Finished" ? " selected" : ""}>Finished</option>
+            </select>
+          </td>
+          <td class="actions">
+            <button class="ghost" data-action="save">Save</button>
+            <button class="danger" data-action="delete">Del</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    async function load() {
+      const { data, error } = await sb
+        .from("clients")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) { alert("Load failed: " + error.message); return; }
+      render(data);
+    }
+
+    document.getElementById("addForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const row = Object.fromEntries(fd.entries());
+      const { error } = await sb.from("clients").insert(row);
+      if (error) { alert("Insert failed: " + error.message); return; }
+      e.target.reset();
+      load();
+    });
+
+    tbody.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button");
+      if (!btn) return;
+      const tr = btn.closest("tr");
+      const id = tr.dataset.id;
+
+      if (btn.dataset.action === "delete") {
+        if (!confirm("Delete this entry?")) return;
+        const { error } = await sb.from("clients").delete().eq("id", id);
+        if (error) { alert("Delete failed: " + error.message); return; }
+        load();
+      }
+
+      if (btn.dataset.action === "save") {
+        const update = {};
+        tr.querySelectorAll("[data-field]").forEach((el) => {
+          update[el.dataset.field] = el.value || null;
+        });
+        const { error } = await sb.from("clients").update(update).eq("id", id);
+        if (error) { alert("Save failed: " + error.message); return; }
+        load();
+      }
+    });
+
+    tbody.addEventListener("change", (e) => {
+      if (e.target.dataset.field === "status") {
+        e.target.className = "badge " + statusClass(e.target.value);
+      }
+    });
+
+    load();
+  </script>
 </body>
 </html>
