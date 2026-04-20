@@ -22,7 +22,7 @@
       padding: 16px;
       margin-bottom: 16px;
     }
-    .row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 8px; }
+    .row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 8px; }
     .row input, .row select, .row textarea {
       padding: 8px 10px;
       border: 1px solid #d1d5db;
@@ -85,10 +85,72 @@
 
   <div id="configError" class="error" style="display:none;"></div>
 
+  <datalist id="business_types">
+    <option value="Appliance Repair">
+    <option value="Auto Detailing">
+    <option value="Bathroom Remodeling">
+    <option value="Carpentry">
+    <option value="Carpet Cleaning">
+    <option value="Chimney Sweep">
+    <option value="Cleaning - Commercial">
+    <option value="Cleaning - Residential">
+    <option value="Commercial Construction">
+    <option value="Concrete">
+    <option value="Decks">
+    <option value="Demolition">
+    <option value="Drywall">
+    <option value="Electrical">
+    <option value="Epoxy Flooring">
+    <option value="Excavation">
+    <option value="Fencing">
+    <option value="Flooring">
+    <option value="Foundation Repair">
+    <option value="Garage Door">
+    <option value="General Contractor">
+    <option value="Gutters">
+    <option value="Handyman">
+    <option value="HVAC">
+    <option value="Insulation">
+    <option value="Irrigation">
+    <option value="Junk Removal">
+    <option value="Kitchen Remodeling">
+    <option value="Landscaping">
+    <option value="Lawn Care">
+    <option value="Locksmith">
+    <option value="Marketing Agency">
+    <option value="Masonry">
+    <option value="Mobile Car Wash">
+    <option value="Moving Services">
+    <option value="Painting - Exterior">
+    <option value="Painting - Interior">
+    <option value="Pavers">
+    <option value="Pest Control">
+    <option value="Photography">
+    <option value="Plumbing">
+    <option value="Pool Installation">
+    <option value="Pool Service">
+    <option value="Pressure Washing">
+    <option value="Real Estate">
+    <option value="Remodeling">
+    <option value="Roofing">
+    <option value="Septic">
+    <option value="Siding">
+    <option value="Snow Removal">
+    <option value="Solar Installation">
+    <option value="Stucco">
+    <option value="Tree Service">
+    <option value="Waterproofing">
+    <option value="Web Design">
+    <option value="Welding">
+    <option value="Window Cleaning">
+    <option value="Window Installation">
+  </datalist>
+
   <div class="card">
     <form id="addForm">
       <div class="row">
         <input name="company_name" placeholder="Company name *" required>
+        <input name="business_type" list="business_types" placeholder="Business type">
         <input name="client_name" placeholder="Client name">
         <input name="phone" placeholder="Phone">
         <input name="link" placeholder="Link (URL)">
@@ -109,12 +171,13 @@
     <table>
       <thead>
         <tr>
-          <th style="width: 15%;">Company</th>
-          <th style="width: 13%;">Client</th>
-          <th style="width: 12%;">Phone</th>
-          <th style="width: 15%;">Link</th>
-          <th style="width: 22%;">Notes</th>
-          <th style="width: 13%;">Status</th>
+          <th style="width: 13%;">Company</th>
+          <th style="width: 11%;">Business Type</th>
+          <th style="width: 11%;">Client</th>
+          <th style="width: 11%;">Phone</th>
+          <th style="width: 13%;">Link</th>
+          <th style="width: 17%;">Notes</th>
+          <th style="width: 14%;">Status</th>
           <th style="width: 10%;"></th>
         </tr>
       </thead>
@@ -160,6 +223,7 @@
           : "";
         tr.innerHTML = `
           <td><input data-field="company_name" value="${esc(r.company_name)}"></td>
+          <td><input data-field="business_type" list="business_types" value="${esc(r.business_type)}"></td>
           <td><input data-field="client_name" value="${esc(r.client_name)}"></td>
           <td><input data-field="phone" value="${esc(r.phone)}"></td>
           <td><input data-field="link" value="${esc(r.link)}" placeholder="https://..."></td>

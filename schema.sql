@@ -4,6 +4,7 @@ create table if not exists public.clients (
   id uuid primary key default gen_random_uuid(),
   company_name text not null,
   client_name text,
+  business_type text,
   phone text,
   link text,
   notes text,
@@ -32,3 +33,6 @@ end; $$;
 create trigger clients_set_updated_at
 before update on public.clients
 for each row execute function public.set_updated_at();
+
+-- Migrations (safe to re-run): add new columns to existing tables.
+alter table public.clients add column if not exists business_type text;
