@@ -39,39 +39,32 @@
     button.danger { background: #dc2626; }
     button.danger:hover { background: #b91c1c; }
     button.primary-lg { font-size: 15px; padding: 10px 18px; }
+
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
     th, td {
       text-align: left;
-      padding: 10px 8px;
+      padding: 12px 10px;
       border-bottom: 1px solid #e5e7eb;
-      vertical-align: top;
+      vertical-align: middle;
     }
     th { font-weight: 600; color: #555; background: #f9fafb; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
-    td input, td select, td textarea {
-      padding: 6px 8px;
-      border: 1px solid transparent;
-      border-radius: 4px;
-      font-size: 14px;
-      font-family: inherit;
-      width: 100%;
-      background: transparent;
-    }
-    td input:focus, td select:focus, td textarea:focus {
-      outline: none;
-      border-color: #d1d5db;
-      background: #fff;
-    }
-    td textarea { resize: vertical; min-height: 28px; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+    tbody tr { cursor: pointer; transition: background 120ms; }
+    tbody tr:hover { background: #f9fafb; }
+    td.truncate { max-width: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    td.actions { white-space: nowrap; text-align: right; }
+
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
     .status-Prospect { background: #fef3c7; color: #92400e; }
     .status-InProgress { background: #dbeafe; color: #1e40af; }
     .status-Finished { background: #d1fae5; color: #065f46; }
-    .actions { white-space: nowrap; }
+    .status-DeadLead { background: #e5e7eb; color: #6b7280; }
+
     .empty { text-align: center; color: #999; padding: 32px; font-size: 14px; }
     .error { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
     a { color: #2563eb; }
+    a.web-link { font-size: 13px; }
 
-    /* Wizard modal */
+    /* Modal shared */
     .overlay {
       position: fixed; inset: 0;
       background: rgba(17, 24, 39, 0.5);
@@ -85,7 +78,7 @@
       background: #fff;
       border-radius: 12px;
       width: 100%;
-      max-width: 520px;
+      max-width: 560px;
       box-shadow: 0 20px 50px rgba(0,0,0,0.25);
       overflow: hidden;
       display: flex;
@@ -105,20 +98,24 @@
       font-size: 22px; padding: 4px 8px; line-height: 1;
     }
     .modal-close:hover { background: #f3f4f6; }
-    .progress {
-      height: 4px;
-      background: #e5e7eb;
-      position: relative;
-    }
-    .progress-bar {
-      height: 100%;
-      background: #111827;
-      transition: width 200ms ease;
+    .modal-footer {
+      padding: 14px 20px;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      background: #f9fafb;
     }
     .step-meta { padding: 16px 20px 4px; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
     .step-body { padding: 4px 20px 16px; overflow-y: auto; flex: 1; }
     .step-title { font-size: 18px; font-weight: 600; margin: 0 0 6px; }
     .step-desc { color: #6b7280; font-size: 14px; margin: 0 0 16px; }
+
+    /* Wizard progress */
+    .progress { height: 4px; background: #e5e7eb; position: relative; }
+    .progress-bar { height: 100%; background: #111827; transition: width 200ms ease; }
+
+    /* Fields */
     .field { margin-bottom: 12px; }
     .field label {
       display: block;
@@ -149,17 +146,30 @@
       border-radius: 6px;
       margin-top: 8px;
     }
-    .modal-footer {
-      padding: 14px 20px;
-      border-top: 1px solid #e5e7eb;
-      display: flex;
-      justify-content: space-between;
-      gap: 8px;
-      background: #f9fafb;
+
+    /* Detail view (static display) */
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; padding: 16px 20px; }
+    .detail-grid .detail-full { grid-column: 1 / -1; }
+    .detail-item .k {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #6b7280;
+      font-weight: 600;
+      margin-bottom: 2px;
     }
+    .detail-item .v {
+      font-size: 14px;
+      color: #1f2937;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+    .detail-item .v.muted { color: #9ca3af; font-style: italic; }
+
+    /* Review (wizard) */
     .review-row {
       display: grid;
-      grid-template-columns: 130px 1fr;
+      grid-template-columns: 140px 1fr;
       gap: 8px;
       padding: 8px 0;
       border-bottom: 1px solid #f3f4f6;
@@ -247,13 +257,12 @@
     <table>
       <thead>
         <tr>
-          <th style="width: 12%;">Company</th>
-          <th style="width: 10%;">Business Type</th>
-          <th style="width: 10%;">Client</th>
-          <th style="width: 10%;">Phone</th>
-          <th style="width: 12%;">Link</th>
-          <th style="width: 15%;">Notes</th>
-          <th style="width: 9%;">Manager</th>
+          <th style="width: 16%;">Company</th>
+          <th style="width: 12%;">Business Type</th>
+          <th style="width: 12%;">Client</th>
+          <th style="width: 12%;">Phone</th>
+          <th style="width: 16%;">Website</th>
+          <th style="width: 10%;">Manager</th>
           <th style="width: 12%;">Status</th>
           <th style="width: 10%;"></th>
         </tr>
@@ -280,6 +289,18 @@
     </div>
   </div>
 
+  <!-- Detail / Edit modal -->
+  <div class="overlay" id="detailOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="detailTitle">Client Details</div>
+        <button class="modal-close" id="closeDetail" aria-label="Close">×</button>
+      </div>
+      <div id="detailBody" class="step-body" style="padding: 0;"></div>
+      <div class="modal-footer" id="detailFooter"></div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = "https://ljghuyeugzmduzzvngkc.supabase.co";
@@ -288,7 +309,7 @@
     const errEl = document.getElementById("configError");
     if (SUPABASE_URL.startsWith("__") || SUPABASE_ANON_KEY.startsWith("__")) {
       errEl.style.display = "block";
-      errEl.textContent = "Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in index.html.";
+      errEl.textContent = "Supabase is not configured.";
     }
 
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -300,8 +321,17 @@
     ));
     const statusClass = (s) => "status-" + (s || "Prospect").replace(/\s/g, "");
     const normPhone = (s) => (s || "").replace(/\D+/g, "");
+    const STATUSES = ["Prospect", "In Progress", "Finished", "Dead Lead"];
 
-    // ---------- Table render ----------
+    function shortUrl(u) {
+      if (!u) return "";
+      try {
+        const x = new URL(u.startsWith("http") ? u : "https://" + u);
+        return x.hostname.replace(/^www\./, "");
+      } catch { return u; }
+    }
+
+    // ---------- Table render (read-only) ----------
     function render(rows) {
       tbody.innerHTML = "";
       if (!rows || rows.length === 0) {
@@ -312,31 +342,18 @@
       for (const r of rows) {
         const tr = document.createElement("tr");
         tr.dataset.id = r.id;
+        const webHtml = r.finished_website
+          ? `<a class="web-link" href="${esc(r.finished_website)}" target="_blank" rel="noopener" data-nolink>${esc(shortUrl(r.finished_website))}</a>`
+          : '<span style="color:#9ca3af;">—</span>';
         tr.innerHTML = `
-          <td><input data-field="company_name" value="${esc(r.company_name)}"></td>
-          <td><input data-field="business_type" list="business_types" value="${esc(r.business_type)}"></td>
-          <td><input data-field="client_name" value="${esc(r.client_name)}"></td>
-          <td><input data-field="phone" value="${esc(r.phone)}"></td>
-          <td><input data-field="link" value="${esc(r.link)}" placeholder="https://..."></td>
-          <td><textarea data-field="notes">${esc(r.notes)}</textarea></td>
-          <td>
-            <select data-field="manager">
-              <option value=""${!r.manager ? " selected" : ""}>—</option>
-              <option${r.manager === "Ivan" ? " selected" : ""}>Ivan</option>
-              <option${r.manager === "Hector" ? " selected" : ""}>Hector</option>
-            </select>
-          </td>
-          <td>
-            <select data-field="status" class="badge ${statusClass(r.status)}">
-              <option${r.status === "Prospect" ? " selected" : ""}>Prospect</option>
-              <option${r.status === "In Progress" ? " selected" : ""}>In Progress</option>
-              <option${r.status === "Finished" ? " selected" : ""}>Finished</option>
-            </select>
-          </td>
-          <td class="actions">
-            <button class="ghost" data-action="save">Save</button>
-            <button class="danger" data-action="delete">Del</button>
-          </td>
+          <td class="truncate">${esc(r.company_name) || '<span style="color:#9ca3af;">—</span>'}</td>
+          <td class="truncate">${esc(r.business_type) || '<span style="color:#9ca3af;">—</span>'}</td>
+          <td class="truncate">${esc(r.client_name) || '<span style="color:#9ca3af;">—</span>'}</td>
+          <td class="truncate">${esc(r.phone) || '<span style="color:#9ca3af;">—</span>'}</td>
+          <td class="truncate">${webHtml}</td>
+          <td>${esc(r.manager) || '<span style="color:#9ca3af;">—</span>'}</td>
+          <td><span class="badge ${statusClass(r.status)}">${esc(r.status || "Prospect")}</span></td>
+          <td class="actions"><button class="danger" data-action="delete" data-nolink>Del</button></td>
         `;
         tbody.appendChild(tr);
       }
@@ -353,38 +370,28 @@
       render(allClients);
     }
 
+    // Row click opens detail; delete button & website link don't trigger it.
     tbody.addEventListener("click", async (e) => {
-      const btn = e.target.closest("button");
-      if (!btn) return;
-      const tr = btn.closest("tr");
+      const noLink = e.target.closest("[data-nolink]");
+      const tr = e.target.closest("tr");
+      if (!tr) return;
       const id = tr.dataset.id;
 
-      if (btn.dataset.action === "delete") {
+      if (noLink && noLink.dataset.action === "delete") {
         if (!confirm("Delete this entry?")) return;
         const { error } = await sb.from("clients").delete().eq("id", id);
         if (error) { alert("Delete failed: " + error.message); return; }
         load();
+        return;
       }
 
-      if (btn.dataset.action === "save") {
-        const update = {};
-        tr.querySelectorAll("[data-field]").forEach((el) => {
-          update[el.dataset.field] = el.value || null;
-        });
-        const { error } = await sb.from("clients").update(update).eq("id", id);
-        if (error) { alert("Save failed: " + error.message); return; }
-        load();
-      }
-    });
+      if (noLink) return; // clicked the web link — let it open normally
 
-    tbody.addEventListener("change", (e) => {
-      if (e.target.dataset.field === "status") {
-        e.target.className = "badge " + statusClass(e.target.value);
-      }
+      openDetail(id);
     });
 
     // ---------- Wizard ----------
-    const steps = [
+    const wizardSteps = [
       {
         title: "Company Info",
         desc: "Who is the business?",
@@ -411,10 +418,11 @@
         },
       },
       {
-        title: "Link",
-        desc: "Website, Google Drive folder, anything relevant.",
+        title: "Links",
+        desc: "Source link (social media or lead source) and finished website if live.",
         fields: [
-          { name: "link", label: "Link", type: "url", placeholder: "https://..." },
+          { name: "link", label: "Source link", type: "url", placeholder: "https://facebook.com/... or any source URL" },
+          { name: "finished_website", label: "Finished website", type: "url", placeholder: "https://yourclient.com" },
         ],
       },
       {
@@ -422,7 +430,7 @@
         desc: "Who's handling this and where does it stand?",
         fields: [
           { name: "manager", label: "Manager", type: "select", options: ["", "Ivan", "Hector"], optionLabels: { "": "— Unassigned —" } },
-          { name: "status", label: "Status", type: "select", options: ["Prospect", "In Progress", "Finished"] },
+          { name: "status", label: "Status", type: "select", options: STATUSES },
         ],
       },
       {
@@ -439,7 +447,7 @@
       },
     ];
 
-    const overlay = document.getElementById("wizardOverlay");
+    const wizardOverlay = document.getElementById("wizardOverlay");
     const stepMeta = document.getElementById("stepMeta");
     const stepBody = document.getElementById("stepBody");
     const progressBar = document.getElementById("progressBar");
@@ -453,17 +461,15 @@
       stepIndex = 0;
       formData = { status: "Prospect", manager: "" };
       renderStep();
-      overlay.classList.add("open");
+      wizardOverlay.classList.add("open");
     }
 
-    function closeWizard() {
-      overlay.classList.remove("open");
-    }
+    function closeWizard() { wizardOverlay.classList.remove("open"); }
 
     function renderStep() {
-      const step = steps[stepIndex];
-      stepMeta.textContent = `Step ${stepIndex + 1} of ${steps.length}`;
-      progressBar.style.width = `${((stepIndex + 1) / steps.length) * 100}%`;
+      const step = wizardSteps[stepIndex];
+      stepMeta.textContent = `Step ${stepIndex + 1} of ${wizardSteps.length}`;
+      progressBar.style.width = `${((stepIndex + 1) / wizardSteps.length) * 100}%`;
 
       if (step.review) {
         stepBody.innerHTML = `
@@ -479,13 +485,12 @@
           ${fieldsHtml}
           <div class="field-error" id="stepError" style="display:none;"></div>
         `;
-        // Focus first input
         const firstInput = stepBody.querySelector("input, select, textarea");
         if (firstInput) setTimeout(() => firstInput.focus(), 50);
       }
 
       backBtn.disabled = stepIndex === 0;
-      nextBtn.textContent = stepIndex === steps.length - 1 ? "Save Client" : "Next";
+      nextBtn.textContent = stepIndex === wizardSteps.length - 1 ? "Save Client" : "Next";
     }
 
     function renderField(f) {
@@ -495,31 +500,15 @@
           const label = (f.optionLabels && f.optionLabels[o] != null) ? f.optionLabels[o] : o;
           return `<option value="${esc(o)}"${formData[f.name] === o ? " selected" : ""}>${esc(label)}</option>`;
         }).join("");
-        return `
-          <div class="field">
-            <label>${esc(f.label)}</label>
-            <select name="${f.name}">${opts}</select>
-          </div>`;
+        return `<div class="field"><label>${esc(f.label)}</label><select name="${f.name}">${opts}</select></div>`;
       }
       if (f.type === "textarea") {
-        return `
-          <div class="field">
-            <label>${esc(f.label)}</label>
-            <textarea name="${f.name}" placeholder="${esc(f.placeholder || "")}">${v}</textarea>
-          </div>`;
+        return `<div class="field"><label>${esc(f.label)}</label><textarea name="${f.name}" placeholder="${esc(f.placeholder || "")}">${v}</textarea></div>`;
       }
       if (f.type === "datalist") {
-        return `
-          <div class="field">
-            <label>${esc(f.label)}</label>
-            <input type="text" name="${f.name}" list="${esc(f.list)}" value="${v}" placeholder="${esc(f.placeholder || "")}">
-          </div>`;
+        return `<div class="field"><label>${esc(f.label)}</label><input type="text" name="${f.name}" list="${esc(f.list)}" value="${v}" placeholder="${esc(f.placeholder || "")}"></div>`;
       }
-      return `
-        <div class="field">
-          <label>${esc(f.label)}</label>
-          <input type="${esc(f.type || "text")}" name="${f.name}" value="${v}" placeholder="${esc(f.placeholder || "")}"${f.required ? " required" : ""}>
-        </div>`;
+      return `<div class="field"><label>${esc(f.label)}</label><input type="${esc(f.type || "text")}" name="${f.name}" value="${v}" placeholder="${esc(f.placeholder || "")}"${f.required ? " required" : ""}></div>`;
     }
 
     function renderReview() {
@@ -528,24 +517,20 @@
         ["Business Type", formData.business_type],
         ["Client", formData.client_name],
         ["Phone", formData.phone],
-        ["Link", formData.link],
+        ["Source Link", formData.link],
+        ["Finished Website", formData.finished_website],
         ["Manager", formData.manager],
         ["Status", formData.status],
         ["Notes", formData.notes],
       ];
       return rows.map(([k, v]) => {
-        const shown = v && v.toString().trim() ? esc(v) : '<span class="v muted">—</span>';
-        const isMuted = !(v && v.toString().trim());
-        return `
-          <div class="review-row">
-            <div class="k">${k}</div>
-            <div class="v">${isMuted ? '<span class="muted">—</span>' : shown}</div>
-          </div>`;
+        const has = v && v.toString().trim();
+        return `<div class="review-row"><div class="k">${k}</div><div class="v${has ? "" : " muted"}">${has ? esc(v) : "—"}</div></div>`;
       }).join("");
     }
 
     function collectStepData() {
-      const step = steps[stepIndex];
+      const step = wizardSteps[stepIndex];
       if (!step.fields) return;
       for (const f of step.fields) {
         const el = stepBody.querySelector(`[name="${f.name}"]`);
@@ -561,40 +546,31 @@
     }
 
     async function goNext() {
-      const step = steps[stepIndex];
+      const step = wizardSteps[stepIndex];
       if (!step.review) {
         collectStepData();
-
-        // Required field check
         for (const f of (step.fields || [])) {
           if (f.required && !formData[f.name]) {
             showStepError(`${f.label.replace(" *", "")} is required.`);
             return;
           }
         }
-
-        // Step-level async validator (e.g. duplicate phone)
         if (step.validate) {
           nextBtn.disabled = true;
           nextBtn.textContent = "Checking...";
           const err = await step.validate(formData);
           nextBtn.disabled = false;
-          nextBtn.textContent = stepIndex === steps.length - 1 ? "Save Client" : "Next";
+          nextBtn.textContent = stepIndex === wizardSteps.length - 1 ? "Save Client" : "Next";
           if (err) { showStepError(err); return; }
         }
       }
-
-      if (stepIndex === steps.length - 1) {
-        await submitWizard();
-        return;
-      }
+      if (stepIndex === wizardSteps.length - 1) { await submitWizard(); return; }
       stepIndex++;
       renderStep();
     }
 
     function goBack() {
       if (stepIndex === 0) return;
-      // Preserve current fields before stepping back
       collectStepData();
       stepIndex--;
       renderStep();
@@ -603,8 +579,6 @@
     async function submitWizard() {
       nextBtn.disabled = true;
       nextBtn.textContent = "Saving...";
-
-      // Final duplicate check (in case allClients changed since step 2)
       const p = normPhone(formData.phone);
       if (p) {
         const existing = allClients.find((c) => normPhone(c.phone) === p);
@@ -615,13 +589,13 @@
           return;
         }
       }
-
       const row = {
         company_name: formData.company_name || null,
         business_type: formData.business_type || null,
         client_name: formData.client_name || null,
         phone: formData.phone || null,
         link: formData.link || null,
+        finished_website: formData.finished_website || null,
         notes: formData.notes || null,
         manager: formData.manager || null,
         status: formData.status || "Prospect",
@@ -634,19 +608,181 @@
       load();
     }
 
+    // ---------- Detail / Edit modal ----------
+    const detailOverlay = document.getElementById("detailOverlay");
+    const detailBody = document.getElementById("detailBody");
+    const detailFooter = document.getElementById("detailFooter");
+    const detailTitle = document.getElementById("detailTitle");
+
+    let detailId = null;
+    let detailMode = "view"; // "view" | "edit"
+    let detailDraft = {};
+
+    function openDetail(id) {
+      detailId = id;
+      detailMode = "view";
+      renderDetail();
+      detailOverlay.classList.add("open");
+    }
+
+    function closeDetail() {
+      detailOverlay.classList.remove("open");
+      detailId = null;
+      detailMode = "view";
+      detailDraft = {};
+    }
+
+    function getCurrentClient() {
+      return allClients.find((c) => c.id === detailId);
+    }
+
+    function renderDetail() {
+      const c = getCurrentClient();
+      if (!c) { closeDetail(); return; }
+      detailTitle.textContent = c.company_name || "Client Details";
+
+      if (detailMode === "view") {
+        renderDetailView(c);
+      } else {
+        renderDetailEdit(c);
+      }
+    }
+
+    function renderDetailView(c) {
+      const linkHtml = c.link
+        ? `<a href="${esc(c.link)}" target="_blank" rel="noopener">${esc(c.link)}</a>`
+        : '<span class="muted">—</span>';
+      const webHtml = c.finished_website
+        ? `<a href="${esc(c.finished_website)}" target="_blank" rel="noopener">${esc(c.finished_website)}</a>`
+        : '<span class="muted">—</span>';
+      const val = (v) => (v && v.toString().trim())
+        ? `<div class="v">${esc(v)}</div>`
+        : `<div class="v muted">—</div>`;
+
+      detailBody.innerHTML = `
+        <div class="detail-grid">
+          <div class="detail-item"><div class="k">Company</div>${val(c.company_name)}</div>
+          <div class="detail-item"><div class="k">Business Type</div>${val(c.business_type)}</div>
+          <div class="detail-item"><div class="k">Client</div>${val(c.client_name)}</div>
+          <div class="detail-item"><div class="k">Phone</div>${val(c.phone)}</div>
+          <div class="detail-item detail-full"><div class="k">Source Link</div><div class="v">${linkHtml}</div></div>
+          <div class="detail-item detail-full"><div class="k">Finished Website</div><div class="v">${webHtml}</div></div>
+          <div class="detail-item"><div class="k">Manager</div>${val(c.manager)}</div>
+          <div class="detail-item"><div class="k">Status</div><div class="v"><span class="badge ${statusClass(c.status)}">${esc(c.status || "Prospect")}</span></div></div>
+          <div class="detail-item detail-full"><div class="k">Notes</div>${val(c.notes)}</div>
+        </div>
+      `;
+
+      detailFooter.innerHTML = `
+        <div></div>
+        <button id="editBtn">Edit</button>
+      `;
+      document.getElementById("editBtn").addEventListener("click", () => {
+        detailMode = "edit";
+        detailDraft = { ...c };
+        renderDetail();
+      });
+    }
+
+    function renderDetailEdit(c) {
+      const d = detailDraft;
+      const managerOpts = ["", "Ivan", "Hector"].map((o) =>
+        `<option value="${esc(o)}"${(d.manager || "") === o ? " selected" : ""}>${o || "— Unassigned —"}</option>`
+      ).join("");
+      const statusOpts = STATUSES.map((o) =>
+        `<option value="${esc(o)}"${(d.status || "Prospect") === o ? " selected" : ""}>${o}</option>`
+      ).join("");
+
+      detailBody.innerHTML = `
+        <div style="padding: 16px 20px;">
+          <div class="field"><label>Company name *</label><input name="company_name" value="${esc(d.company_name)}" required></div>
+          <div class="field"><label>Business type</label><input name="business_type" list="business_types" value="${esc(d.business_type)}"></div>
+          <div class="field"><label>Client name</label><input name="client_name" value="${esc(d.client_name)}"></div>
+          <div class="field"><label>Phone</label><input name="phone" type="tel" value="${esc(d.phone)}"></div>
+          <div class="field"><label>Source link</label><input name="link" type="url" value="${esc(d.link)}" placeholder="https://..."></div>
+          <div class="field"><label>Finished website</label><input name="finished_website" type="url" value="${esc(d.finished_website)}" placeholder="https://..."></div>
+          <div class="field"><label>Manager</label><select name="manager">${managerOpts}</select></div>
+          <div class="field"><label>Status</label><select name="status">${statusOpts}</select></div>
+          <div class="field"><label>Notes</label><textarea name="notes">${esc(d.notes)}</textarea></div>
+          <div class="field-error" id="detailError" style="display:none;"></div>
+        </div>
+      `;
+
+      detailFooter.innerHTML = `
+        <button class="ghost" id="cancelEditBtn">Cancel</button>
+        <button id="saveEditBtn">Save changes</button>
+      `;
+      document.getElementById("cancelEditBtn").addEventListener("click", () => {
+        detailMode = "view";
+        renderDetail();
+      });
+      document.getElementById("saveEditBtn").addEventListener("click", saveEdit);
+    }
+
+    async function saveEdit() {
+      const fields = ["company_name", "business_type", "client_name", "phone", "link", "finished_website", "manager", "status", "notes"];
+      const update = {};
+      for (const name of fields) {
+        const el = detailBody.querySelector(`[name="${name}"]`);
+        if (el) update[name] = el.value.trim() || null;
+      }
+      if (!update.company_name) {
+        const err = document.getElementById("detailError");
+        err.textContent = "Company name is required.";
+        err.style.display = "block";
+        return;
+      }
+
+      // Duplicate phone check (exclude current record)
+      const p = normPhone(update.phone);
+      if (p) {
+        const existing = allClients.find((c) => c.id !== detailId && normPhone(c.phone) === p);
+        if (existing) {
+          const err = document.getElementById("detailError");
+          err.textContent = `This phone is already registered under "${existing.company_name}".`;
+          err.style.display = "block";
+          return;
+        }
+      }
+
+      const saveBtn = document.getElementById("saveEditBtn");
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Saving...";
+      const { error } = await sb.from("clients").update(update).eq("id", detailId);
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save changes";
+      if (error) {
+        const err = document.getElementById("detailError");
+        err.textContent = "Save failed: " + error.message;
+        err.style.display = "block";
+        return;
+      }
+      await load();
+      // Re-open in view mode with refreshed data
+      detailMode = "view";
+      renderDetail();
+    }
+
+    // ---------- Wire up ----------
     document.getElementById("openWizard").addEventListener("click", openWizard);
     document.getElementById("closeWizard").addEventListener("click", closeWizard);
-    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeWizard(); });
+    wizardOverlay.addEventListener("click", (e) => { if (e.target === wizardOverlay) closeWizard(); });
+    backBtn.addEventListener("click", goBack);
+    nextBtn.addEventListener("click", goNext);
+
+    document.getElementById("closeDetail").addEventListener("click", closeDetail);
+    detailOverlay.addEventListener("click", (e) => { if (e.target === detailOverlay) closeDetail(); });
+
     document.addEventListener("keydown", (e) => {
-      if (!overlay.classList.contains("open")) return;
-      if (e.key === "Escape") closeWizard();
-      if (e.key === "Enter" && e.target.tagName !== "TEXTAREA") {
+      if (e.key === "Escape") {
+        if (wizardOverlay.classList.contains("open")) closeWizard();
+        else if (detailOverlay.classList.contains("open")) closeDetail();
+      }
+      if (e.key === "Enter" && wizardOverlay.classList.contains("open") && e.target.tagName !== "TEXTAREA") {
         e.preventDefault();
         goNext();
       }
     });
-    backBtn.addEventListener("click", goBack);
-    nextBtn.addEventListener("click", goNext);
 
     load();
   </script>

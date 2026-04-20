@@ -7,10 +7,11 @@ create table if not exists public.clients (
   business_type text,
   phone text,
   link text,
+  finished_website text,
   notes text,
   manager text,
   status text not null default 'Prospect'
-    check (status in ('Finished', 'In Progress', 'Prospect')),
+    check (status in ('Finished', 'In Progress', 'Prospect', 'Dead Lead')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -38,3 +39,9 @@ for each row execute function public.set_updated_at();
 -- Migrations (safe to re-run): add new columns to existing tables.
 alter table public.clients add column if not exists business_type text;
 alter table public.clients add column if not exists manager text;
+alter table public.clients add column if not exists finished_website text;
+
+-- Expand status options to include 'Dead Lead'.
+alter table public.clients drop constraint if exists clients_status_check;
+alter table public.clients add constraint clients_status_check
+  check (status in ('Finished', 'In Progress', 'Prospect', 'Dead Lead'));
