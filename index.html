@@ -323,6 +323,29 @@
     const normPhone = (s) => (s || "").replace(/\D+/g, "");
     const STATUSES = ["Prospect", "In Progress", "Finished", "Dead Lead"];
 
+    // US-format phone: (XXX) XXX-XXXX. Accepts any input, formats up to 10 digits.
+    function formatPhone(raw) {
+      const d = normPhone(raw).slice(0, 10);
+      if (!d) return "";
+      if (d.length <= 3) return `(${d}`;
+      if (d.length <= 6) return `(${d.slice(0,3)}) ${d.slice(3)}`;
+      return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
+    }
+    // Reformat DB value for display (only if it's a clean 10-digit US number).
+    function displayPhone(s) {
+      if (!s) return "";
+      const d = normPhone(s);
+      if (d.length === 10) return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
+      return s;
+    }
+
+    // Live-format any phone input as the user types (wizard + edit modal).
+    document.addEventListener("input", (e) => {
+      if (e.target.matches('input[name="phone"]')) {
+        e.target.value = formatPhone(e.target.value);
+      }
+    });
+
     function shortUrl(u) {
       if (!u) return "";
       try {
@@ -349,7 +372,7 @@
           <td class="truncate">${esc(r.company_name) || '<span style="color:#9ca3af;">—</span>'}</td>
           <td class="truncate">${esc(r.business_type) || '<span style="color:#9ca3af;">—</span>'}</td>
           <td class="truncate">${esc(r.client_name) || '<span style="color:#9ca3af;">—</span>'}</td>
-          <td class="truncate">${esc(r.phone) || '<span style="color:#9ca3af;">—</span>'}</td>
+          <td class="truncate">${r.phone ? esc(displayPhone(r.phone)) : '<span style="color:#9ca3af;">—</span>'}</td>
           <td class="truncate">${webHtml}</td>
           <td>${esc(r.manager) || '<span style="color:#9ca3af;">—</span>'}</td>
           <td><span class="badge ${statusClass(r.status)}">${esc(r.status || "Prospect")}</span></td>
@@ -405,7 +428,7 @@
         desc: "Who's the point of contact?",
         fields: [
           { name: "client_name", label: "Client name", type: "text", placeholder: "Jane Doe" },
-          { name: "phone", label: "Phone", type: "tel", placeholder: "(555) 123-4567" },
+          { name: "phone", label: "Phone", type: "tel", placeholder: "(555) 123-4567", maxlength: 14, inputmode: "numeric", autocomplete: "tel-national" },
         ],
         validate: async (data) => {
           const p = normPhone(data.phone);
@@ -508,7 +531,11 @@
       if (f.type === "datalist") {
         return `<div class="field"><label>${esc(f.label)}</label><input type="text" name="${f.name}" list="${esc(f.list)}" value="${v}" placeholder="${esc(f.placeholder || "")}"></div>`;
       }
-      return `<div class="field"><label>${esc(f.label)}</label><input type="${esc(f.type || "text")}" name="${f.name}" value="${v}" placeholder="${esc(f.placeholder || "")}"${f.required ? " required" : ""}></div>`;
+      const extra =
+        (f.maxlength ? ` maxlength="${f.maxlength}"` : "") +
+        (f.inputmode ? ` inputmode="${esc(f.inputmode)}"` : "") +
+        (f.autocomplete ? ` autocomplete="${esc(f.autocomplete)}"` : "");
+      return `<div class="field"><label>${esc(f.label)}</label><input type="${esc(f.type || "text")}" name="${f.name}" value="${v}" placeholder="${esc(f.placeholder || "")}"${f.required ? " required" : ""}${extra}></div>`;
     }
 
     function renderReview() {
@@ -664,7 +691,7 @@
           <div class="detail-item"><div class="k">Company</div>${val(c.company_name)}</div>
           <div class="detail-item"><div class="k">Business Type</div>${val(c.business_type)}</div>
           <div class="detail-item"><div class="k">Client</div>${val(c.client_name)}</div>
-          <div class="detail-item"><div class="k">Phone</div>${val(c.phone)}</div>
+          <div class="detail-item"><div class="k">Phone</div>${val(displayPhone(c.phone))}</div>
           <div class="detail-item detail-full"><div class="k">Source Link</div><div class="v">${linkHtml}</div></div>
           <div class="detail-item detail-full"><div class="k">Finished Website</div><div class="v">${webHtml}</div></div>
           <div class="detail-item"><div class="k">Manager</div>${val(c.manager)}</div>
@@ -698,7 +725,7 @@
           <div class="field"><label>Company name *</label><input name="company_name" value="${esc(d.company_name)}" required></div>
           <div class="field"><label>Business type</label><input name="business_type" list="business_types" value="${esc(d.business_type)}"></div>
           <div class="field"><label>Client name</label><input name="client_name" value="${esc(d.client_name)}"></div>
-          <div class="field"><label>Phone</label><input name="phone" type="tel" value="${esc(d.phone)}"></div>
+          <div class="field"><label>Phone</label><input name="phone" type="tel" value="${esc(displayPhone(d.phone))}" placeholder="(555) 123-4567" maxlength="14" inputmode="numeric" autocomplete="tel-national"></div>
           <div class="field"><label>Source link</label><input name="link" type="url" value="${esc(d.link)}" placeholder="https://..."></div>
           <div class="field"><label>Finished website</label><input name="finished_website" type="url" value="${esc(d.finished_website)}" placeholder="https://..."></div>
           <div class="field"><label>Manager</label><select name="manager">${managerOpts}</select></div>
