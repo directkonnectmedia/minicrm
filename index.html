@@ -70,6 +70,45 @@
 
     .empty { text-align: center; color: #999; padding: 32px; font-size: 14px; }
     .error { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; }
+    .tab {
+      background: transparent; color: #6b7280; border: none; border-bottom: 2px solid transparent;
+      padding: 8px 14px; font-size: 14px; font-weight: 500; cursor: pointer; border-radius: 0;
+    }
+    .tab:hover { background: #f3f4f6; color: #1f2937; }
+    .tab.active { color: #111827; border-bottom-color: #111827; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Overdue */
+    .overdue-banner {
+      background: #fee2e2; color: #991b1b; padding: 10px 14px; border-radius: 8px;
+      margin-bottom: 12px; font-size: 14px; font-weight: 500; display: none;
+    }
+    .overdue-banner.show { display: block; }
+    tr.row-overdue { background: #fef2f2; }
+    tr.row-overdue:hover { background: #fee2e2; }
+    .badge.overdue { background: #dc2626; color: white; margin-left: 6px; }
+    .badge.due-today { background: #f59e0b; color: white; margin-left: 6px; }
+
+    /* Calendar */
+    #calendar { min-height: 600px; }
+    .fc .fc-toolbar-title { font-size: 1.2em !important; }
+    .fc-event { cursor: pointer; }
+
+    /* Follow-up box in detail view */
+    .followup-box {
+      background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;
+      padding: 12px; margin: 8px 20px 0; display: flex; align-items: center;
+      justify-content: space-between; gap: 12px;
+    }
+    .followup-box.overdue { background: #fef2f2; border-color: #fecaca; }
+    .followup-box .fup-text { font-size: 14px; }
+    .followup-box .fup-text .fup-label { color: #6b7280; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px; }
+    .followup-box .fup-text .fup-value { color: #1f2937; }
+    .followup-box .fup-text .fup-value.overdue { color: #991b1b; font-weight: 600; }
     a { color: #2563eb; }
     a.web-link { font-size: 13px; }
 
@@ -262,24 +301,39 @@
     <option value="Window Installation">
   </datalist>
 
-  <div class="card">
-    <table>
-      <thead>
-        <tr>
-          <th style="width: 13%;">Company</th>
-          <th style="width: 10%;">Business Type</th>
-          <th style="width: 10%;">Client</th>
-          <th style="width: 11%;">Phone</th>
-          <th style="width: 13%;">Website</th>
-          <th style="width: 8%;">Manager</th>
-          <th style="width: 11%;">Status</th>
-          <th style="width: 16%;">Client Status</th>
-          <th style="width: 8%;"></th>
-        </tr>
-      </thead>
-      <tbody id="rows"></tbody>
-    </table>
-    <div id="empty" class="empty" style="display:none;">No entries yet. Click "+ Add New Client" to start.</div>
+  <div class="tabs">
+    <button class="tab active" data-view="list">📋 List</button>
+    <button class="tab" data-view="calendar">📅 Calendar</button>
+  </div>
+
+  <div class="tab-content active" data-view="list">
+    <div id="overdueBanner" class="overdue-banner"></div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 12%;">Company</th>
+            <th style="width: 10%;">Business Type</th>
+            <th style="width: 10%;">Client</th>
+            <th style="width: 10%;">Phone</th>
+            <th style="width: 11%;">Website</th>
+            <th style="width: 8%;">Manager</th>
+            <th style="width: 10%;">Status</th>
+            <th style="width: 13%;">Client Status</th>
+            <th style="width: 9%;">Follow-up</th>
+            <th style="width: 7%;"></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div id="empty" class="empty" style="display:none;">No entries yet. Click "+ Add New Client" to start.</div>
+    </div>
+  </div>
+
+  <div class="tab-content" data-view="calendar">
+    <div class="card">
+      <div id="calendar"></div>
+    </div>
   </div>
 
   <!-- Wizard modal -->
@@ -312,6 +366,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
   <script>
     const SUPABASE_URL = "https://ljghuyeugzmduzzvngkc.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqZ2h1eWV1Z3ptZHV6enZuZ2tjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MTIzOTIsImV4cCI6MjA5MjI4ODM5Mn0.aoeOD1Xvm_q_ZYlJ_x72J_WvmODkwvbNQ7dwbCa5bTY";
@@ -337,6 +392,29 @@
       "New Lead","Contacted","Interested","Proposal Sent",
       "Negotiation","Follow Up","Closed Won","Closed Lost","Nurture"
     ];
+
+    // Date helpers
+    function todayISO() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+    function followupState(dateStr) {
+      if (!dateStr) return "none";
+      const today = todayISO();
+      if (dateStr < today) return "overdue";
+      if (dateStr === today) return "today";
+      return "future";
+    }
+    function formatDate(dateStr) {
+      if (!dateStr) return "";
+      // Parse as local date to avoid timezone shifting (DB stores YYYY-MM-DD)
+      const [y, m, d] = dateStr.split("-").map(Number);
+      const dt = new Date(y, m - 1, d);
+      return dt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    }
 
     // US-format phone: (XXX) XXX-XXXX. Accepts any input, formats up to 10 digits.
     function formatPhone(raw) {
@@ -377,12 +455,29 @@
         return;
       }
       emptyEl.style.display = "none";
+      let overdueCount = 0;
       for (const r of rows) {
         const tr = document.createElement("tr");
         tr.dataset.id = r.id;
         const webHtml = r.finished_website
           ? `<a class="web-link" href="${esc(r.finished_website)}" target="_blank" rel="noopener" data-nolink>${esc(shortUrl(r.finished_website))}</a>`
           : '<span style="color:#9ca3af;">—</span>';
+
+        const fState = followupState(r.follow_up_date);
+        let fupHtml = '<span style="color:#9ca3af;">—</span>';
+        if (r.follow_up_date) {
+          const dateText = formatDate(r.follow_up_date);
+          if (fState === "overdue") {
+            fupHtml = `${esc(dateText)} <span class="badge overdue">OVERDUE</span>`;
+            overdueCount++;
+            tr.classList.add("row-overdue");
+          } else if (fState === "today") {
+            fupHtml = `${esc(dateText)} <span class="badge due-today">TODAY</span>`;
+          } else {
+            fupHtml = esc(dateText);
+          }
+        }
+
         tr.innerHTML = `
           <td class="truncate">${esc(r.company_name) || '<span style="color:#9ca3af;">—</span>'}</td>
           <td class="truncate">${esc(r.business_type) || '<span style="color:#9ca3af;">—</span>'}</td>
@@ -392,9 +487,18 @@
           <td>${esc(r.manager) || '<span style="color:#9ca3af;">—</span>'}</td>
           <td><span class="badge ${statusClass(r.status)}">${esc(r.status || "Prospect")}</span></td>
           <td><span class="badge ${csClass(r.client_status)}">${esc(r.client_status || "New Lead")}</span></td>
+          <td class="truncate">${fupHtml}</td>
           <td class="actions"><button class="danger" data-action="delete" data-nolink>Del</button></td>
         `;
         tbody.appendChild(tr);
+      }
+
+      const banner = document.getElementById("overdueBanner");
+      if (overdueCount > 0) {
+        banner.textContent = `⚠️ ${overdueCount} client${overdueCount === 1 ? "" : "s"} overdue for follow-up`;
+        banner.classList.add("show");
+      } else {
+        banner.classList.remove("show");
       }
     }
 
@@ -407,6 +511,7 @@
       if (error) { alert("Load failed: " + error.message); return; }
       allClients = data || [];
       render(allClients);
+      refreshCalendar();
     }
 
     // Row click opens detail; delete button & website link don't trigger it.
@@ -467,11 +572,12 @@
       },
       {
         title: "Assignment",
-        desc: "Who's handling this and where does it stand?",
+        desc: "Who's handling this, where does it stand, when to follow up?",
         fields: [
           { name: "manager", label: "Manager", type: "select", options: ["", "Ivan", "Hector"], optionLabels: { "": "— Unassigned —" } },
           { name: "status", label: "Status", type: "select", options: STATUSES },
           { name: "client_status", label: "Client status", type: "select", options: CLIENT_STATUSES },
+          { name: "follow_up_date", label: "Follow-up date (optional)", type: "date" },
         ],
       },
       {
@@ -568,6 +674,7 @@
         ["Manager", formData.manager],
         ["Status", formData.status],
         ["Client Status", formData.client_status],
+        ["Follow-up", formData.follow_up_date ? formatDate(formData.follow_up_date) : ""],
         ["Notes", formData.notes],
       ];
       return rows.map(([k, v]) => {
@@ -648,6 +755,7 @@
         manager: formData.manager || null,
         status: formData.status || "Prospect",
         client_status: formData.client_status || "New Lead",
+        follow_up_date: formData.follow_up_date || null,
       };
       const { error } = await sb.from("clients").insert(row);
       nextBtn.disabled = false;
@@ -697,6 +805,34 @@
       }
     }
 
+    function renderFollowupBox(c) {
+      const state = followupState(c.follow_up_date);
+      if (!c.follow_up_date) {
+        return `
+          <div class="followup-box">
+            <div class="fup-text">
+              <div class="fup-label">Follow-up</div>
+              <div class="fup-value" style="color:#6b7280;">Not scheduled</div>
+            </div>
+            <button class="ghost" id="addToCalendarBtn">📅 Add to Calendar</button>
+          </div>
+        `;
+      }
+      const dateText = formatDate(c.follow_up_date);
+      const isOverdue = state === "overdue";
+      const isToday = state === "today";
+      const note = isOverdue ? " (overdue)" : isToday ? " (today)" : "";
+      return `
+        <div class="followup-box${isOverdue ? " overdue" : ""}">
+          <div class="fup-text">
+            <div class="fup-label">Follow-up</div>
+            <div class="fup-value${isOverdue ? " overdue" : ""}">${esc(dateText)}${note}</div>
+          </div>
+          <button id="viewOnCalendarBtn">📅 View on Calendar</button>
+        </div>
+      `;
+    }
+
     function renderDetailView(c) {
       const linkAnchor = (u) => u
         ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>`
@@ -719,7 +855,29 @@
           <div class="detail-item"><div class="k">Client Status</div><div class="v"><span class="badge ${csClass(c.client_status)}">${esc(c.client_status || "New Lead")}</span></div></div>
           <div class="detail-item detail-full"><div class="k">Notes</div>${val(c.notes)}</div>
         </div>
+        ${renderFollowupBox(c)}
       `;
+
+      // Wire follow-up actions
+      const viewBtn = document.getElementById("viewOnCalendarBtn");
+      if (viewBtn) viewBtn.addEventListener("click", () => {
+        const targetDate = c.follow_up_date;
+        closeDetail();
+        switchTab("calendar");
+        setTimeout(() => {
+          if (calendarInstance && targetDate) calendarInstance.gotoDate(targetDate);
+        }, 80);
+      });
+      const addBtn = document.getElementById("addToCalendarBtn");
+      if (addBtn) addBtn.addEventListener("click", () => {
+        detailMode = "edit";
+        detailDraft = { ...c };
+        renderDetail();
+        setTimeout(() => {
+          const el = detailBody.querySelector('[name="follow_up_date"]');
+          if (el) { el.focus(); if (el.showPicker) try { el.showPicker(); } catch {} }
+        }, 50);
+      });
 
       detailFooter.innerHTML = `
         <div></div>
@@ -756,6 +914,7 @@
           <div class="field"><label>Manager</label><select name="manager">${managerOpts}</select></div>
           <div class="field"><label>Status</label><select name="status">${statusOpts}</select></div>
           <div class="field"><label>Client status</label><select name="client_status">${csOpts}</select></div>
+          <div class="field"><label>Follow-up date</label><input name="follow_up_date" type="date" value="${esc(d.follow_up_date)}"></div>
           <div class="field"><label>Notes</label><textarea name="notes">${esc(d.notes)}</textarea></div>
           <div class="field-error" id="detailError" style="display:none;"></div>
         </div>
@@ -773,7 +932,7 @@
     }
 
     async function saveEdit() {
-      const fields = ["company_name", "business_type", "client_name", "phone", "profile_link", "post_link", "finished_website", "manager", "status", "client_status", "notes"];
+      const fields = ["company_name", "business_type", "client_name", "phone", "profile_link", "post_link", "finished_website", "manager", "status", "client_status", "follow_up_date", "notes"];
       const update = {};
       for (const name of fields) {
         const el = detailBody.querySelector(`[name="${name}"]`);
@@ -815,6 +974,85 @@
       detailMode = "view";
       renderDetail();
     }
+
+    // ---------- Tabs + Calendar ----------
+    let calendarInstance = null;
+
+    function switchTab(name) {
+      document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.view === name));
+      document.querySelectorAll(".tab-content").forEach((t) => t.classList.toggle("active", t.dataset.view === name));
+      if (name === "calendar") {
+        initCalendar();
+        // Need to render size after tab becomes visible
+        setTimeout(() => { if (calendarInstance) calendarInstance.updateSize(); }, 50);
+      }
+    }
+
+    function csColorHex(s) {
+      const map = {
+        "New Lead":      "#3b82f6",
+        "Contacted":     "#14b8a6",
+        "Interested":    "#8b5cf6",
+        "Proposal Sent": "#f97316",
+        "Negotiation":   "#6366f1",
+        "Follow Up":     "#f59e0b",
+        "Closed Won":    "#10b981",
+        "Closed Lost":   "#ef4444",
+        "Nurture":       "#6b7280",
+      };
+      return map[s] || "#6b7280";
+    }
+
+    function buildCalendarEvents() {
+      return allClients
+        .filter((c) => c.follow_up_date)
+        .map((c) => {
+          const state = followupState(c.follow_up_date);
+          const overdue = state === "overdue";
+          const baseColor = csColorHex(c.client_status);
+          const color = overdue ? "#dc2626" : baseColor;
+          const prefix = overdue ? "⚠ " : state === "today" ? "• " : "";
+          return {
+            id: c.id,
+            title: prefix + (c.company_name || "(no name)"),
+            start: c.follow_up_date,
+            allDay: true,
+            color,
+            extendedProps: { client_status: c.client_status, overdue },
+          };
+        });
+    }
+
+    function initCalendar() {
+      if (calendarInstance) return;
+      const el = document.getElementById("calendar");
+      calendarInstance = new FullCalendar.Calendar(el, {
+        initialView: "dayGridMonth",
+        headerToolbar: {
+          left: "prev,next today",
+          center: "title",
+          right: "dayGridMonth,timeGridWeek,listWeek",
+        },
+        height: "auto",
+        events: buildCalendarEvents(),
+        eventClick: (info) => {
+          info.jsEvent.preventDefault();
+          openDetail(info.event.id);
+        },
+      });
+      calendarInstance.render();
+    }
+
+    function refreshCalendar() {
+      if (!calendarInstance) return;
+      const events = buildCalendarEvents();
+      calendarInstance.removeAllEvents();
+      events.forEach((e) => calendarInstance.addEvent(e));
+    }
+
+    document.querySelectorAll(".tab").forEach((t) => {
+      t.addEventListener("click", () => switchTab(t.dataset.view));
+    });
 
     // ---------- Wire up ----------
     document.getElementById("openWizard").addEventListener("click", openWizard);

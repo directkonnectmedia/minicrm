@@ -11,6 +11,7 @@ create table if not exists public.clients (
   finished_website text,
   notes text,
   manager text,
+  follow_up_date date,
   client_status text not null default 'New Lead'
     check (client_status in (
       'New Lead','Contacted','Interested','Proposal Sent',
@@ -68,6 +69,9 @@ end $$;
 
 alter table public.clients add column if not exists profile_link text;
 alter table public.clients add column if not exists post_link text;
+
+-- Follow-up date for calendar/overdue tracking.
+alter table public.clients add column if not exists follow_up_date date;
 
 -- Client status (sales pipeline stage).
 alter table public.clients add column if not exists client_status text not null default 'New Lead';
