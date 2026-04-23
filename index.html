@@ -58,6 +58,15 @@
     .status-InProgress { background: #dbeafe; color: #1e40af; }
     .status-Finished { background: #d1fae5; color: #065f46; }
     .status-DeadLead { background: #e5e7eb; color: #6b7280; }
+    .cs-NewLead        { background: #dbeafe; color: #1e40af; }
+    .cs-Contacted      { background: #ccfbf1; color: #115e59; }
+    .cs-Interested     { background: #ede9fe; color: #5b21b6; }
+    .cs-ProposalSent   { background: #fed7aa; color: #9a3412; }
+    .cs-Negotiation    { background: #e0e7ff; color: #3730a3; }
+    .cs-FollowUp       { background: #fef3c7; color: #92400e; }
+    .cs-ClosedWon      { background: #d1fae5; color: #065f46; }
+    .cs-ClosedLost     { background: #fee2e2; color: #991b1b; }
+    .cs-Nurture        { background: #f3f4f6; color: #4b5563; }
 
     .empty { text-align: center; color: #999; padding: 32px; font-size: 14px; }
     .error { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
@@ -257,14 +266,15 @@
     <table>
       <thead>
         <tr>
-          <th style="width: 16%;">Company</th>
-          <th style="width: 12%;">Business Type</th>
-          <th style="width: 12%;">Client</th>
-          <th style="width: 12%;">Phone</th>
-          <th style="width: 16%;">Website</th>
-          <th style="width: 10%;">Manager</th>
-          <th style="width: 12%;">Status</th>
-          <th style="width: 10%;"></th>
+          <th style="width: 13%;">Company</th>
+          <th style="width: 10%;">Business Type</th>
+          <th style="width: 10%;">Client</th>
+          <th style="width: 11%;">Phone</th>
+          <th style="width: 13%;">Website</th>
+          <th style="width: 8%;">Manager</th>
+          <th style="width: 11%;">Status</th>
+          <th style="width: 16%;">Client Status</th>
+          <th style="width: 8%;"></th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
@@ -320,8 +330,13 @@
       { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
     ));
     const statusClass = (s) => "status-" + (s || "Prospect").replace(/\s/g, "");
+    const csClass = (s) => "cs-" + (s || "New Lead").replace(/\s/g, "");
     const normPhone = (s) => (s || "").replace(/\D+/g, "");
     const STATUSES = ["Prospect", "In Progress", "Finished", "Dead Lead"];
+    const CLIENT_STATUSES = [
+      "New Lead","Contacted","Interested","Proposal Sent",
+      "Negotiation","Follow Up","Closed Won","Closed Lost","Nurture"
+    ];
 
     // US-format phone: (XXX) XXX-XXXX. Accepts any input, formats up to 10 digits.
     function formatPhone(raw) {
@@ -376,6 +391,7 @@
           <td class="truncate">${webHtml}</td>
           <td>${esc(r.manager) || '<span style="color:#9ca3af;">—</span>'}</td>
           <td><span class="badge ${statusClass(r.status)}">${esc(r.status || "Prospect")}</span></td>
+          <td><span class="badge ${csClass(r.client_status)}">${esc(r.client_status || "New Lead")}</span></td>
           <td class="actions"><button class="danger" data-action="delete" data-nolink>Del</button></td>
         `;
         tbody.appendChild(tr);
@@ -442,9 +458,10 @@
       },
       {
         title: "Links",
-        desc: "Source link (social media or lead source) and finished website if live.",
+        desc: "Profile, post, and finished website.",
         fields: [
-          { name: "link", label: "Source link", type: "url", placeholder: "https://facebook.com/... or any source URL" },
+          { name: "profile_link", label: "Profile link", type: "url", placeholder: "https://facebook.com/yourclient" },
+          { name: "post_link", label: "Post link", type: "url", placeholder: "https://facebook.com/post/..." },
           { name: "finished_website", label: "Finished website", type: "url", placeholder: "https://yourclient.com" },
         ],
       },
@@ -454,6 +471,7 @@
         fields: [
           { name: "manager", label: "Manager", type: "select", options: ["", "Ivan", "Hector"], optionLabels: { "": "— Unassigned —" } },
           { name: "status", label: "Status", type: "select", options: STATUSES },
+          { name: "client_status", label: "Client status", type: "select", options: CLIENT_STATUSES },
         ],
       },
       {
@@ -482,7 +500,7 @@
 
     function openWizard() {
       stepIndex = 0;
-      formData = { status: "Prospect", manager: "" };
+      formData = { status: "Prospect", manager: "", client_status: "New Lead" };
       renderStep();
       wizardOverlay.classList.add("open");
     }
@@ -544,10 +562,12 @@
         ["Business Type", formData.business_type],
         ["Client", formData.client_name],
         ["Phone", formData.phone],
-        ["Source Link", formData.link],
+        ["Profile Link", formData.profile_link],
+        ["Post Link", formData.post_link],
         ["Finished Website", formData.finished_website],
         ["Manager", formData.manager],
         ["Status", formData.status],
+        ["Client Status", formData.client_status],
         ["Notes", formData.notes],
       ];
       return rows.map(([k, v]) => {
@@ -621,11 +641,13 @@
         business_type: formData.business_type || null,
         client_name: formData.client_name || null,
         phone: formData.phone || null,
-        link: formData.link || null,
+        profile_link: formData.profile_link || null,
+        post_link: formData.post_link || null,
         finished_website: formData.finished_website || null,
         notes: formData.notes || null,
         manager: formData.manager || null,
         status: formData.status || "Prospect",
+        client_status: formData.client_status || "New Lead",
       };
       const { error } = await sb.from("clients").insert(row);
       nextBtn.disabled = false;
@@ -676,11 +698,8 @@
     }
 
     function renderDetailView(c) {
-      const linkHtml = c.link
-        ? `<a href="${esc(c.link)}" target="_blank" rel="noopener">${esc(c.link)}</a>`
-        : '<span class="muted">—</span>';
-      const webHtml = c.finished_website
-        ? `<a href="${esc(c.finished_website)}" target="_blank" rel="noopener">${esc(c.finished_website)}</a>`
+      const linkAnchor = (u) => u
+        ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>`
         : '<span class="muted">—</span>';
       const val = (v) => (v && v.toString().trim())
         ? `<div class="v">${esc(v)}</div>`
@@ -692,10 +711,12 @@
           <div class="detail-item"><div class="k">Business Type</div>${val(c.business_type)}</div>
           <div class="detail-item"><div class="k">Client</div>${val(c.client_name)}</div>
           <div class="detail-item"><div class="k">Phone</div>${val(displayPhone(c.phone))}</div>
-          <div class="detail-item detail-full"><div class="k">Source Link</div><div class="v">${linkHtml}</div></div>
-          <div class="detail-item detail-full"><div class="k">Finished Website</div><div class="v">${webHtml}</div></div>
+          <div class="detail-item detail-full"><div class="k">Profile Link</div><div class="v">${linkAnchor(c.profile_link)}</div></div>
+          <div class="detail-item detail-full"><div class="k">Post Link</div><div class="v">${linkAnchor(c.post_link)}</div></div>
+          <div class="detail-item detail-full"><div class="k">Finished Website</div><div class="v">${linkAnchor(c.finished_website)}</div></div>
           <div class="detail-item"><div class="k">Manager</div>${val(c.manager)}</div>
           <div class="detail-item"><div class="k">Status</div><div class="v"><span class="badge ${statusClass(c.status)}">${esc(c.status || "Prospect")}</span></div></div>
+          <div class="detail-item"><div class="k">Client Status</div><div class="v"><span class="badge ${csClass(c.client_status)}">${esc(c.client_status || "New Lead")}</span></div></div>
           <div class="detail-item detail-full"><div class="k">Notes</div>${val(c.notes)}</div>
         </div>
       `;
@@ -719,6 +740,9 @@
       const statusOpts = STATUSES.map((o) =>
         `<option value="${esc(o)}"${(d.status || "Prospect") === o ? " selected" : ""}>${o}</option>`
       ).join("");
+      const csOpts = CLIENT_STATUSES.map((o) =>
+        `<option value="${esc(o)}"${(d.client_status || "New Lead") === o ? " selected" : ""}>${o}</option>`
+      ).join("");
 
       detailBody.innerHTML = `
         <div style="padding: 16px 20px;">
@@ -726,10 +750,12 @@
           <div class="field"><label>Business type</label><input name="business_type" list="business_types" value="${esc(d.business_type)}"></div>
           <div class="field"><label>Client name</label><input name="client_name" value="${esc(d.client_name)}"></div>
           <div class="field"><label>Phone</label><input name="phone" type="tel" value="${esc(displayPhone(d.phone))}" placeholder="(555) 123-4567" maxlength="14" inputmode="numeric" autocomplete="tel-national"></div>
-          <div class="field"><label>Source link</label><input name="link" type="url" value="${esc(d.link)}" placeholder="https://..."></div>
+          <div class="field"><label>Profile link</label><input name="profile_link" type="url" value="${esc(d.profile_link)}" placeholder="https://..."></div>
+          <div class="field"><label>Post link</label><input name="post_link" type="url" value="${esc(d.post_link)}" placeholder="https://..."></div>
           <div class="field"><label>Finished website</label><input name="finished_website" type="url" value="${esc(d.finished_website)}" placeholder="https://..."></div>
           <div class="field"><label>Manager</label><select name="manager">${managerOpts}</select></div>
           <div class="field"><label>Status</label><select name="status">${statusOpts}</select></div>
+          <div class="field"><label>Client status</label><select name="client_status">${csOpts}</select></div>
           <div class="field"><label>Notes</label><textarea name="notes">${esc(d.notes)}</textarea></div>
           <div class="field-error" id="detailError" style="display:none;"></div>
         </div>
@@ -747,7 +773,7 @@
     }
 
     async function saveEdit() {
-      const fields = ["company_name", "business_type", "client_name", "phone", "link", "finished_website", "manager", "status", "notes"];
+      const fields = ["company_name", "business_type", "client_name", "phone", "profile_link", "post_link", "finished_website", "manager", "status", "client_status", "notes"];
       const update = {};
       for (const name of fields) {
         const el = detailBody.querySelector(`[name="${name}"]`);

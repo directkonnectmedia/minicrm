@@ -6,10 +6,16 @@ create table if not exists public.clients (
   client_name text,
   business_type text,
   phone text,
-  link text,
+  profile_link text,
+  post_link text,
   finished_website text,
   notes text,
   manager text,
+  client_status text not null default 'New Lead'
+    check (client_status in (
+      'New Lead','Contacted','Interested','Proposal Sent',
+      'Negotiation','Follow Up','Closed Won','Closed Lost','Nurture'
+    )),
   status text not null default 'Prospect'
     check (status in ('Finished', 'In Progress', 'Prospect', 'Dead Lead')),
   created_at timestamptz not null default now(),
@@ -45,3 +51,29 @@ alter table public.clients add column if not exists finished_website text;
 alter table public.clients drop constraint if exists clients_status_check;
 alter table public.clients add constraint clients_status_check
   check (status in ('Finished', 'In Progress', 'Prospect', 'Dead Lead'));
+
+-- Rename old source link to profile_link (preserves existing data).
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'clients' and column_name = 'link'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'clients' and column_name = 'profile_link'
+  ) then
+    alter table public.clients rename column link to profile_link;
+  end if;
+end $$;
+
+alter table public.clients add column if not exists profile_link text;
+alter table public.clients add column if not exists post_link text;
+
+-- Client status (sales pipeline stage).
+alter table public.clients add column if not exists client_status text not null default 'New Lead';
+alter table public.clients drop constraint if exists clients_client_status_check;
+alter table public.clients add constraint clients_client_status_check
+  check (client_status in (
+    'New Lead','Contacted','Interested','Proposal Sent',
+    'Negotiation','Follow Up','Closed Won','Closed Lost','Nurture'
+  ));
