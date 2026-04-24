@@ -15,7 +15,8 @@
     }
     h1 { margin: 0 0 4px; font-size: 24px; }
     .sub { color: #666; margin-bottom: 24px; font-size: 14px; }
-    .header-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .header-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
+    .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .card {
       background: #fff;
       border: 1px solid #e5e7eb;
@@ -39,6 +40,8 @@
     button.danger { background: #dc2626; }
     button.danger:hover { background: #b91c1c; }
     button.primary-lg { font-size: 15px; padding: 10px 18px; }
+    button.outline { background: #fff; color: #111827; border: 1px solid #d1d5db; }
+    button.outline:hover { background: #f9fafb; }
 
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
     th, td {
@@ -54,10 +57,15 @@
     td.actions { white-space: nowrap; text-align: right; }
 
     .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
-    .status-Prospect { background: #fef3c7; color: #92400e; }
-    .status-InProgress { background: #dbeafe; color: #1e40af; }
-    .status-Finished { background: #d1fae5; color: #065f46; }
-    .status-DeadLead { background: #e5e7eb; color: #6b7280; }
+
+    /* Web status */
+    .ws-NotStarted   { background: #f3f4f6; color: #4b5563; }
+    .ws-InProgress   { background: #dbeafe; color: #1e40af; }
+    .ws-Review       { background: #fef3c7; color: #92400e; }
+    .ws-NeedsFixing  { background: #fee2e2; color: #991b1b; }
+    .ws-Finished     { background: #d1fae5; color: #065f46; }
+
+    /* Client status */
     .cs-NewLead        { background: #dbeafe; color: #1e40af; }
     .cs-Contacted      { background: #ccfbf1; color: #115e59; }
     .cs-Interested     { background: #ede9fe; color: #5b21b6; }
@@ -68,8 +76,18 @@
     .cs-ClosedLost     { background: #fee2e2; color: #991b1b; }
     .cs-Nurture        { background: #f3f4f6; color: #4b5563; }
 
+    /* Motivation */
+    .mo-NotSet { background: #f3f4f6; color: #6b7280; }
+    .mo-Dead   { background: #1f2937; color: #f9fafb; }
+    .mo-Cold   { background: #dbeafe; color: #1e40af; }
+    .mo-Warm   { background: #fed7aa; color: #9a3412; }
+    .mo-Hot    { background: #fee2e2; color: #991b1b; }
+    .mo-VIP    { background: #fef9c3; color: #854d0e; border: 1px solid #eab308; }
+
     .empty { text-align: center; color: #999; padding: 32px; font-size: 14px; }
     .error { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
+    a { color: #2563eb; }
+    a.web-link { font-size: 13px; }
 
     /* Tabs */
     .tabs { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; }
@@ -90,8 +108,16 @@
     .overdue-banner.show { display: block; }
     tr.row-overdue { background: #fef2f2; }
     tr.row-overdue:hover { background: #fee2e2; }
-    .badge.overdue { background: #dc2626; color: white; margin-left: 6px; }
-    .badge.due-today { background: #f59e0b; color: white; margin-left: 6px; }
+    .badge.overdue { background: #dc2626; color: white; margin-left: 6px; font-size: 10px; }
+    .badge.due-today { background: #f59e0b; color: white; margin-left: 6px; font-size: 10px; }
+    .fup-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin-right: 4px; }
+
+    /* Active filter chips */
+    .filter-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+    .filter-chip {
+      background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe;
+      padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 500;
+    }
 
     /* Calendar */
     #calendar { min-height: 600px; }
@@ -105,14 +131,14 @@
       justify-content: space-between; gap: 12px;
     }
     .followup-box.overdue { background: #fef2f2; border-color: #fecaca; }
-    .followup-box .fup-text { font-size: 14px; }
-    .followup-box .fup-text .fup-label { color: #6b7280; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px; }
-    .followup-box .fup-text .fup-value { color: #1f2937; }
+    .followup-box .fup-text .fup-label2 { color: #6b7280; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px; }
+    .followup-box .fup-text .fup-value { color: #1f2937; font-size: 14px; }
     .followup-box .fup-text .fup-value.overdue { color: #991b1b; font-weight: 600; }
-    a { color: #2563eb; }
-    a.web-link { font-size: 13px; }
+    .fup-type-tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; margin-left: 8px; }
+    .fup-type-Followup   { background: #dbeafe; color: #1e40af; }
+    .fup-type-Appointment { background: #fed7aa; color: #9a3412; }
 
-    /* Modal shared */
+    /* Modals */
     .overlay {
       position: fixed; inset: 0;
       background: rgba(17, 24, 39, 0.5);
@@ -185,7 +211,7 @@
       border-color: #6366f1;
       box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
     }
-    .field textarea { min-height: 100px; resize: vertical; }
+    .field textarea { min-height: 80px; resize: vertical; }
     .field-error {
       color: #991b1b;
       font-size: 13px;
@@ -194,8 +220,9 @@
       border-radius: 6px;
       margin-top: 8px;
     }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
-    /* Detail view (static display) */
+    /* Detail view */
     .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; padding: 16px 20px; }
     .detail-grid .detail-full { grid-column: 1 / -1; }
     .detail-item .k {
@@ -213,6 +240,25 @@
       white-space: pre-wrap;
     }
     .detail-item .v.muted { color: #9ca3af; font-style: italic; }
+
+    /* Notes thread (chat-style) */
+    .notes-section { margin: 0 20px 12px; }
+    .notes-section h4 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; margin: 16px 0 6px; font-weight: 600; }
+    .notes-thread {
+      background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;
+      padding: 10px; max-height: 200px; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .notes-thread.empty { color: #9ca3af; font-style: italic; font-size: 13px; text-align: center; padding: 20px; }
+    .note-entry {
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 6px;
+      padding: 8px 10px; font-size: 13px;
+    }
+    .note-entry .note-time { font-size: 11px; color: #6b7280; margin-bottom: 3px; }
+    .note-entry .note-text { color: #1f2937; white-space: pre-wrap; word-break: break-word; }
+    .new-note-box { margin-top: 8px; }
+    .new-note-box textarea { min-height: 60px; }
+    .new-note-box .hint { font-size: 11px; color: #6b7280; margin-top: 4px; }
 
     /* Review (wizard) */
     .review-row {
@@ -235,69 +281,35 @@
       <h1>Mini CRM</h1>
       <div class="sub">Hello Mini CRM</div>
     </div>
-    <button class="primary-lg" id="openWizard">+ Add New Client</button>
+    <div class="header-actions">
+      <button class="primary-lg" id="openWizard">+ Add New Client</button>
+      <button class="outline" id="openFilters">🔎 Apply Filters</button>
+      <button class="ghost" id="clearFilters" style="display:none;">✕ Clear All Filters</button>
+    </div>
   </div>
 
   <div id="configError" class="error" style="display:none;"></div>
 
   <datalist id="business_types">
-    <option value="Appliance Repair">
-    <option value="Auto Detailing">
-    <option value="Bathroom Remodeling">
-    <option value="Carpentry">
-    <option value="Carpet Cleaning">
-    <option value="Chimney Sweep">
-    <option value="Cleaning - Commercial">
-    <option value="Cleaning - Residential">
-    <option value="Commercial Construction">
-    <option value="Concrete">
-    <option value="Decks">
-    <option value="Demolition">
-    <option value="Drywall">
-    <option value="Electrical">
-    <option value="Epoxy Flooring">
-    <option value="Excavation">
-    <option value="Fencing">
-    <option value="Flooring">
-    <option value="Foundation Repair">
-    <option value="Garage Door">
-    <option value="General Contractor">
-    <option value="Gutters">
-    <option value="Handyman">
-    <option value="HVAC">
-    <option value="Insulation">
-    <option value="Irrigation">
-    <option value="Junk Removal">
-    <option value="Kitchen Remodeling">
-    <option value="Landscaping">
-    <option value="Lawn Care">
-    <option value="Locksmith">
-    <option value="Marketing Agency">
-    <option value="Masonry">
-    <option value="Mobile Car Wash">
-    <option value="Moving Services">
-    <option value="Painting - Exterior">
-    <option value="Painting - Interior">
-    <option value="Pavers">
-    <option value="Pest Control">
-    <option value="Photography">
-    <option value="Plumbing">
-    <option value="Pool Installation">
-    <option value="Pool Service">
-    <option value="Pressure Washing">
-    <option value="Real Estate">
-    <option value="Remodeling">
-    <option value="Roofing">
-    <option value="Septic">
-    <option value="Siding">
-    <option value="Snow Removal">
-    <option value="Solar Installation">
-    <option value="Stucco">
-    <option value="Tree Service">
-    <option value="Waterproofing">
-    <option value="Web Design">
-    <option value="Welding">
-    <option value="Window Cleaning">
+    <option value="Appliance Repair"><option value="Auto Detailing"><option value="Bathroom Remodeling">
+    <option value="Carpentry"><option value="Carpet Cleaning"><option value="Chimney Sweep">
+    <option value="Cleaning - Commercial"><option value="Cleaning - Residential"><option value="Commercial Construction">
+    <option value="Concrete"><option value="Decks"><option value="Demolition">
+    <option value="Drywall"><option value="Electrical"><option value="Epoxy Flooring">
+    <option value="Excavation"><option value="Fencing"><option value="Flooring">
+    <option value="Foundation Repair"><option value="Garage Door"><option value="General Contractor">
+    <option value="Gutters"><option value="Handyman"><option value="HVAC">
+    <option value="Insulation"><option value="Irrigation"><option value="Junk Removal">
+    <option value="Kitchen Remodeling"><option value="Landscaping"><option value="Lawn Care">
+    <option value="Locksmith"><option value="Marketing Agency"><option value="Masonry">
+    <option value="Mobile Car Wash"><option value="Moving Services"><option value="Painting - Exterior">
+    <option value="Painting - Interior"><option value="Pavers"><option value="Pest Control">
+    <option value="Photography"><option value="Plumbing"><option value="Pool Installation">
+    <option value="Pool Service"><option value="Pressure Washing"><option value="Real Estate">
+    <option value="Remodeling"><option value="Roofing"><option value="Septic">
+    <option value="Siding"><option value="Snow Removal"><option value="Solar Installation">
+    <option value="Stucco"><option value="Tree Service"><option value="Waterproofing">
+    <option value="Web Design"><option value="Welding"><option value="Window Cleaning">
     <option value="Window Installation">
   </datalist>
 
@@ -305,6 +317,8 @@
     <button class="tab active" data-view="list">📋 List</button>
     <button class="tab" data-view="calendar">📅 Calendar</button>
   </div>
+
+  <div id="filterChips" class="filter-chips"></div>
 
   <div class="tab-content active" data-view="list">
     <div id="overdueBanner" class="overdue-banner"></div>
@@ -314,19 +328,19 @@
           <tr>
             <th style="width: 12%;">Company</th>
             <th style="width: 10%;">Business Type</th>
-            <th style="width: 10%;">Client</th>
-            <th style="width: 10%;">Phone</th>
-            <th style="width: 11%;">Website</th>
-            <th style="width: 8%;">Manager</th>
-            <th style="width: 10%;">Status</th>
-            <th style="width: 13%;">Client Status</th>
-            <th style="width: 9%;">Follow-up</th>
-            <th style="width: 7%;"></th>
+            <th style="width: 9%;">Client</th>
+            <th style="width: 9%;">Phone</th>
+            <th style="width: 7%;">Manager</th>
+            <th style="width: 10%;">Web Status</th>
+            <th style="width: 11%;">Client Status</th>
+            <th style="width: 8%;">Motivation</th>
+            <th style="width: 16%;">Follow-up / Appointment</th>
+            <th style="width: 8%;"></th>
           </tr>
         </thead>
         <tbody id="rows"></tbody>
       </table>
-      <div id="empty" class="empty" style="display:none;">No entries yet. Click "+ Add New Client" to start.</div>
+      <div id="empty" class="empty" style="display:none;">No entries match. Clear filters or add a client.</div>
     </div>
   </div>
 
@@ -336,7 +350,7 @@
     </div>
   </div>
 
-  <!-- Wizard modal -->
+  <!-- Wizard modal (Add New Client) -->
   <div class="overlay" id="wizardOverlay">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wizardTitle">
       <div class="modal-header">
@@ -344,7 +358,7 @@
         <button class="modal-close" id="closeWizard" aria-label="Close">×</button>
       </div>
       <div class="progress"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
-      <div class="step-meta" id="stepMeta">Step 1 of 6</div>
+      <div class="step-meta" id="stepMeta">Step 1 of 7</div>
       <div class="step-body" id="stepBody"></div>
       <div class="modal-footer">
         <button class="ghost" id="backBtn">Back</button>
@@ -365,6 +379,75 @@
     </div>
   </div>
 
+  <!-- Schedule mini-wizard modal (date -> time -> type) -->
+  <div class="overlay" id="scheduleOverlay">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div class="modal-title">Schedule Follow-up / Appointment</div>
+        <button class="modal-close" id="closeSchedule" aria-label="Close">×</button>
+      </div>
+      <div class="progress"><div class="progress-bar" id="scheduleProgress" style="width:33%"></div></div>
+      <div class="step-meta" id="scheduleMeta">Step 1 of 3</div>
+      <div class="step-body" id="scheduleBody"></div>
+      <div class="modal-footer">
+        <button class="ghost" id="scheduleBack">Back</button>
+        <button id="scheduleNext">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter modal -->
+  <div class="overlay" id="filterOverlay">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div class="modal-title">Apply Filters</div>
+        <button class="modal-close" id="closeFilter" aria-label="Close">×</button>
+      </div>
+      <div class="step-body">
+        <div class="field">
+          <label>Business Type</label>
+          <select id="f_business_type"><option value="">Any</option></select>
+        </div>
+        <div class="field">
+          <label>Manager</label>
+          <select id="f_manager">
+            <option value="">Any</option>
+            <option value="Ivan">Ivan</option>
+            <option value="Hector">Hector</option>
+            <option value="__unassigned">Unassigned</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Web Status</label>
+          <select id="f_web_status"><option value="">Any</option></select>
+        </div>
+        <div class="field">
+          <label>Client Status</label>
+          <select id="f_client_status"><option value="">Any</option></select>
+        </div>
+        <div class="field">
+          <label>Motivation</label>
+          <select id="f_motivation"><option value="">Any</option></select>
+        </div>
+        <div class="field">
+          <label>Follow-up</label>
+          <select id="f_followup">
+            <option value="">Any</option>
+            <option value="overdue">Overdue</option>
+            <option value="today">Due today</option>
+            <option value="week">This week</option>
+            <option value="any">Has any set</option>
+            <option value="none">Not set</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" id="filterReset">Reset</button>
+        <button id="filterApply">Apply Filters</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
   <script>
@@ -381,42 +464,26 @@
     const tbody = document.getElementById("rows");
     const emptyEl = document.getElementById("empty");
 
-    const esc = (s) => (s ?? "").toString().replace(/[&<>"']/g, (c) => (
-      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
-    ));
-    const statusClass = (s) => "status-" + (s || "Prospect").replace(/\s/g, "");
-    const csClass = (s) => "cs-" + (s || "New Lead").replace(/\s/g, "");
-    const normPhone = (s) => (s || "").replace(/\D+/g, "");
-    const STATUSES = ["Prospect", "In Progress", "Finished", "Dead Lead"];
+    // ---- Constants ----
+    const WEB_STATUSES = ["Not Started", "In Progress", "Review", "Needs Fixing", "Finished"];
     const CLIENT_STATUSES = [
       "New Lead","Contacted","Interested","Proposal Sent",
       "Negotiation","Follow Up","Closed Won","Closed Lost","Nurture"
     ];
+    const MOTIVATIONS = ["Not Set", "Dead", "Cold", "Warm", "Hot", "VIP"];
+    const FOLLOW_UP_TYPES = ["Follow-up", "Appointment"];
+    const NOTE_CAP = 5;
 
-    // Date helpers
-    function todayISO() {
-      const d = new Date();
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${y}-${m}-${day}`;
-    }
-    function followupState(dateStr) {
-      if (!dateStr) return "none";
-      const today = todayISO();
-      if (dateStr < today) return "overdue";
-      if (dateStr === today) return "today";
-      return "future";
-    }
-    function formatDate(dateStr) {
-      if (!dateStr) return "";
-      // Parse as local date to avoid timezone shifting (DB stores YYYY-MM-DD)
-      const [y, m, d] = dateStr.split("-").map(Number);
-      const dt = new Date(y, m - 1, d);
-      return dt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-    }
+    // ---- Helpers ----
+    const esc = (s) => (s ?? "").toString().replace(/[&<>"']/g, (c) => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+    ));
+    const wsClass = (s) => "ws-" + (s || "Not Started").replace(/\s/g, "");
+    const csClass = (s) => "cs-" + (s || "New Lead").replace(/\s/g, "");
+    const moClass = (s) => "mo-" + (s || "Not Set").replace(/\s/g, "");
+    const normPhone = (s) => (s || "").replace(/\D+/g, "");
+    const fupTypeClass = (t) => "fup-type-" + (t || "Follow-up").replace(/[-\s]/g, "");
 
-    // US-format phone: (XXX) XXX-XXXX. Accepts any input, formats up to 10 digits.
     function formatPhone(raw) {
       const d = normPhone(raw).slice(0, 10);
       if (!d) return "";
@@ -424,19 +491,14 @@
       if (d.length <= 6) return `(${d.slice(0,3)}) ${d.slice(3)}`;
       return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
     }
-    // Reformat DB value for display (only if it's a clean 10-digit US number).
     function displayPhone(s) {
       if (!s) return "";
       const d = normPhone(s);
       if (d.length === 10) return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
       return s;
     }
-
-    // Live-format any phone input as the user types (wizard + edit modal).
     document.addEventListener("input", (e) => {
-      if (e.target.matches('input[name="phone"]')) {
-        e.target.value = formatPhone(e.target.value);
-      }
+      if (e.target.matches('input[name="phone"]')) e.target.value = formatPhone(e.target.value);
     });
 
     function shortUrl(u) {
@@ -447,11 +509,130 @@
       } catch { return u; }
     }
 
-    // ---------- Table render (read-only) ----------
-    function render(rows) {
+    // Follow-up state
+    function fupState(iso) {
+      if (!iso) return "none";
+      const then = new Date(iso);
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const tomStart = todayStart + 24*60*60*1000;
+      const t = then.getTime();
+      if (t < todayStart) return "overdue";
+      if (t < tomStart) return "today";
+      return "future";
+    }
+    function isThisWeek(iso) {
+      if (!iso) return false;
+      const then = new Date(iso);
+      const now = new Date();
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
+      return then >= now && then <= end;
+    }
+    function formatDateTime(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+        + " · " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    }
+    function formatDateOnly(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    }
+    function formatTimeOnly(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    }
+    // Build ISO from date string (YYYY-MM-DD) + time string (HH:MM)
+    function combineDateTime(dateStr, timeStr) {
+      if (!dateStr) return null;
+      const t = timeStr || "09:00";
+      const iso = new Date(`${dateStr}T${t}:00`).toISOString();
+      return iso;
+    }
+    function splitDateTime(iso) {
+      if (!iso) return { date: "", time: "" };
+      const d = new Date(iso);
+      const pad = (n) => String(n).padStart(2, "0");
+      return {
+        date: `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`,
+        time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+      };
+    }
+
+    // Notes
+    function trimNotes(arr) {
+      const a = Array.isArray(arr) ? arr : [];
+      return a.slice(-NOTE_CAP);
+    }
+    function appendNote(arr, text) {
+      if (!text || !text.trim()) return trimNotes(arr);
+      const entry = { at: new Date().toISOString(), text: text.trim() };
+      return trimNotes([...(Array.isArray(arr) ? arr : []), entry]);
+    }
+
+    // ---------- Filters ----------
+    const DEFAULT_FILTERS = { business_type: "", manager: "", web_status: "", client_status: "", motivation: "", followup: "" };
+    let filters = { ...DEFAULT_FILTERS };
+
+    function anyFilterActive() {
+      return Object.values(filters).some((v) => v && v !== "");
+    }
+
+    function applyFiltersToClients(list) {
+      return list.filter((c) => {
+        if (filters.business_type && c.business_type !== filters.business_type) return false;
+        if (filters.manager) {
+          if (filters.manager === "__unassigned") {
+            if (c.manager) return false;
+          } else if (c.manager !== filters.manager) return false;
+        }
+        if (filters.web_status && c.web_status !== filters.web_status) return false;
+        if (filters.client_status && c.client_status !== filters.client_status) return false;
+        if (filters.motivation && c.motivation !== filters.motivation) return false;
+        if (filters.followup) {
+          const state = fupState(c.follow_up_at);
+          if (filters.followup === "overdue" && state !== "overdue") return false;
+          if (filters.followup === "today" && state !== "today") return false;
+          if (filters.followup === "week" && !isThisWeek(c.follow_up_at)) return false;
+          if (filters.followup === "any" && !c.follow_up_at) return false;
+          if (filters.followup === "none" && c.follow_up_at) return false;
+        }
+        return true;
+      });
+    }
+
+    function renderFilterChips() {
+      const chips = document.getElementById("filterChips");
+      const parts = [];
+      if (filters.business_type) parts.push(["Business", filters.business_type]);
+      if (filters.manager) parts.push(["Manager", filters.manager === "__unassigned" ? "Unassigned" : filters.manager]);
+      if (filters.web_status) parts.push(["Web Status", filters.web_status]);
+      if (filters.client_status) parts.push(["Client Status", filters.client_status]);
+      if (filters.motivation) parts.push(["Motivation", filters.motivation]);
+      if (filters.followup) {
+        const labels = { overdue: "Overdue", today: "Due today", week: "This week", any: "Has follow-up", none: "No follow-up" };
+        parts.push(["Follow-up", labels[filters.followup] || filters.followup]);
+      }
+      chips.innerHTML = parts.map(([k, v]) => `<span class="filter-chip">${esc(k)}: ${esc(v)}</span>`).join("");
+      document.getElementById("clearFilters").style.display = anyFilterActive() ? "" : "none";
+      try { localStorage.setItem("crm_filters", JSON.stringify(filters)); } catch {}
+    }
+
+    try {
+      const saved = localStorage.getItem("crm_filters");
+      if (saved) filters = { ...DEFAULT_FILTERS, ...JSON.parse(saved) };
+    } catch {}
+
+    // ---------- Table render ----------
+    function render() {
+      const rows = applyFiltersToClients(allClients);
       tbody.innerHTML = "";
       if (!rows || rows.length === 0) {
         emptyEl.style.display = "block";
+        document.getElementById("overdueBanner").classList.remove("show");
+        renderFilterChips();
         return;
       }
       emptyEl.style.display = "none";
@@ -459,23 +640,16 @@
       for (const r of rows) {
         const tr = document.createElement("tr");
         tr.dataset.id = r.id;
-        const webHtml = r.finished_website
-          ? `<a class="web-link" href="${esc(r.finished_website)}" target="_blank" rel="noopener" data-nolink>${esc(shortUrl(r.finished_website))}</a>`
-          : '<span style="color:#9ca3af;">—</span>';
 
-        const fState = followupState(r.follow_up_date);
-        let fupHtml = '<span style="color:#9ca3af;">—</span>';
-        if (r.follow_up_date) {
-          const dateText = formatDate(r.follow_up_date);
-          if (fState === "overdue") {
-            fupHtml = `${esc(dateText)} <span class="badge overdue">OVERDUE</span>`;
-            overdueCount++;
-            tr.classList.add("row-overdue");
-          } else if (fState === "today") {
-            fupHtml = `${esc(dateText)} <span class="badge due-today">TODAY</span>`;
-          } else {
-            fupHtml = esc(dateText);
-          }
+        const fState = fupState(r.follow_up_at);
+        let fupHtml = '<span style="color:#9ca3af;">Not set</span>';
+        if (r.follow_up_at) {
+          const dt = formatDateTime(r.follow_up_at);
+          const typeTag = `<span class="fup-type-tag ${fupTypeClass(r.follow_up_type)}">${esc(r.follow_up_type || "Follow-up")}</span>`;
+          let stateBadge = "";
+          if (fState === "overdue") { stateBadge = '<span class="badge overdue">OVERDUE</span>'; overdueCount++; tr.classList.add("row-overdue"); }
+          else if (fState === "today") { stateBadge = '<span class="badge due-today">TODAY</span>'; }
+          fupHtml = `${esc(dt)} ${typeTag}${stateBadge}`;
         }
 
         tr.innerHTML = `
@@ -483,10 +657,10 @@
           <td class="truncate">${esc(r.business_type) || '<span style="color:#9ca3af;">—</span>'}</td>
           <td class="truncate">${esc(r.client_name) || '<span style="color:#9ca3af;">—</span>'}</td>
           <td class="truncate">${r.phone ? esc(displayPhone(r.phone)) : '<span style="color:#9ca3af;">—</span>'}</td>
-          <td class="truncate">${webHtml}</td>
           <td>${esc(r.manager) || '<span style="color:#9ca3af;">—</span>'}</td>
-          <td><span class="badge ${statusClass(r.status)}">${esc(r.status || "Prospect")}</span></td>
+          <td><span class="badge ${wsClass(r.web_status)}">${esc(r.web_status || "Not Started")}</span></td>
           <td><span class="badge ${csClass(r.client_status)}">${esc(r.client_status || "New Lead")}</span></td>
+          <td><span class="badge ${moClass(r.motivation)}">${esc(r.motivation || "Not Set")}</span></td>
           <td class="truncate">${fupHtml}</td>
           <td class="actions"><button class="danger" data-action="delete" data-nolink>Del</button></td>
         `;
@@ -500,6 +674,7 @@
       } else {
         banner.classList.remove("show");
       }
+      renderFilterChips();
     }
 
     let allClients = [];
@@ -510,7 +685,8 @@
         .order("created_at", { ascending: false });
       if (error) { alert("Load failed: " + error.message); return; }
       allClients = data || [];
-      render(allClients);
+      populateFilterModalOptions();
+      render();
       refreshCalendar();
     }
 
@@ -528,13 +704,11 @@
         load();
         return;
       }
-
-      if (noLink) return; // clicked the web link — let it open normally
-
+      if (noLink) return;
       openDetail(id);
     });
 
-    // ---------- Wizard ----------
+    // ---------- Wizard (Add New Client) ----------
     const wizardSteps = [
       {
         title: "Company Info",
@@ -555,9 +729,7 @@
           const p = normPhone(data.phone);
           if (!p) return null;
           const existing = allClients.find((c) => normPhone(c.phone) === p);
-          if (existing) {
-            return `This contact already exists — registered under "${existing.company_name}".`;
-          }
+          if (existing) return `This contact already exists — registered under "${existing.company_name}".`;
           return null;
         },
       },
@@ -572,26 +744,32 @@
       },
       {
         title: "Assignment",
-        desc: "Who's handling this, where does it stand, when to follow up?",
+        desc: "Who's handling this and where does it stand?",
         fields: [
           { name: "manager", label: "Manager", type: "select", options: ["", "Ivan", "Hector"], optionLabels: { "": "— Unassigned —" } },
-          { name: "status", label: "Status", type: "select", options: STATUSES },
+          { name: "web_status", label: "Web status", type: "select", options: WEB_STATUSES },
           { name: "client_status", label: "Client status", type: "select", options: CLIENT_STATUSES },
-          { name: "follow_up_date", label: "Follow-up date (optional)", type: "date" },
+          { name: "motivation", label: "Motivation", type: "select", options: MOTIVATIONS },
+        ],
+      },
+      {
+        title: "Schedule Follow-up",
+        desc: "Optional — date, time, and type. Leave blank to skip.",
+        fields: [
+          { name: "fu_date", label: "Date", type: "date" },
+          { name: "fu_time", label: "Time", type: "time" },
+          { name: "fu_type", label: "Type", type: "select", options: FOLLOW_UP_TYPES },
         ],
       },
       {
         title: "Notes",
-        desc: "Anything else worth remembering?",
+        desc: "Add an initial note for the client and/or the website build. Both optional.",
         fields: [
-          { name: "notes", label: "Notes", type: "textarea", placeholder: "Met at trade show, interested in Q2 project..." },
+          { name: "initial_client_note", label: "Client notes", type: "textarea", placeholder: "First impressions, relationship context, ..." },
+          { name: "initial_web_note", label: "Web notes", type: "textarea", placeholder: "Tech stack preferences, design direction, ..." },
         ],
       },
-      {
-        title: "Review",
-        desc: "Double-check before saving.",
-        review: true,
-      },
+      { title: "Review", desc: "Double-check before saving.", review: true },
     ];
 
     const wizardOverlay = document.getElementById("wizardOverlay");
@@ -606,11 +784,10 @@
 
     function openWizard() {
       stepIndex = 0;
-      formData = { status: "Prospect", manager: "", client_status: "New Lead" };
+      formData = { web_status: "Not Started", manager: "", client_status: "New Lead", motivation: "Not Set", fu_type: "Follow-up" };
       renderStep();
       wizardOverlay.classList.add("open");
     }
-
     function closeWizard() { wizardOverlay.classList.remove("open"); }
 
     function renderStep() {
@@ -619,23 +796,13 @@
       progressBar.style.width = `${((stepIndex + 1) / wizardSteps.length) * 100}%`;
 
       if (step.review) {
-        stepBody.innerHTML = `
-          <h2 class="step-title">${step.title}</h2>
-          <p class="step-desc">${step.desc}</p>
-          ${renderReview()}
-        `;
+        stepBody.innerHTML = `<h2 class="step-title">${step.title}</h2><p class="step-desc">${step.desc}</p>${renderReview()}`;
       } else {
         const fieldsHtml = step.fields.map(renderField).join("");
-        stepBody.innerHTML = `
-          <h2 class="step-title">${step.title}</h2>
-          <p class="step-desc">${step.desc}</p>
-          ${fieldsHtml}
-          <div class="field-error" id="stepError" style="display:none;"></div>
-        `;
+        stepBody.innerHTML = `<h2 class="step-title">${step.title}</h2><p class="step-desc">${step.desc}</p>${fieldsHtml}<div class="field-error" id="stepError" style="display:none;"></div>`;
         const firstInput = stepBody.querySelector("input, select, textarea");
         if (firstInput) setTimeout(() => firstInput.focus(), 50);
       }
-
       backBtn.disabled = stepIndex === 0;
       nextBtn.textContent = stepIndex === wizardSteps.length - 1 ? "Save Client" : "Next";
     }
@@ -663,6 +830,7 @@
     }
 
     function renderReview() {
+      const fuIso = formData.fu_date ? combineDateTime(formData.fu_date, formData.fu_time) : null;
       const rows = [
         ["Company", formData.company_name],
         ["Business Type", formData.business_type],
@@ -672,10 +840,12 @@
         ["Post Link", formData.post_link],
         ["Finished Website", formData.finished_website],
         ["Manager", formData.manager],
-        ["Status", formData.status],
+        ["Web Status", formData.web_status],
         ["Client Status", formData.client_status],
-        ["Follow-up", formData.follow_up_date ? formatDate(formData.follow_up_date) : ""],
-        ["Notes", formData.notes],
+        ["Motivation", formData.motivation],
+        ["Follow-up", fuIso ? `${formatDateTime(fuIso)} (${formData.fu_type || "Follow-up"})` : ""],
+        ["Client Notes", formData.initial_client_note],
+        ["Web Notes", formData.initial_web_note],
       ];
       return rows.map(([k, v]) => {
         const has = v && v.toString().trim();
@@ -691,7 +861,6 @@
         if (el) formData[f.name] = el.value.trim();
       }
     }
-
     function showStepError(msg) {
       const el = document.getElementById("stepError");
       if (!el) { alert(msg); return; }
@@ -704,17 +873,12 @@
       if (!step.review) {
         collectStepData();
         for (const f of (step.fields || [])) {
-          if (f.required && !formData[f.name]) {
-            showStepError(`${f.label.replace(" *", "")} is required.`);
-            return;
-          }
+          if (f.required && !formData[f.name]) { showStepError(`${f.label.replace(" *", "")} is required.`); return; }
         }
         if (step.validate) {
-          nextBtn.disabled = true;
-          nextBtn.textContent = "Checking...";
+          nextBtn.disabled = true; nextBtn.textContent = "Checking...";
           const err = await step.validate(formData);
-          nextBtn.disabled = false;
-          nextBtn.textContent = stepIndex === wizardSteps.length - 1 ? "Save Client" : "Next";
+          nextBtn.disabled = false; nextBtn.textContent = stepIndex === wizardSteps.length - 1 ? "Save Client" : "Next";
           if (err) { showStepError(err); return; }
         }
       }
@@ -722,7 +886,6 @@
       stepIndex++;
       renderStep();
     }
-
     function goBack() {
       if (stepIndex === 0) return;
       collectStepData();
@@ -731,18 +894,19 @@
     }
 
     async function submitWizard() {
-      nextBtn.disabled = true;
-      nextBtn.textContent = "Saving...";
+      nextBtn.disabled = true; nextBtn.textContent = "Saving...";
       const p = normPhone(formData.phone);
       if (p) {
         const existing = allClients.find((c) => normPhone(c.phone) === p);
         if (existing) {
-          nextBtn.disabled = false;
-          nextBtn.textContent = "Save Client";
+          nextBtn.disabled = false; nextBtn.textContent = "Save Client";
           alert(`This contact already exists — registered under "${existing.company_name}".`);
           return;
         }
       }
+      const fuIso = formData.fu_date ? combineDateTime(formData.fu_date, formData.fu_time) : null;
+      const clientNotes = formData.initial_client_note ? appendNote([], formData.initial_client_note) : [];
+      const webNotes = formData.initial_web_note ? appendNote([], formData.initial_web_note) : [];
       const row = {
         company_name: formData.company_name || null,
         business_type: formData.business_type || null,
@@ -751,15 +915,17 @@
         profile_link: formData.profile_link || null,
         post_link: formData.post_link || null,
         finished_website: formData.finished_website || null,
-        notes: formData.notes || null,
         manager: formData.manager || null,
-        status: formData.status || "Prospect",
+        web_status: formData.web_status || "Not Started",
         client_status: formData.client_status || "New Lead",
-        follow_up_date: formData.follow_up_date || null,
+        motivation: formData.motivation || "Not Set",
+        follow_up_at: fuIso,
+        follow_up_type: formData.fu_type || "Follow-up",
+        client_notes: clientNotes,
+        web_notes: webNotes,
       };
       const { error } = await sb.from("clients").insert(row);
-      nextBtn.disabled = false;
-      nextBtn.textContent = "Save Client";
+      nextBtn.disabled = false; nextBtn.textContent = "Save Client";
       if (error) { alert("Insert failed: " + error.message); return; }
       closeWizard();
       load();
@@ -772,74 +938,66 @@
     const detailTitle = document.getElementById("detailTitle");
 
     let detailId = null;
-    let detailMode = "view"; // "view" | "edit"
+    let detailMode = "view"; // view | edit
     let detailDraft = {};
 
     function openDetail(id) {
-      detailId = id;
-      detailMode = "view";
-      renderDetail();
+      detailId = id; detailMode = "view"; renderDetail();
       detailOverlay.classList.add("open");
     }
-
     function closeDetail() {
       detailOverlay.classList.remove("open");
-      detailId = null;
-      detailMode = "view";
-      detailDraft = {};
+      detailId = null; detailMode = "view"; detailDraft = {};
     }
-
-    function getCurrentClient() {
-      return allClients.find((c) => c.id === detailId);
-    }
+    function getCurrentClient() { return allClients.find((c) => c.id === detailId); }
 
     function renderDetail() {
       const c = getCurrentClient();
       if (!c) { closeDetail(); return; }
       detailTitle.textContent = c.company_name || "Client Details";
+      if (detailMode === "view") renderDetailView(c); else renderDetailEdit(c);
+    }
 
-      if (detailMode === "view") {
-        renderDetailView(c);
-      } else {
-        renderDetailEdit(c);
-      }
+    function renderNotesThread(notes) {
+      const arr = Array.isArray(notes) ? notes : [];
+      if (arr.length === 0) return '<div class="notes-thread empty">No notes yet</div>';
+      // Oldest at top, newest at bottom
+      return `<div class="notes-thread">${arr.map((n) => `
+        <div class="note-entry">
+          <div class="note-time">${esc(formatDateTime(n.at))}</div>
+          <div class="note-text">${esc(n.text)}</div>
+        </div>`).join("")}</div>`;
     }
 
     function renderFollowupBox(c) {
-      const state = followupState(c.follow_up_date);
-      if (!c.follow_up_date) {
+      const state = fupState(c.follow_up_at);
+      const typeTag = `<span class="fup-type-tag ${fupTypeClass(c.follow_up_type)}">${esc(c.follow_up_type || "Follow-up")}</span>`;
+      if (!c.follow_up_at) {
         return `
           <div class="followup-box">
             <div class="fup-text">
-              <div class="fup-label">Follow-up</div>
-              <div class="fup-value" style="color:#6b7280;">Not scheduled</div>
+              <div class="fup-label2">Schedule</div>
+              <div class="fup-value" style="color:#6b7280;">Not set</div>
             </div>
             <button class="ghost" id="addToCalendarBtn">📅 Add to Calendar</button>
-          </div>
-        `;
+          </div>`;
       }
-      const dateText = formatDate(c.follow_up_date);
       const isOverdue = state === "overdue";
       const isToday = state === "today";
       const note = isOverdue ? " (overdue)" : isToday ? " (today)" : "";
       return `
         <div class="followup-box${isOverdue ? " overdue" : ""}">
           <div class="fup-text">
-            <div class="fup-label">Follow-up</div>
-            <div class="fup-value${isOverdue ? " overdue" : ""}">${esc(dateText)}${note}</div>
+            <div class="fup-label2">${esc(c.follow_up_type || "Follow-up")}</div>
+            <div class="fup-value${isOverdue ? " overdue" : ""}">${esc(formatDateTime(c.follow_up_at))}${note} ${typeTag}</div>
           </div>
           <button id="viewOnCalendarBtn">📅 View on Calendar</button>
-        </div>
-      `;
+        </div>`;
     }
 
     function renderDetailView(c) {
-      const linkAnchor = (u) => u
-        ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>`
-        : '<span class="muted">—</span>';
-      const val = (v) => (v && v.toString().trim())
-        ? `<div class="v">${esc(v)}</div>`
-        : `<div class="v muted">—</div>`;
+      const linkAnchor = (u) => u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>` : '<span class="muted">—</span>';
+      const val = (v) => (v && v.toString().trim()) ? `<div class="v">${esc(v)}</div>` : `<div class="v muted">—</div>`;
 
       detailBody.innerHTML = `
         <div class="detail-grid">
@@ -851,38 +1009,30 @@
           <div class="detail-item detail-full"><div class="k">Post Link</div><div class="v">${linkAnchor(c.post_link)}</div></div>
           <div class="detail-item detail-full"><div class="k">Finished Website</div><div class="v">${linkAnchor(c.finished_website)}</div></div>
           <div class="detail-item"><div class="k">Manager</div>${val(c.manager)}</div>
-          <div class="detail-item"><div class="k">Status</div><div class="v"><span class="badge ${statusClass(c.status)}">${esc(c.status || "Prospect")}</span></div></div>
+          <div class="detail-item"><div class="k">Web Status</div><div class="v"><span class="badge ${wsClass(c.web_status)}">${esc(c.web_status || "Not Started")}</span></div></div>
           <div class="detail-item"><div class="k">Client Status</div><div class="v"><span class="badge ${csClass(c.client_status)}">${esc(c.client_status || "New Lead")}</span></div></div>
-          <div class="detail-item detail-full"><div class="k">Notes</div>${val(c.notes)}</div>
+          <div class="detail-item"><div class="k">Motivation</div><div class="v"><span class="badge ${moClass(c.motivation)}">${esc(c.motivation || "Not Set")}</span></div></div>
         </div>
         ${renderFollowupBox(c)}
+        <div class="notes-section">
+          <h4>Client Notes (last 5)</h4>
+          ${renderNotesThread(c.client_notes)}
+          <h4>Web Notes (last 5)</h4>
+          ${renderNotesThread(c.web_notes)}
+        </div>
       `;
 
-      // Wire follow-up actions
       const viewBtn = document.getElementById("viewOnCalendarBtn");
       if (viewBtn) viewBtn.addEventListener("click", () => {
-        const targetDate = c.follow_up_date;
+        const targetDate = c.follow_up_at;
         closeDetail();
         switchTab("calendar");
-        setTimeout(() => {
-          if (calendarInstance && targetDate) calendarInstance.gotoDate(targetDate);
-        }, 80);
+        setTimeout(() => { if (calendarInstance && targetDate) calendarInstance.gotoDate(targetDate); }, 80);
       });
       const addBtn = document.getElementById("addToCalendarBtn");
-      if (addBtn) addBtn.addEventListener("click", () => {
-        detailMode = "edit";
-        detailDraft = { ...c };
-        renderDetail();
-        setTimeout(() => {
-          const el = detailBody.querySelector('[name="follow_up_date"]');
-          if (el) { el.focus(); if (el.showPicker) try { el.showPicker(); } catch {} }
-        }, 50);
-      });
+      if (addBtn) addBtn.addEventListener("click", () => openSchedule(c.id));
 
-      detailFooter.innerHTML = `
-        <div></div>
-        <button id="editBtn">Edit</button>
-      `;
+      detailFooter.innerHTML = `<div></div><button id="editBtn">Edit</button>`;
       document.getElementById("editBtn").addEventListener("click", () => {
         detailMode = "edit";
         detailDraft = { ...c };
@@ -895,12 +1045,11 @@
       const managerOpts = ["", "Ivan", "Hector"].map((o) =>
         `<option value="${esc(o)}"${(d.manager || "") === o ? " selected" : ""}>${o || "— Unassigned —"}</option>`
       ).join("");
-      const statusOpts = STATUSES.map((o) =>
-        `<option value="${esc(o)}"${(d.status || "Prospect") === o ? " selected" : ""}>${o}</option>`
-      ).join("");
-      const csOpts = CLIENT_STATUSES.map((o) =>
-        `<option value="${esc(o)}"${(d.client_status || "New Lead") === o ? " selected" : ""}>${o}</option>`
-      ).join("");
+      const wsOpts = WEB_STATUSES.map((o) => `<option value="${esc(o)}"${(d.web_status || "Not Started") === o ? " selected" : ""}>${o}</option>`).join("");
+      const csOpts = CLIENT_STATUSES.map((o) => `<option value="${esc(o)}"${(d.client_status || "New Lead") === o ? " selected" : ""}>${o}</option>`).join("");
+      const moOpts = MOTIVATIONS.map((o) => `<option value="${esc(o)}"${(d.motivation || "Not Set") === o ? " selected" : ""}>${o}</option>`).join("");
+      const fuTypeOpts = FOLLOW_UP_TYPES.map((o) => `<option value="${esc(o)}"${(d.follow_up_type || "Follow-up") === o ? " selected" : ""}>${o}</option>`).join("");
+      const { date: fuDate, time: fuTime } = splitDateTime(d.follow_up_at);
 
       detailBody.innerHTML = `
         <div style="padding: 16px 20px;">
@@ -912,67 +1061,225 @@
           <div class="field"><label>Post link</label><input name="post_link" type="url" value="${esc(d.post_link)}" placeholder="https://..."></div>
           <div class="field"><label>Finished website</label><input name="finished_website" type="url" value="${esc(d.finished_website)}" placeholder="https://..."></div>
           <div class="field"><label>Manager</label><select name="manager">${managerOpts}</select></div>
-          <div class="field"><label>Status</label><select name="status">${statusOpts}</select></div>
+          <div class="field"><label>Web status</label><select name="web_status">${wsOpts}</select></div>
           <div class="field"><label>Client status</label><select name="client_status">${csOpts}</select></div>
-          <div class="field"><label>Follow-up date</label><input name="follow_up_date" type="date" value="${esc(d.follow_up_date)}"></div>
-          <div class="field"><label>Notes</label><textarea name="notes">${esc(d.notes)}</textarea></div>
-          <div class="field-error" id="detailError" style="display:none;"></div>
-        </div>
-      `;
+          <div class="field"><label>Motivation</label><select name="motivation">${moOpts}</select></div>
+          <div class="field-row">
+            <div class="field"><label>Follow-up date</label><input name="fu_date" type="date" value="${esc(fuDate)}"></div>
+            <div class="field"><label>Follow-up time</label><input name="fu_time" type="time" value="${esc(fuTime)}"></div>
+          </div>
+          <div class="field"><label>Follow-up type</label><select name="follow_up_type">${fuTypeOpts}</select></div>
 
-      detailFooter.innerHTML = `
-        <button class="ghost" id="cancelEditBtn">Cancel</button>
-        <button id="saveEditBtn">Save changes</button>
-      `;
-      document.getElementById("cancelEditBtn").addEventListener("click", () => {
-        detailMode = "view";
-        renderDetail();
-      });
+          <h4 style="font-size:13px;text-transform:uppercase;letter-spacing:0.04em;color:#6b7280;margin:18px 0 6px;">Client Notes (last ${NOTE_CAP})</h4>
+          ${renderNotesThread(d.client_notes)}
+          <div class="new-note-box">
+            <textarea name="new_client_note" placeholder="Add a new client note (leaves an entry with today's timestamp)..."></textarea>
+            <div class="hint">Oldest entry auto-drops when you hit ${NOTE_CAP + 1}.</div>
+          </div>
+
+          <h4 style="font-size:13px;text-transform:uppercase;letter-spacing:0.04em;color:#6b7280;margin:18px 0 6px;">Web Notes (last ${NOTE_CAP})</h4>
+          ${renderNotesThread(d.web_notes)}
+          <div class="new-note-box">
+            <textarea name="new_web_note" placeholder="Add a new web/build note..."></textarea>
+          </div>
+
+          <div class="field-error" id="detailError" style="display:none;margin-top:12px;"></div>
+        </div>`;
+
+      detailFooter.innerHTML = `<button class="ghost" id="cancelEditBtn">Cancel</button><button id="saveEditBtn">Save changes</button>`;
+      document.getElementById("cancelEditBtn").addEventListener("click", () => { detailMode = "view"; renderDetail(); });
       document.getElementById("saveEditBtn").addEventListener("click", saveEdit);
     }
 
     async function saveEdit() {
-      const fields = ["company_name", "business_type", "client_name", "phone", "profile_link", "post_link", "finished_website", "manager", "status", "client_status", "follow_up_date", "notes"];
-      const update = {};
-      for (const name of fields) {
+      const get = (name) => {
         const el = detailBody.querySelector(`[name="${name}"]`);
-        if (el) update[name] = el.value.trim() || null;
-      }
+        return el ? el.value.trim() : "";
+      };
+      const update = {
+        company_name: get("company_name") || null,
+        business_type: get("business_type") || null,
+        client_name: get("client_name") || null,
+        phone: get("phone") || null,
+        profile_link: get("profile_link") || null,
+        post_link: get("post_link") || null,
+        finished_website: get("finished_website") || null,
+        manager: get("manager") || null,
+        web_status: get("web_status") || "Not Started",
+        client_status: get("client_status") || "New Lead",
+        motivation: get("motivation") || "Not Set",
+        follow_up_type: get("follow_up_type") || "Follow-up",
+      };
+      const fuDate = get("fu_date");
+      const fuTime = get("fu_time");
+      update.follow_up_at = fuDate ? combineDateTime(fuDate, fuTime) : null;
+
       if (!update.company_name) {
         const err = document.getElementById("detailError");
-        err.textContent = "Company name is required.";
-        err.style.display = "block";
-        return;
+        err.textContent = "Company name is required."; err.style.display = "block"; return;
       }
 
-      // Duplicate phone check (exclude current record)
       const p = normPhone(update.phone);
       if (p) {
         const existing = allClients.find((c) => c.id !== detailId && normPhone(c.phone) === p);
         if (existing) {
           const err = document.getElementById("detailError");
           err.textContent = `This phone is already registered under "${existing.company_name}".`;
-          err.style.display = "block";
-          return;
+          err.style.display = "block"; return;
         }
       }
 
+      // Notes: append new entries if any
+      const current = getCurrentClient() || {};
+      const newClientNote = get("new_client_note");
+      const newWebNote = get("new_web_note");
+      update.client_notes = newClientNote ? appendNote(current.client_notes, newClientNote) : trimNotes(current.client_notes);
+      update.web_notes = newWebNote ? appendNote(current.web_notes, newWebNote) : trimNotes(current.web_notes);
+
       const saveBtn = document.getElementById("saveEditBtn");
-      saveBtn.disabled = true;
-      saveBtn.textContent = "Saving...";
+      saveBtn.disabled = true; saveBtn.textContent = "Saving...";
       const { error } = await sb.from("clients").update(update).eq("id", detailId);
-      saveBtn.disabled = false;
-      saveBtn.textContent = "Save changes";
+      saveBtn.disabled = false; saveBtn.textContent = "Save changes";
       if (error) {
         const err = document.getElementById("detailError");
-        err.textContent = "Save failed: " + error.message;
-        err.style.display = "block";
-        return;
+        err.textContent = "Save failed: " + error.message; err.style.display = "block"; return;
       }
       await load();
-      // Re-open in view mode with refreshed data
       detailMode = "view";
       renderDetail();
+    }
+
+    // ---------- Schedule mini-wizard (date -> time -> type) ----------
+    const scheduleOverlay = document.getElementById("scheduleOverlay");
+    const scheduleMeta = document.getElementById("scheduleMeta");
+    const scheduleBody = document.getElementById("scheduleBody");
+    const scheduleProgress = document.getElementById("scheduleProgress");
+    const scheduleBack = document.getElementById("scheduleBack");
+    const scheduleNext = document.getElementById("scheduleNext");
+
+    let scheduleClientId = null;
+    let scheduleStep = 0;
+    let scheduleData = { date: "", time: "09:00", type: "Follow-up" };
+
+    function openSchedule(clientId) {
+      scheduleClientId = clientId;
+      scheduleStep = 0;
+      const c = allClients.find((x) => x.id === clientId);
+      const parts = splitDateTime(c && c.follow_up_at);
+      scheduleData = { date: parts.date || "", time: parts.time || "09:00", type: (c && c.follow_up_type) || "Follow-up" };
+      // Close detail modal so they're focused on scheduling; reopen after save.
+      detailOverlay.classList.remove("open");
+      renderScheduleStep();
+      scheduleOverlay.classList.add("open");
+    }
+    function closeSchedule() { scheduleOverlay.classList.remove("open"); }
+
+    function renderScheduleStep() {
+      scheduleMeta.textContent = `Step ${scheduleStep + 1} of 3`;
+      scheduleProgress.style.width = `${((scheduleStep + 1) / 3) * 100}%`;
+      if (scheduleStep === 0) {
+        scheduleBody.innerHTML = `
+          <h2 class="step-title">Pick a date</h2>
+          <p class="step-desc">Which day should this be scheduled for?</p>
+          <div class="field"><label>Date</label><input id="s_date" type="date" value="${esc(scheduleData.date)}"></div>`;
+        setTimeout(() => document.getElementById("s_date").focus(), 50);
+      } else if (scheduleStep === 1) {
+        scheduleBody.innerHTML = `
+          <h2 class="step-title">Pick a time</h2>
+          <p class="step-desc">What time of day?</p>
+          <div class="field"><label>Time</label><input id="s_time" type="time" value="${esc(scheduleData.time)}"></div>`;
+        setTimeout(() => document.getElementById("s_time").focus(), 50);
+      } else {
+        const opts = FOLLOW_UP_TYPES.map((o) => `<option value="${esc(o)}"${scheduleData.type === o ? " selected" : ""}>${o}</option>`).join("");
+        scheduleBody.innerHTML = `
+          <h2 class="step-title">What kind?</h2>
+          <p class="step-desc">Follow-up is a casual check-in. Appointment is a firm commitment.</p>
+          <div class="field"><label>Type</label><select id="s_type">${opts}</select></div>`;
+      }
+      scheduleBack.disabled = scheduleStep === 0;
+      scheduleNext.textContent = scheduleStep === 2 ? "Save" : "Next";
+    }
+
+    async function scheduleGoNext() {
+      if (scheduleStep === 0) {
+        const v = document.getElementById("s_date").value;
+        if (!v) { alert("Pick a date first."); return; }
+        scheduleData.date = v;
+        scheduleStep = 1; renderScheduleStep(); return;
+      }
+      if (scheduleStep === 1) {
+        scheduleData.time = document.getElementById("s_time").value || "09:00";
+        scheduleStep = 2; renderScheduleStep(); return;
+      }
+      scheduleData.type = document.getElementById("s_type").value || "Follow-up";
+      const fuIso = combineDateTime(scheduleData.date, scheduleData.time);
+      scheduleNext.disabled = true; scheduleNext.textContent = "Saving...";
+      const { error } = await sb.from("clients")
+        .update({ follow_up_at: fuIso, follow_up_type: scheduleData.type })
+        .eq("id", scheduleClientId);
+      scheduleNext.disabled = false; scheduleNext.textContent = "Save";
+      if (error) { alert("Save failed: " + error.message); return; }
+      closeSchedule();
+      const id = scheduleClientId;
+      await load();
+      // Reopen detail to show the new schedule
+      openDetail(id);
+    }
+    function scheduleGoBack() {
+      if (scheduleStep === 0) return;
+      if (scheduleStep === 1) scheduleData.date = document.getElementById("s_date")?.value || scheduleData.date;
+      if (scheduleStep === 2) scheduleData.time = document.getElementById("s_time")?.value || scheduleData.time;
+      scheduleStep--; renderScheduleStep();
+    }
+
+    // ---------- Filter modal ----------
+    const filterOverlay = document.getElementById("filterOverlay");
+
+    function populateFilterModalOptions() {
+      const btSelect = document.getElementById("f_business_type");
+      const types = Array.from(new Set(allClients.map((c) => c.business_type).filter(Boolean))).sort();
+      btSelect.innerHTML = `<option value="">Any</option>` + types.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
+      document.getElementById("f_web_status").innerHTML = `<option value="">Any</option>` + WEB_STATUSES.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("");
+      document.getElementById("f_client_status").innerHTML = `<option value="">Any</option>` + CLIENT_STATUSES.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("");
+      document.getElementById("f_motivation").innerHTML = `<option value="">Any</option>` + MOTIVATIONS.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("");
+    }
+
+    function openFilterModal() {
+      document.getElementById("f_business_type").value = filters.business_type;
+      document.getElementById("f_manager").value = filters.manager;
+      document.getElementById("f_web_status").value = filters.web_status;
+      document.getElementById("f_client_status").value = filters.client_status;
+      document.getElementById("f_motivation").value = filters.motivation;
+      document.getElementById("f_followup").value = filters.followup;
+      filterOverlay.classList.add("open");
+    }
+    function closeFilterModal() { filterOverlay.classList.remove("open"); }
+
+    function applyFilterFromModal() {
+      filters = {
+        business_type: document.getElementById("f_business_type").value,
+        manager: document.getElementById("f_manager").value,
+        web_status: document.getElementById("f_web_status").value,
+        client_status: document.getElementById("f_client_status").value,
+        motivation: document.getElementById("f_motivation").value,
+        followup: document.getElementById("f_followup").value,
+      };
+      closeFilterModal();
+      render();
+      refreshCalendar();
+    }
+    function resetFiltersModal() {
+      document.getElementById("f_business_type").value = "";
+      document.getElementById("f_manager").value = "";
+      document.getElementById("f_web_status").value = "";
+      document.getElementById("f_client_status").value = "";
+      document.getElementById("f_motivation").value = "";
+      document.getElementById("f_followup").value = "";
+    }
+    function clearAllFilters() {
+      filters = { ...DEFAULT_FILTERS };
+      render();
+      refreshCalendar();
     }
 
     // ---------- Tabs + Calendar ----------
@@ -983,42 +1290,25 @@
       document.querySelectorAll(".tab-content").forEach((t) => t.classList.toggle("active", t.dataset.view === name));
       if (name === "calendar") {
         initCalendar();
-        // Need to render size after tab becomes visible
         setTimeout(() => { if (calendarInstance) calendarInstance.updateSize(); }, 50);
       }
     }
 
-    function csColorHex(s) {
-      const map = {
-        "New Lead":      "#3b82f6",
-        "Contacted":     "#14b8a6",
-        "Interested":    "#8b5cf6",
-        "Proposal Sent": "#f97316",
-        "Negotiation":   "#6366f1",
-        "Follow Up":     "#f59e0b",
-        "Closed Won":    "#10b981",
-        "Closed Lost":   "#ef4444",
-        "Nurture":       "#6b7280",
-      };
-      return map[s] || "#6b7280";
-    }
-
     function buildCalendarEvents() {
-      return allClients
-        .filter((c) => c.follow_up_date)
+      const visible = applyFiltersToClients(allClients);
+      return visible
+        .filter((c) => c.follow_up_at)
         .map((c) => {
-          const state = followupState(c.follow_up_date);
-          const overdue = state === "overdue";
-          const baseColor = csColorHex(c.client_status);
-          const color = overdue ? "#dc2626" : baseColor;
-          const prefix = overdue ? "⚠ " : state === "today" ? "• " : "";
+          const state = fupState(c.follow_up_at);
+          const isAppt = c.follow_up_type === "Appointment";
+          const color = state === "overdue" ? "#dc2626" : (isAppt ? "#f97316" : "#3b82f6");
+          const prefix = isAppt ? "📞 " : "";
           return {
             id: c.id,
             title: prefix + (c.company_name || "(no name)"),
-            start: c.follow_up_date,
-            allDay: true,
+            start: c.follow_up_at,
+            allDay: false,
             color,
-            extendedProps: { client_status: c.client_status, overdue },
           };
         });
     }
@@ -1031,18 +1321,14 @@
         headerToolbar: {
           left: "prev,next today",
           center: "title",
-          right: "dayGridMonth,timeGridWeek,listWeek",
+          right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
         },
         height: "auto",
         events: buildCalendarEvents(),
-        eventClick: (info) => {
-          info.jsEvent.preventDefault();
-          openDetail(info.event.id);
-        },
+        eventClick: (info) => { info.jsEvent.preventDefault(); openDetail(info.event.id); },
       });
       calendarInstance.render();
     }
-
     function refreshCalendar() {
       if (!calendarInstance) return;
       const events = buildCalendarEvents();
@@ -1050,11 +1336,9 @@
       events.forEach((e) => calendarInstance.addEvent(e));
     }
 
-    document.querySelectorAll(".tab").forEach((t) => {
-      t.addEventListener("click", () => switchTab(t.dataset.view));
-    });
-
     // ---------- Wire up ----------
+    document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => switchTab(t.dataset.view)));
+
     document.getElementById("openWizard").addEventListener("click", openWizard);
     document.getElementById("closeWizard").addEventListener("click", closeWizard);
     wizardOverlay.addEventListener("click", (e) => { if (e.target === wizardOverlay) closeWizard(); });
@@ -1064,14 +1348,27 @@
     document.getElementById("closeDetail").addEventListener("click", closeDetail);
     detailOverlay.addEventListener("click", (e) => { if (e.target === detailOverlay) closeDetail(); });
 
+    document.getElementById("closeSchedule").addEventListener("click", closeSchedule);
+    scheduleOverlay.addEventListener("click", (e) => { if (e.target === scheduleOverlay) closeSchedule(); });
+    scheduleBack.addEventListener("click", scheduleGoBack);
+    scheduleNext.addEventListener("click", scheduleGoNext);
+
+    document.getElementById("openFilters").addEventListener("click", openFilterModal);
+    document.getElementById("closeFilter").addEventListener("click", closeFilterModal);
+    filterOverlay.addEventListener("click", (e) => { if (e.target === filterOverlay) closeFilterModal(); });
+    document.getElementById("filterApply").addEventListener("click", applyFilterFromModal);
+    document.getElementById("filterReset").addEventListener("click", resetFiltersModal);
+    document.getElementById("clearFilters").addEventListener("click", clearAllFilters);
+
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
-        if (wizardOverlay.classList.contains("open")) closeWizard();
+        if (scheduleOverlay.classList.contains("open")) closeSchedule();
+        else if (filterOverlay.classList.contains("open")) closeFilterModal();
+        else if (wizardOverlay.classList.contains("open")) closeWizard();
         else if (detailOverlay.classList.contains("open")) closeDetail();
       }
       if (e.key === "Enter" && wizardOverlay.classList.contains("open") && e.target.tagName !== "TEXTAREA") {
-        e.preventDefault();
-        goNext();
+        e.preventDefault(); goNext();
       }
     });
 
