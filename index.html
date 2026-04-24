@@ -110,7 +110,6 @@
     tr.row-overdue:hover { background: #fee2e2; }
     .badge.overdue { background: #dc2626; color: white; margin-left: 6px; font-size: 10px; }
     .badge.due-today { background: #f59e0b; color: white; margin-left: 6px; font-size: 10px; }
-    .fup-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin-right: 4px; }
 
     /* Active filter chips */
     .filter-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -124,21 +123,11 @@
     .fc .fc-toolbar-title { font-size: 1.2em !important; }
     .fc-event { cursor: pointer; }
 
-    /* Follow-up box in detail view */
-    .followup-box {
-      background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;
-      padding: 12px; margin: 8px 20px 0; display: flex; align-items: center;
-      justify-content: space-between; gap: 12px;
-    }
-    .followup-box.overdue { background: #fef2f2; border-color: #fecaca; }
-    .followup-box .fup-text .fup-label2 { color: #6b7280; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px; }
-    .followup-box .fup-text .fup-value { color: #1f2937; font-size: 14px; }
-    .followup-box .fup-text .fup-value.overdue { color: #991b1b; font-weight: 600; }
-    .fup-type-tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; margin-left: 8px; }
-    .fup-type-Followup   { background: #dbeafe; color: #1e40af; }
+    .fup-type-tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; margin-left: 6px; }
+    .fup-type-Followup    { background: #dbeafe; color: #1e40af; }
     .fup-type-Appointment { background: #fed7aa; color: #9a3412; }
 
-    /* Modals */
+    /* Modals (shared) */
     .overlay {
       position: fixed; inset: 0;
       background: rgba(17, 24, 39, 0.5);
@@ -159,8 +148,9 @@
       flex-direction: column;
       max-height: 90vh;
     }
+    .modal-wide { max-width: 920px; }
     .modal-header {
-      padding: 16px 20px;
+      padding: 14px 18px;
       border-bottom: 1px solid #e5e7eb;
       display: flex;
       align-items: center;
@@ -184,90 +174,244 @@
     .step-body { padding: 4px 20px 16px; overflow-y: auto; flex: 1; }
     .step-title { font-size: 18px; font-weight: 600; margin: 0 0 6px; }
     .step-desc { color: #6b7280; font-size: 14px; margin: 0 0 16px; }
-
-    /* Wizard progress */
-    .progress { height: 4px; background: #e5e7eb; position: relative; }
+    .progress { height: 4px; background: #e5e7eb; }
     .progress-bar { height: 100%; background: #111827; transition: width 200ms ease; }
 
-    /* Fields */
+    /* Wizard fields */
     .field { margin-bottom: 12px; }
-    .field label {
-      display: block;
-      font-size: 13px;
-      font-weight: 500;
-      margin-bottom: 4px;
-      color: #374151;
-    }
+    .field label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: #374151; }
     .field input, .field select, .field textarea {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      font-size: 14px;
-      font-family: inherit;
+      width: 100%; padding: 10px 12px;
+      border: 1px solid #d1d5db; border-radius: 6px;
+      font-size: 14px; font-family: inherit;
     }
     .field input:focus, .field select:focus, .field textarea:focus {
-      outline: none;
-      border-color: #6366f1;
+      outline: none; border-color: #6366f1;
       box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
     }
     .field textarea { min-height: 80px; resize: vertical; }
     .field-error {
-      color: #991b1b;
-      font-size: 13px;
-      background: #fee2e2;
-      padding: 8px 10px;
-      border-radius: 6px;
-      margin-top: 8px;
+      color: #991b1b; font-size: 13px; background: #fee2e2;
+      padding: 8px 10px; border-radius: 6px; margin-top: 8px;
     }
-    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
-    /* Detail view */
-    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; padding: 16px 20px; }
-    .detail-grid .detail-full { grid-column: 1 / -1; }
-    .detail-item .k {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: #6b7280;
-      font-weight: 600;
-      margin-bottom: 2px;
+    /* === PROFILE LAYOUT === */
+    .profile-layout {
+      display: grid;
+      grid-template-columns: 32% 68%;
+      height: 70vh;
+      min-height: 480px;
+      overflow: hidden;
     }
-    .detail-item .v {
-      font-size: 14px;
-      color: #1f2937;
-      word-break: break-word;
-      white-space: pre-wrap;
+    @media (max-width: 720px) {
+      .profile-layout { grid-template-columns: 1fr; height: auto; max-height: 80vh; overflow-y: auto; }
     }
-    .detail-item .v.muted { color: #9ca3af; font-style: italic; }
 
-    /* Notes thread (chat-style) */
-    .notes-section { margin: 0 20px 12px; }
-    .notes-section h4 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; margin: 16px 0 6px; font-weight: 600; }
+    /* Notes panel (left) */
+    .profile-notes {
+      display: flex; flex-direction: column;
+      border-right: 1px solid #e5e7eb;
+      background: #f9fafb;
+      overflow: hidden;
+    }
+    .notes-toggle { display: flex; border-bottom: 1px solid #e5e7eb; background: #fff; }
+    .notes-toggle button {
+      flex: 1; background: transparent; color: #6b7280;
+      border: none; border-bottom: 3px solid transparent;
+      padding: 11px 8px; font-size: 13px; font-weight: 500;
+      cursor: pointer; border-radius: 0;
+    }
+    .notes-toggle button:hover { background: #f3f4f6; color: #1f2937; }
+    .notes-toggle button.active.client-tab { color: #1e40af; border-bottom-color: #3b82f6; background: #eff6ff; }
+    .notes-toggle button.active.web-tab    { color: #065f46; border-bottom-color: #10b981; background: #ecfdf5; }
     .notes-thread {
-      background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;
-      padding: 10px; max-height: 200px; overflow-y: auto;
-      display: flex; flex-direction: column; gap: 8px;
+      flex: 1; overflow-y: auto; padding: 12px;
+      display: flex; flex-direction: column; gap: 6px;
     }
-    .notes-thread.empty { color: #9ca3af; font-style: italic; font-size: 13px; text-align: center; padding: 20px; }
-    .note-entry {
-      background: #fff; border: 1px solid #e5e7eb; border-radius: 6px;
-      padding: 8px 10px; font-size: 13px;
+    .notes-thread.empty {
+      color: #9ca3af; font-style: italic; text-align: center;
+      padding: 32px 8px; font-size: 13px;
+      align-items: center; justify-content: center;
     }
-    .note-entry .note-time { font-size: 11px; color: #6b7280; margin-bottom: 3px; }
-    .note-entry .note-text { color: #1f2937; white-space: pre-wrap; word-break: break-word; }
-    .new-note-box { margin-top: 8px; }
-    .new-note-box textarea { min-height: 60px; }
-    .new-note-box .hint { font-size: 11px; color: #6b7280; margin-top: 4px; }
+    .bubble-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; max-width: 88%; align-self: flex-end; }
+    .bubble {
+      padding: 8px 12px; border-radius: 16px;
+      font-size: 13px; word-break: break-word; white-space: pre-wrap;
+      line-height: 1.35;
+    }
+    .bubble-client { background: #3b82f6; color: white; border-bottom-right-radius: 4px; }
+    .bubble-web    { background: #10b981; color: white; border-bottom-right-radius: 4px; }
+    .bubble-time { font-size: 10px; color: #9ca3af; padding: 0 6px; }
+    .notes-input-bar {
+      border-top: 1px solid #e5e7eb;
+      padding: 10px; background: #fff;
+      display: flex; gap: 6px; align-items: flex-end;
+    }
+    .notes-input-bar textarea {
+      flex: 1; padding: 8px 12px;
+      border: 1px solid #d1d5db; border-radius: 18px;
+      font-size: 13px; font-family: inherit; resize: none;
+      min-height: 36px; max-height: 90px;
+    }
+    .notes-input-bar textarea:focus { outline: none; border-color: #6366f1; }
+    .notes-input-bar button { padding: 8px 14px; font-size: 13px; border-radius: 18px; }
+    .notes-cap-hint { font-size: 10px; color: #9ca3af; padding: 4px 12px 6px; text-align: center; background: #fff; border-top: 1px solid #f3f4f6; }
+
+    /* Right panel */
+    .profile-right { display: flex; flex-direction: column; overflow: hidden; }
+    .right-tabs { display: flex; border-bottom: 1px solid #e5e7eb; background: #f9fafb; }
+    .right-tabs button {
+      background: transparent; color: #6b7280;
+      border: none; border-bottom: 2px solid transparent;
+      padding: 12px 18px; font-size: 13px; font-weight: 500;
+      cursor: pointer; border-radius: 0;
+    }
+    .right-tabs button:hover { color: #1f2937; background: #fff; }
+    .right-tabs button.active { color: #111827; border-bottom-color: #111827; background: #fff; }
+    .right-content { flex: 1; overflow-y: auto; padding: 18px 20px; }
+
+    /* Info rows */
+    .info-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 0; border-bottom: 1px solid #f3f4f6;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-label {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+      color: #6b7280; font-weight: 600; width: 100px; flex-shrink: 0;
+    }
+    .info-value { flex: 1; font-size: 14px; color: #1f2937; word-break: break-word; min-width: 0; }
+    .info-value.muted { color: #9ca3af; font-style: italic; }
+    .info-value a { font-size: 13px; }
+    .row-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .icon-btn {
+      background: #fff; border: 1px solid #e5e7eb; color: #6b7280;
+      padding: 4px 8px; border-radius: 6px; cursor: pointer;
+      font-size: 13px; line-height: 1;
+    }
+    .icon-btn:hover { background: #f3f4f6; color: #1f2937; border-color: #d1d5db; }
+    .icon-btn.copied { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+    .inline-edit-row { display: flex; gap: 4px; flex: 1; min-width: 0; }
+    .inline-edit-row input {
+      flex: 1; min-width: 0; padding: 6px 10px;
+      border: 1px solid #6366f1; border-radius: 6px;
+      font-size: 14px; font-family: inherit;
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+    }
+
+    /* Field block (right panel section) */
+    .field-block { margin-bottom: 22px; }
+    .field-block-title {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+      color: #6b7280; font-weight: 600; margin-bottom: 8px;
+    }
+
+    /* Pills */
+    .pill-bar { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pill {
+      display: inline-block;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      background: #f3f4f6;
+      color: #4b5563;
+      border: 2px solid #d1d5db;
+      transition: all 120ms ease;
+      user-select: none;
+    }
+    .pill:hover { background: #e5e7eb; }
+
+    /* Web Status pills */
+    .pill.p-ws-NotStarted   { border-color: #6b7280; }
+    .pill.p-ws-NotStarted.active   { background: #6b7280; color: white; }
+    .pill.p-ws-InProgress   { border-color: #3b82f6; }
+    .pill.p-ws-InProgress.active   { background: #3b82f6; color: white; }
+    .pill.p-ws-Review       { border-color: #f59e0b; }
+    .pill.p-ws-Review.active       { background: #f59e0b; color: white; }
+    .pill.p-ws-NeedsFixing  { border-color: #dc2626; }
+    .pill.p-ws-NeedsFixing.active  { background: #dc2626; color: white; }
+    .pill.p-ws-Finished     { border-color: #10b981; }
+    .pill.p-ws-Finished.active     { background: #10b981; color: white; }
+
+    /* Client Status pills */
+    .pill.p-cs-NewLead      { border-color: #3b82f6; }
+    .pill.p-cs-NewLead.active      { background: #3b82f6; color: white; }
+    .pill.p-cs-Contacted    { border-color: #14b8a6; }
+    .pill.p-cs-Contacted.active    { background: #14b8a6; color: white; }
+    .pill.p-cs-Interested   { border-color: #8b5cf6; }
+    .pill.p-cs-Interested.active   { background: #8b5cf6; color: white; }
+    .pill.p-cs-ProposalSent { border-color: #f97316; }
+    .pill.p-cs-ProposalSent.active { background: #f97316; color: white; }
+    .pill.p-cs-Negotiation  { border-color: #6366f1; }
+    .pill.p-cs-Negotiation.active  { background: #6366f1; color: white; }
+    .pill.p-cs-FollowUp     { border-color: #f59e0b; }
+    .pill.p-cs-FollowUp.active     { background: #f59e0b; color: white; }
+    .pill.p-cs-ClosedWon    { border-color: #10b981; }
+    .pill.p-cs-ClosedWon.active    { background: #10b981; color: white; }
+    .pill.p-cs-ClosedLost   { border-color: #dc2626; }
+    .pill.p-cs-ClosedLost.active   { background: #dc2626; color: white; }
+    .pill.p-cs-Nurture      { border-color: #6b7280; }
+    .pill.p-cs-Nurture.active      { background: #6b7280; color: white; }
+
+    /* Motivation pills */
+    .pill.p-mo-NotSet { border-color: #9ca3af; }
+    .pill.p-mo-NotSet.active { background: #6b7280; color: white; }
+    .pill.p-mo-Dead   { border-color: #1f2937; }
+    .pill.p-mo-Dead.active   { background: #1f2937; color: white; }
+    .pill.p-mo-Cold   { border-color: #3b82f6; }
+    .pill.p-mo-Cold.active   { background: #3b82f6; color: white; }
+    .pill.p-mo-Warm   { border-color: #f97316; }
+    .pill.p-mo-Warm.active   { background: #f97316; color: white; }
+    .pill.p-mo-Hot    { border-color: #dc2626; }
+    .pill.p-mo-Hot.active    { background: #dc2626; color: white; }
+    .pill.p-mo-VIP    { border-color: #eab308; }
+    .pill.p-mo-VIP.active    { background: #eab308; color: white; }
+
+    /* Manager pills */
+    .pill.p-mgr-Unassigned { border-color: #9ca3af; }
+    .pill.p-mgr-Unassigned.active { background: #6b7280; color: white; }
+    .pill.p-mgr-Ivan   { border-color: #3b82f6; }
+    .pill.p-mgr-Ivan.active   { background: #3b82f6; color: white; }
+    .pill.p-mgr-Hector { border-color: #8b5cf6; }
+    .pill.p-mgr-Hector.active { background: #8b5cf6; color: white; }
+
+    /* Schedule type pills */
+    .pill.p-fut-Followup    { border-color: #3b82f6; }
+    .pill.p-fut-Followup.active    { background: #3b82f6; color: white; }
+    .pill.p-fut-Appointment { border-color: #f97316; }
+    .pill.p-fut-Appointment.active { background: #f97316; color: white; }
+
+    /* Schedule block */
+    .schedule-block {
+      background: #f9fafb; border: 1px solid #e5e7eb;
+      border-radius: 8px; padding: 14px;
+    }
+    .schedule-block.overdue { background: #fef2f2; border-color: #fecaca; }
+    .schedule-current {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; flex-wrap: wrap;
+    }
+    .source-of-truth { font-size: 14px; font-weight: 500; color: #1f2937; }
+    .source-of-truth.overdue { color: #991b1b; }
+    .source-of-truth.empty { color: #6b7280; font-style: italic; font-weight: normal; }
+    .schedule-edit-menu {
+      margin-top: 12px; display: flex; gap: 8px;
+      border-top: 1px solid #e5e7eb; padding-top: 12px;
+    }
+    .schedule-form { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+    .schedule-form .date-time-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .schedule-form input[type="date"], .schedule-form input[type="time"] {
+      padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px;
+      font-size: 14px; font-family: inherit; width: 100%;
+    }
+    .schedule-form .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 
     /* Review (wizard) */
     .review-row {
-      display: grid;
-      grid-template-columns: 140px 1fr;
-      gap: 8px;
-      padding: 8px 0;
-      border-bottom: 1px solid #f3f4f6;
-      font-size: 14px;
+      display: grid; grid-template-columns: 140px 1fr;
+      gap: 8px; padding: 8px 0; border-bottom: 1px solid #f3f4f6; font-size: 14px;
     }
     .review-row:last-child { border-bottom: none; }
     .review-row .k { color: #6b7280; font-weight: 500; }
@@ -367,31 +511,34 @@
     </div>
   </div>
 
-  <!-- Detail / Edit modal -->
+  <!-- Profile / Detail modal (REDESIGNED) -->
   <div class="overlay" id="detailOverlay">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+    <div class="modal modal-wide" role="dialog" aria-modal="true">
       <div class="modal-header">
         <div class="modal-title" id="detailTitle">Client Details</div>
         <button class="modal-close" id="closeDetail" aria-label="Close">×</button>
       </div>
-      <div id="detailBody" class="step-body" style="padding: 0;"></div>
-      <div class="modal-footer" id="detailFooter"></div>
-    </div>
-  </div>
-
-  <!-- Schedule mini-wizard modal (date -> time -> type) -->
-  <div class="overlay" id="scheduleOverlay">
-    <div class="modal" role="dialog" aria-modal="true">
-      <div class="modal-header">
-        <div class="modal-title">Schedule Follow-up / Appointment</div>
-        <button class="modal-close" id="closeSchedule" aria-label="Close">×</button>
-      </div>
-      <div class="progress"><div class="progress-bar" id="scheduleProgress" style="width:33%"></div></div>
-      <div class="step-meta" id="scheduleMeta">Step 1 of 3</div>
-      <div class="step-body" id="scheduleBody"></div>
-      <div class="modal-footer">
-        <button class="ghost" id="scheduleBack">Back</button>
-        <button id="scheduleNext">Next</button>
+      <div class="profile-layout">
+        <div class="profile-notes">
+          <div class="notes-toggle">
+            <button class="client-tab active" id="notesTabClient">💬 Client Notes</button>
+            <button class="web-tab"            id="notesTabWeb">🌐 Web Notes</button>
+          </div>
+          <div id="notesThread" class="notes-thread"></div>
+          <div class="notes-input-bar">
+            <textarea id="noteInput" placeholder="Type a note... (Enter to send, Shift+Enter for newline)"></textarea>
+            <button id="sendNoteBtn">Send</button>
+          </div>
+          <div class="notes-cap-hint">Last 5 notes shown. Older notes auto-drop.</div>
+        </div>
+        <div class="profile-right">
+          <div class="right-tabs">
+            <button data-rtab="info">Info</button>
+            <button data-rtab="client_status">Client Status</button>
+            <button data-rtab="web_status">Web Status</button>
+          </div>
+          <div id="rightContent" class="right-content"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -404,12 +551,8 @@
         <button class="modal-close" id="closeFilter" aria-label="Close">×</button>
       </div>
       <div class="step-body">
-        <div class="field">
-          <label>Business Type</label>
-          <select id="f_business_type"><option value="">Any</option></select>
-        </div>
-        <div class="field">
-          <label>Manager</label>
+        <div class="field"><label>Business Type</label><select id="f_business_type"><option value="">Any</option></select></div>
+        <div class="field"><label>Manager</label>
           <select id="f_manager">
             <option value="">Any</option>
             <option value="Ivan">Ivan</option>
@@ -417,20 +560,10 @@
             <option value="__unassigned">Unassigned</option>
           </select>
         </div>
-        <div class="field">
-          <label>Web Status</label>
-          <select id="f_web_status"><option value="">Any</option></select>
-        </div>
-        <div class="field">
-          <label>Client Status</label>
-          <select id="f_client_status"><option value="">Any</option></select>
-        </div>
-        <div class="field">
-          <label>Motivation</label>
-          <select id="f_motivation"><option value="">Any</option></select>
-        </div>
-        <div class="field">
-          <label>Follow-up</label>
+        <div class="field"><label>Web Status</label><select id="f_web_status"><option value="">Any</option></select></div>
+        <div class="field"><label>Client Status</label><select id="f_client_status"><option value="">Any</option></select></div>
+        <div class="field"><label>Motivation</label><select id="f_motivation"><option value="">Any</option></select></div>
+        <div class="field"><label>Follow-up</label>
           <select id="f_followup">
             <option value="">Any</option>
             <option value="overdue">Overdue</option>
@@ -465,13 +598,11 @@
     const emptyEl = document.getElementById("empty");
 
     // ---- Constants ----
-    const WEB_STATUSES = ["Not Started", "In Progress", "Review", "Needs Fixing", "Finished"];
-    const CLIENT_STATUSES = [
-      "New Lead","Contacted","Interested","Proposal Sent",
-      "Negotiation","Follow Up","Closed Won","Closed Lost","Nurture"
-    ];
-    const MOTIVATIONS = ["Not Set", "Dead", "Cold", "Warm", "Hot", "VIP"];
+    const WEB_STATUSES    = ["Not Started", "In Progress", "Review", "Needs Fixing", "Finished"];
+    const CLIENT_STATUSES = ["New Lead","Contacted","Interested","Proposal Sent","Negotiation","Follow Up","Closed Won","Closed Lost","Nurture"];
+    const MOTIVATIONS     = ["Not Set", "Dead", "Cold", "Warm", "Hot", "VIP"];
     const FOLLOW_UP_TYPES = ["Follow-up", "Appointment"];
+    const MANAGERS        = [{ label: "Unassigned", value: "" }, { label: "Ivan", value: "Ivan" }, { label: "Hector", value: "Hector" }];
     const NOTE_CAP = 5;
 
     // ---- Helpers ----
@@ -483,6 +614,7 @@
     const moClass = (s) => "mo-" + (s || "Not Set").replace(/\s/g, "");
     const normPhone = (s) => (s || "").replace(/\D+/g, "");
     const fupTypeClass = (t) => "fup-type-" + (t || "Follow-up").replace(/[-\s]/g, "");
+    const slug = (s) => (s || "").replace(/[-\s]/g, "");
 
     function formatPhone(raw) {
       const d = normPhone(raw).slice(0, 10);
@@ -498,7 +630,7 @@
       return s;
     }
     document.addEventListener("input", (e) => {
-      if (e.target.matches('input[name="phone"]')) e.target.value = formatPhone(e.target.value);
+      if (e.target.matches('input[name="phone"], input.phone-input')) e.target.value = formatPhone(e.target.value);
     });
 
     function shortUrl(u) {
@@ -509,7 +641,6 @@
       } catch { return u; }
     }
 
-    // Follow-up state
     function fupState(iso) {
       if (!iso) return "none";
       const then = new Date(iso);
@@ -534,22 +665,16 @@
       return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
         + " · " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
     }
-    function formatDateOnly(iso) {
+    function formatNoteTime(iso) {
       if (!iso) return "";
       const d = new Date(iso);
-      return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+      return d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+        + ", " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
     }
-    function formatTimeOnly(iso) {
-      if (!iso) return "";
-      const d = new Date(iso);
-      return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-    }
-    // Build ISO from date string (YYYY-MM-DD) + time string (HH:MM)
     function combineDateTime(dateStr, timeStr) {
       if (!dateStr) return null;
       const t = timeStr || "09:00";
-      const iso = new Date(`${dateStr}T${t}:00`).toISOString();
-      return iso;
+      return new Date(`${dateStr}T${t}:00`).toISOString();
     }
     function splitDateTime(iso) {
       if (!iso) return { date: "", time: "" };
@@ -561,7 +686,6 @@
       };
     }
 
-    // Notes
     function trimNotes(arr) {
       const a = Array.isArray(arr) ? arr : [];
       return a.slice(-NOTE_CAP);
@@ -575,18 +699,14 @@
     // ---------- Filters ----------
     const DEFAULT_FILTERS = { business_type: "", manager: "", web_status: "", client_status: "", motivation: "", followup: "" };
     let filters = { ...DEFAULT_FILTERS };
-
-    function anyFilterActive() {
-      return Object.values(filters).some((v) => v && v !== "");
-    }
+    function anyFilterActive() { return Object.values(filters).some((v) => v && v !== ""); }
 
     function applyFiltersToClients(list) {
       return list.filter((c) => {
         if (filters.business_type && c.business_type !== filters.business_type) return false;
         if (filters.manager) {
-          if (filters.manager === "__unassigned") {
-            if (c.manager) return false;
-          } else if (c.manager !== filters.manager) return false;
+          if (filters.manager === "__unassigned") { if (c.manager) return false; }
+          else if (c.manager !== filters.manager) return false;
         }
         if (filters.web_status && c.web_status !== filters.web_status) return false;
         if (filters.client_status && c.client_status !== filters.client_status) return false;
@@ -625,7 +745,14 @@
       if (saved) filters = { ...DEFAULT_FILTERS, ...JSON.parse(saved) };
     } catch {}
 
-    // ---------- Table render ----------
+    // ---------- Table ----------
+    const COLUMN_TO_TAB = {
+      company: "info", business_type: "info", client: "info", phone: "info",
+      manager: "client_status", client_status: "client_status",
+      motivation: "client_status", followup: "client_status",
+      web_status: "web_status",
+    };
+
     function render() {
       const rows = applyFiltersToClients(allClients);
       tbody.innerHTML = "";
@@ -653,15 +780,15 @@
         }
 
         tr.innerHTML = `
-          <td class="truncate">${esc(r.company_name) || '<span style="color:#9ca3af;">—</span>'}</td>
-          <td class="truncate">${esc(r.business_type) || '<span style="color:#9ca3af;">—</span>'}</td>
-          <td class="truncate">${esc(r.client_name) || '<span style="color:#9ca3af;">—</span>'}</td>
-          <td class="truncate">${r.phone ? esc(displayPhone(r.phone)) : '<span style="color:#9ca3af;">—</span>'}</td>
-          <td>${esc(r.manager) || '<span style="color:#9ca3af;">—</span>'}</td>
-          <td><span class="badge ${wsClass(r.web_status)}">${esc(r.web_status || "Not Started")}</span></td>
-          <td><span class="badge ${csClass(r.client_status)}">${esc(r.client_status || "New Lead")}</span></td>
-          <td><span class="badge ${moClass(r.motivation)}">${esc(r.motivation || "Not Set")}</span></td>
-          <td class="truncate">${fupHtml}</td>
+          <td class="truncate" data-col="company">${esc(r.company_name) || '<span style="color:#9ca3af;">—</span>'}</td>
+          <td class="truncate" data-col="business_type">${esc(r.business_type) || '<span style="color:#9ca3af;">—</span>'}</td>
+          <td class="truncate" data-col="client">${esc(r.client_name) || '<span style="color:#9ca3af;">—</span>'}</td>
+          <td class="truncate" data-col="phone">${r.phone ? esc(displayPhone(r.phone)) : '<span style="color:#9ca3af;">—</span>'}</td>
+          <td data-col="manager">${esc(r.manager) || '<span style="color:#9ca3af;">—</span>'}</td>
+          <td data-col="web_status"><span class="badge ${wsClass(r.web_status)}">${esc(r.web_status || "Not Started")}</span></td>
+          <td data-col="client_status"><span class="badge ${csClass(r.client_status)}">${esc(r.client_status || "New Lead")}</span></td>
+          <td data-col="motivation"><span class="badge ${moClass(r.motivation)}">${esc(r.motivation || "Not Set")}</span></td>
+          <td class="truncate" data-col="followup">${fupHtml}</td>
           <td class="actions"><button class="danger" data-action="delete" data-nolink>Del</button></td>
         `;
         tbody.appendChild(tr);
@@ -671,18 +798,13 @@
       if (overdueCount > 0) {
         banner.textContent = `⚠️ ${overdueCount} client${overdueCount === 1 ? "" : "s"} overdue for follow-up`;
         banner.classList.add("show");
-      } else {
-        banner.classList.remove("show");
-      }
+      } else { banner.classList.remove("show"); }
       renderFilterChips();
     }
 
     let allClients = [];
     async function load() {
-      const { data, error } = await sb
-        .from("clients")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const { data, error } = await sb.from("clients").select("*").order("created_at", { ascending: false });
       if (error) { alert("Load failed: " + error.message); return; }
       allClients = data || [];
       populateFilterModalOptions();
@@ -690,7 +812,6 @@
       refreshCalendar();
     }
 
-    // Row click opens detail; delete button & website link don't trigger it.
     tbody.addEventListener("click", async (e) => {
       const noLink = e.target.closest("[data-nolink]");
       const tr = e.target.closest("tr");
@@ -705,22 +826,22 @@
         return;
       }
       if (noLink) return;
-      openDetail(id);
+
+      const td = e.target.closest("td");
+      const col = td?.dataset.col;
+      const tab = COLUMN_TO_TAB[col] || "info";
+      openDetail(id, tab);
     });
 
-    // ---------- Wizard (Add New Client) ----------
+    // ---------- Wizard (Add New Client) — UNCHANGED behavior ----------
     const wizardSteps = [
-      {
-        title: "Company Info",
-        desc: "Who is the business?",
+      { title: "Company Info", desc: "Who is the business?",
         fields: [
           { name: "company_name", label: "Company name *", type: "text", required: true, placeholder: "Acme Paving Co." },
           { name: "business_type", label: "Business type", type: "datalist", list: "business_types", placeholder: "Pick one or type your own" },
         ],
       },
-      {
-        title: "Contact",
-        desc: "Who's the point of contact?",
+      { title: "Contact", desc: "Who's the point of contact?",
         fields: [
           { name: "client_name", label: "Client name", type: "text", placeholder: "Jane Doe" },
           { name: "phone", label: "Phone", type: "tel", placeholder: "(555) 123-4567", maxlength: 14, inputmode: "numeric", autocomplete: "tel-national" },
@@ -733,18 +854,14 @@
           return null;
         },
       },
-      {
-        title: "Links",
-        desc: "Profile, post, and finished website.",
+      { title: "Links", desc: "Profile, post, and finished website.",
         fields: [
           { name: "profile_link", label: "Profile link", type: "url", placeholder: "https://facebook.com/yourclient" },
           { name: "post_link", label: "Post link", type: "url", placeholder: "https://facebook.com/post/..." },
           { name: "finished_website", label: "Finished website", type: "url", placeholder: "https://yourclient.com" },
         ],
       },
-      {
-        title: "Assignment",
-        desc: "Who's handling this and where does it stand?",
+      { title: "Assignment", desc: "Who's handling this and where does it stand?",
         fields: [
           { name: "manager", label: "Manager", type: "select", options: ["", "Ivan", "Hector"], optionLabels: { "": "— Unassigned —" } },
           { name: "web_status", label: "Web status", type: "select", options: WEB_STATUSES },
@@ -752,18 +869,14 @@
           { name: "motivation", label: "Motivation", type: "select", options: MOTIVATIONS },
         ],
       },
-      {
-        title: "Schedule Follow-up",
-        desc: "Optional — date, time, and type. Leave blank to skip.",
+      { title: "Schedule Follow-up", desc: "Optional — date, time, and type. Leave blank to skip.",
         fields: [
           { name: "fu_date", label: "Date", type: "date" },
           { name: "fu_time", label: "Time", type: "time" },
           { name: "fu_type", label: "Type", type: "select", options: FOLLOW_UP_TYPES },
         ],
       },
-      {
-        title: "Notes",
-        desc: "Add an initial note for the client and/or the website build. Both optional.",
+      { title: "Notes", desc: "Add an initial note for the client and/or the website build. Both optional.",
         fields: [
           { name: "initial_client_note", label: "Client notes", type: "textarea", placeholder: "First impressions, relationship context, ..." },
           { name: "initial_web_note", label: "Web notes", type: "textarea", placeholder: "Tech stack preferences, design direction, ..." },
@@ -794,7 +907,6 @@
       const step = wizardSteps[stepIndex];
       stepMeta.textContent = `Step ${stepIndex + 1} of ${wizardSteps.length}`;
       progressBar.style.width = `${((stepIndex + 1) / wizardSteps.length) * 100}%`;
-
       if (step.review) {
         stepBody.innerHTML = `<h2 class="step-title">${step.title}</h2><p class="step-desc">${step.desc}</p>${renderReview()}`;
       } else {
@@ -816,36 +928,23 @@
         }).join("");
         return `<div class="field"><label>${esc(f.label)}</label><select name="${f.name}">${opts}</select></div>`;
       }
-      if (f.type === "textarea") {
-        return `<div class="field"><label>${esc(f.label)}</label><textarea name="${f.name}" placeholder="${esc(f.placeholder || "")}">${v}</textarea></div>`;
-      }
-      if (f.type === "datalist") {
-        return `<div class="field"><label>${esc(f.label)}</label><input type="text" name="${f.name}" list="${esc(f.list)}" value="${v}" placeholder="${esc(f.placeholder || "")}"></div>`;
-      }
-      const extra =
-        (f.maxlength ? ` maxlength="${f.maxlength}"` : "") +
-        (f.inputmode ? ` inputmode="${esc(f.inputmode)}"` : "") +
-        (f.autocomplete ? ` autocomplete="${esc(f.autocomplete)}"` : "");
+      if (f.type === "textarea") return `<div class="field"><label>${esc(f.label)}</label><textarea name="${f.name}" placeholder="${esc(f.placeholder || "")}">${v}</textarea></div>`;
+      if (f.type === "datalist") return `<div class="field"><label>${esc(f.label)}</label><input type="text" name="${f.name}" list="${esc(f.list)}" value="${v}" placeholder="${esc(f.placeholder || "")}"></div>`;
+      const extra = (f.maxlength ? ` maxlength="${f.maxlength}"` : "") + (f.inputmode ? ` inputmode="${esc(f.inputmode)}"` : "") + (f.autocomplete ? ` autocomplete="${esc(f.autocomplete)}"` : "");
       return `<div class="field"><label>${esc(f.label)}</label><input type="${esc(f.type || "text")}" name="${f.name}" value="${v}" placeholder="${esc(f.placeholder || "")}"${f.required ? " required" : ""}${extra}></div>`;
     }
 
     function renderReview() {
       const fuIso = formData.fu_date ? combineDateTime(formData.fu_date, formData.fu_time) : null;
       const rows = [
-        ["Company", formData.company_name],
-        ["Business Type", formData.business_type],
-        ["Client", formData.client_name],
-        ["Phone", formData.phone],
-        ["Profile Link", formData.profile_link],
-        ["Post Link", formData.post_link],
+        ["Company", formData.company_name], ["Business Type", formData.business_type],
+        ["Client", formData.client_name], ["Phone", formData.phone],
+        ["Profile Link", formData.profile_link], ["Post Link", formData.post_link],
         ["Finished Website", formData.finished_website],
-        ["Manager", formData.manager],
-        ["Web Status", formData.web_status],
-        ["Client Status", formData.client_status],
-        ["Motivation", formData.motivation],
+        ["Manager", formData.manager], ["Web Status", formData.web_status],
+        ["Client Status", formData.client_status], ["Motivation", formData.motivation],
         ["Follow-up", fuIso ? `${formatDateTime(fuIso)} (${formData.fu_type || "Follow-up"})` : ""],
-        ["Client Notes", formData.initial_client_note],
-        ["Web Notes", formData.initial_web_note],
+        ["Client Notes", formData.initial_client_note], ["Web Notes", formData.initial_web_note],
       ];
       return rows.map(([k, v]) => {
         const has = v && v.toString().trim();
@@ -864,8 +963,7 @@
     function showStepError(msg) {
       const el = document.getElementById("stepError");
       if (!el) { alert(msg); return; }
-      el.textContent = msg;
-      el.style.display = "block";
+      el.textContent = msg; el.style.display = "block";
     }
 
     async function goNext() {
@@ -883,15 +981,9 @@
         }
       }
       if (stepIndex === wizardSteps.length - 1) { await submitWizard(); return; }
-      stepIndex++;
-      renderStep();
+      stepIndex++; renderStep();
     }
-    function goBack() {
-      if (stepIndex === 0) return;
-      collectStepData();
-      stepIndex--;
-      renderStep();
-    }
+    function goBack() { if (stepIndex === 0) return; collectStepData(); stepIndex--; renderStep(); }
 
     async function submitWizard() {
       nextBtn.disabled = true; nextBtn.textContent = "Saving...";
@@ -908,342 +1000,476 @@
       const clientNotes = formData.initial_client_note ? appendNote([], formData.initial_client_note) : [];
       const webNotes = formData.initial_web_note ? appendNote([], formData.initial_web_note) : [];
       const row = {
-        company_name: formData.company_name || null,
-        business_type: formData.business_type || null,
-        client_name: formData.client_name || null,
-        phone: formData.phone || null,
-        profile_link: formData.profile_link || null,
-        post_link: formData.post_link || null,
+        company_name: formData.company_name || null, business_type: formData.business_type || null,
+        client_name: formData.client_name || null, phone: formData.phone || null,
+        profile_link: formData.profile_link || null, post_link: formData.post_link || null,
         finished_website: formData.finished_website || null,
         manager: formData.manager || null,
         web_status: formData.web_status || "Not Started",
         client_status: formData.client_status || "New Lead",
         motivation: formData.motivation || "Not Set",
-        follow_up_at: fuIso,
-        follow_up_type: formData.fu_type || "Follow-up",
-        client_notes: clientNotes,
-        web_notes: webNotes,
+        follow_up_at: fuIso, follow_up_type: formData.fu_type || "Follow-up",
+        client_notes: clientNotes, web_notes: webNotes,
       };
       const { error } = await sb.from("clients").insert(row);
       nextBtn.disabled = false; nextBtn.textContent = "Save Client";
       if (error) { alert("Insert failed: " + error.message); return; }
-      closeWizard();
-      load();
+      closeWizard(); load();
     }
 
-    // ---------- Detail / Edit modal ----------
+    // ============================================================
+    // PROFILE / DETAIL — REDESIGNED
+    // ============================================================
     const detailOverlay = document.getElementById("detailOverlay");
-    const detailBody = document.getElementById("detailBody");
-    const detailFooter = document.getElementById("detailFooter");
     const detailTitle = document.getElementById("detailTitle");
+    const rightContent = document.getElementById("rightContent");
+    const notesThreadEl = document.getElementById("notesThread");
+    const noteInput = document.getElementById("noteInput");
 
     let detailId = null;
-    let detailMode = "view"; // view | edit
-    let detailDraft = {};
+    let detailRightTab = "info";       // info | client_status | web_status
+    let detailNotesTab = "client";      // client | web
+    let detailEditingField = null;      // field name being edited (text-field pencil-edit)
+    let detailScheduleMode = "view";    // view | menu | edit
+    let detailScheduleDraft = null;     // { date, time, type } when in edit mode
 
-    function openDetail(id) {
-      detailId = id; detailMode = "view"; renderDetail();
+    function openDetail(id, defaultTab = "info") {
+      detailId = id;
+      detailRightTab = defaultTab;
+      detailNotesTab = "client";
+      detailEditingField = null;
+      detailScheduleMode = "view";
+      detailScheduleDraft = null;
+      renderProfile();
       detailOverlay.classList.add("open");
     }
     function closeDetail() {
       detailOverlay.classList.remove("open");
-      detailId = null; detailMode = "view"; detailDraft = {};
+      detailId = null; detailEditingField = null; detailScheduleDraft = null;
     }
     function getCurrentClient() { return allClients.find((c) => c.id === detailId); }
 
-    function renderDetail() {
+    function renderProfile() {
       const c = getCurrentClient();
       if (!c) { closeDetail(); return; }
       detailTitle.textContent = c.company_name || "Client Details";
-      if (detailMode === "view") renderDetailView(c); else renderDetailEdit(c);
+
+      // Notes panel
+      document.getElementById("notesTabClient").classList.toggle("active", detailNotesTab === "client");
+      document.getElementById("notesTabWeb").classList.toggle("active", detailNotesTab === "web");
+      const notes = detailNotesTab === "client" ? (c.client_notes || []) : (c.web_notes || []);
+      const bubbleClass = detailNotesTab === "client" ? "bubble-client" : "bubble-web";
+      if (notes.length === 0) {
+        notesThreadEl.classList.add("empty");
+        notesThreadEl.innerHTML = `No ${detailNotesTab === "client" ? "client" : "web"} notes yet.<br>Type below and hit Send.`;
+      } else {
+        notesThreadEl.classList.remove("empty");
+        notesThreadEl.innerHTML = notes.map((n) => `
+          <div class="bubble-wrap">
+            <div class="bubble ${bubbleClass}">${esc(n.text)}</div>
+            <div class="bubble-time">${esc(formatNoteTime(n.at))}</div>
+          </div>
+        `).join("");
+        // Scroll to bottom (newest)
+        setTimeout(() => { notesThreadEl.scrollTop = notesThreadEl.scrollHeight; }, 0);
+      }
+
+      // Right tabs active state
+      document.querySelectorAll(".right-tabs button").forEach((b) => {
+        b.classList.toggle("active", b.dataset.rtab === detailRightTab);
+      });
+
+      // Right content
+      if (detailRightTab === "info") rightContent.innerHTML = renderInfoTab(c);
+      else if (detailRightTab === "client_status") rightContent.innerHTML = renderClientStatusTab(c);
+      else rightContent.innerHTML = renderWebStatusTab(c);
+
+      // Auto-focus inline edit input if any
+      if (detailEditingField) {
+        const inp = rightContent.querySelector(`input[data-edit="${detailEditingField}"]`);
+        if (inp) { inp.focus(); inp.select?.(); }
+      }
     }
 
-    function renderNotesThread(notes) {
-      const arr = Array.isArray(notes) ? notes : [];
-      if (arr.length === 0) return '<div class="notes-thread empty">No notes yet</div>';
-      // Oldest at top, newest at bottom
-      return `<div class="notes-thread">${arr.map((n) => `
-        <div class="note-entry">
-          <div class="note-time">${esc(formatDateTime(n.at))}</div>
-          <div class="note-text">${esc(n.text)}</div>
-        </div>`).join("")}</div>`;
+    // ---- Info tab ----
+    function renderInfoTab(c) {
+      return `
+        ${renderInfoRow("Company", c.company_name, "company_name", "text")}
+        ${renderInfoRow("Business Type", c.business_type, "business_type", "datalist")}
+        ${renderInfoRow("Client", c.client_name, "client_name", "text")}
+        ${renderInfoRow("Phone", c.phone, "phone", "phone")}
+        ${renderInfoRow("Profile Link", c.profile_link, "profile_link", "url")}
+        ${renderInfoRow("Post Link", c.post_link, "post_link", "url")}
+      `;
     }
 
-    function renderFollowupBox(c) {
-      const state = fupState(c.follow_up_at);
-      const typeTag = `<span class="fup-type-tag ${fupTypeClass(c.follow_up_type)}">${esc(c.follow_up_type || "Follow-up")}</span>`;
-      if (!c.follow_up_at) {
+    function renderInfoRow(label, value, fieldName, type) {
+      const inEdit = detailEditingField === fieldName;
+      if (inEdit) {
+        const inputType = type === "phone" ? "tel" : (type === "url" ? "url" : "text");
+        const v = type === "phone" ? displayPhone(value) : (value || "");
+        const phoneAttrs = type === "phone" ? ' maxlength="14" inputmode="numeric" class="phone-input"' : "";
+        const datalistAttr = type === "datalist" ? ' list="business_types"' : "";
         return `
-          <div class="followup-box">
-            <div class="fup-text">
-              <div class="fup-label2">Schedule</div>
-              <div class="fup-value" style="color:#6b7280;">Not set</div>
+          <div class="info-row">
+            <div class="info-label">${esc(label)}</div>
+            <div class="inline-edit-row">
+              <input type="${inputType}" data-edit="${fieldName}" value="${esc(v)}"${phoneAttrs}${datalistAttr}>
             </div>
-            <button class="ghost" id="addToCalendarBtn">📅 Add to Calendar</button>
+            <div class="row-actions">
+              <button class="icon-btn" data-action="save-edit" data-field="${fieldName}" title="Save">✓</button>
+              <button class="icon-btn" data-action="cancel-edit" title="Cancel">✕</button>
+            </div>
           </div>`;
       }
-      const isOverdue = state === "overdue";
-      const isToday = state === "today";
-      const note = isOverdue ? " (overdue)" : isToday ? " (today)" : "";
+      let displayHtml;
+      if (type === "url" && value) displayHtml = `<a href="${esc(value)}" target="_blank" rel="noopener">${esc(value)}</a>`;
+      else if (type === "phone" && value) displayHtml = esc(displayPhone(value));
+      else if (value) displayHtml = esc(value);
+      else displayHtml = `<span class="muted">—</span>`;
+      const showCopy = !!value;
+      const copyValue = type === "phone" ? displayPhone(value) : (value || "");
+      const copyBtn = showCopy ? `<button class="icon-btn" data-action="copy" data-value="${esc(copyValue)}" title="Copy">📋</button>` : "";
       return `
-        <div class="followup-box${isOverdue ? " overdue" : ""}">
-          <div class="fup-text">
-            <div class="fup-label2">${esc(c.follow_up_type || "Follow-up")}</div>
-            <div class="fup-value${isOverdue ? " overdue" : ""}">${esc(formatDateTime(c.follow_up_at))}${note} ${typeTag}</div>
+        <div class="info-row">
+          <div class="info-label">${esc(label)}</div>
+          <div class="info-value${value ? "" : " muted"}">${displayHtml}</div>
+          <div class="row-actions">
+            ${copyBtn}
+            <button class="icon-btn" data-action="edit" data-field="${fieldName}" title="Edit">✏️</button>
           </div>
-          <button id="viewOnCalendarBtn">📅 View on Calendar</button>
         </div>`;
     }
 
-    function renderDetailView(c) {
-      const linkAnchor = (u) => u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>` : '<span class="muted">—</span>';
-      const val = (v) => (v && v.toString().trim()) ? `<div class="v">${esc(v)}</div>` : `<div class="v muted">—</div>`;
-
-      detailBody.innerHTML = `
-        <div class="detail-grid">
-          <div class="detail-item"><div class="k">Company</div>${val(c.company_name)}</div>
-          <div class="detail-item"><div class="k">Business Type</div>${val(c.business_type)}</div>
-          <div class="detail-item"><div class="k">Client</div>${val(c.client_name)}</div>
-          <div class="detail-item"><div class="k">Phone</div>${val(displayPhone(c.phone))}</div>
-          <div class="detail-item detail-full"><div class="k">Profile Link</div><div class="v">${linkAnchor(c.profile_link)}</div></div>
-          <div class="detail-item detail-full"><div class="k">Post Link</div><div class="v">${linkAnchor(c.post_link)}</div></div>
-          <div class="detail-item detail-full"><div class="k">Finished Website</div><div class="v">${linkAnchor(c.finished_website)}</div></div>
-          <div class="detail-item"><div class="k">Manager</div>${val(c.manager)}</div>
-          <div class="detail-item"><div class="k">Web Status</div><div class="v"><span class="badge ${wsClass(c.web_status)}">${esc(c.web_status || "Not Started")}</span></div></div>
-          <div class="detail-item"><div class="k">Client Status</div><div class="v"><span class="badge ${csClass(c.client_status)}">${esc(c.client_status || "New Lead")}</span></div></div>
-          <div class="detail-item"><div class="k">Motivation</div><div class="v"><span class="badge ${moClass(c.motivation)}">${esc(c.motivation || "Not Set")}</span></div></div>
+    // ---- Client Status tab ----
+    function renderClientStatusTab(c) {
+      return `
+        <div class="field-block">
+          <div class="field-block-title">Manager</div>
+          <div class="pill-bar">
+            ${MANAGERS.map((m) => {
+              const active = (c.manager || "") === m.value;
+              return `<button class="pill p-mgr-${slug(m.label)}${active ? " active" : ""}" data-action="pill" data-field="manager" data-value="${esc(m.value)}">${esc(m.label)}</button>`;
+            }).join("")}
+          </div>
         </div>
-        ${renderFollowupBox(c)}
-        <div class="notes-section">
-          <h4>Client Notes (last 5)</h4>
-          ${renderNotesThread(c.client_notes)}
-          <h4>Web Notes (last 5)</h4>
-          ${renderNotesThread(c.web_notes)}
+
+        <div class="field-block">
+          <div class="field-block-title">Client Status</div>
+          <div class="pill-bar">
+            ${CLIENT_STATUSES.map((o) => {
+              const active = (c.client_status || "New Lead") === o;
+              return `<button class="pill p-cs-${slug(o)}${active ? " active" : ""}" data-action="pill" data-field="client_status" data-value="${esc(o)}">${esc(o)}</button>`;
+            }).join("")}
+          </div>
+        </div>
+
+        <div class="field-block">
+          <div class="field-block-title">Motivation</div>
+          <div class="pill-bar">
+            ${MOTIVATIONS.map((o) => {
+              const active = (c.motivation || "Not Set") === o;
+              return `<button class="pill p-mo-${slug(o)}${active ? " active" : ""}" data-action="pill" data-field="motivation" data-value="${esc(o)}">${esc(o)}</button>`;
+            }).join("")}
+          </div>
+        </div>
+
+        <div class="field-block">
+          <div class="field-block-title">Schedule</div>
+          ${renderScheduleSection(c)}
         </div>
       `;
-
-      const viewBtn = document.getElementById("viewOnCalendarBtn");
-      if (viewBtn) viewBtn.addEventListener("click", () => {
-        const targetDate = c.follow_up_at;
-        closeDetail();
-        switchTab("calendar");
-        setTimeout(() => { if (calendarInstance && targetDate) calendarInstance.gotoDate(targetDate); }, 80);
-      });
-      const addBtn = document.getElementById("addToCalendarBtn");
-      if (addBtn) addBtn.addEventListener("click", () => openSchedule(c.id));
-
-      detailFooter.innerHTML = `<div></div><button id="editBtn">Edit</button>`;
-      document.getElementById("editBtn").addEventListener("click", () => {
-        detailMode = "edit";
-        detailDraft = { ...c };
-        renderDetail();
-      });
     }
 
-    function renderDetailEdit(c) {
-      const d = detailDraft;
-      const managerOpts = ["", "Ivan", "Hector"].map((o) =>
-        `<option value="${esc(o)}"${(d.manager || "") === o ? " selected" : ""}>${o || "— Unassigned —"}</option>`
-      ).join("");
-      const wsOpts = WEB_STATUSES.map((o) => `<option value="${esc(o)}"${(d.web_status || "Not Started") === o ? " selected" : ""}>${o}</option>`).join("");
-      const csOpts = CLIENT_STATUSES.map((o) => `<option value="${esc(o)}"${(d.client_status || "New Lead") === o ? " selected" : ""}>${o}</option>`).join("");
-      const moOpts = MOTIVATIONS.map((o) => `<option value="${esc(o)}"${(d.motivation || "Not Set") === o ? " selected" : ""}>${o}</option>`).join("");
-      const fuTypeOpts = FOLLOW_UP_TYPES.map((o) => `<option value="${esc(o)}"${(d.follow_up_type || "Follow-up") === o ? " selected" : ""}>${o}</option>`).join("");
-      const { date: fuDate, time: fuTime } = splitDateTime(d.follow_up_at);
+    function renderScheduleSection(c) {
+      const hasSchedule = !!c.follow_up_at;
+      const state = fupState(c.follow_up_at);
+      const overdueClass = state === "overdue" ? " overdue" : "";
 
-      detailBody.innerHTML = `
-        <div style="padding: 16px 20px;">
-          <div class="field"><label>Company name *</label><input name="company_name" value="${esc(d.company_name)}" required></div>
-          <div class="field"><label>Business type</label><input name="business_type" list="business_types" value="${esc(d.business_type)}"></div>
-          <div class="field"><label>Client name</label><input name="client_name" value="${esc(d.client_name)}"></div>
-          <div class="field"><label>Phone</label><input name="phone" type="tel" value="${esc(displayPhone(d.phone))}" placeholder="(555) 123-4567" maxlength="14" inputmode="numeric" autocomplete="tel-national"></div>
-          <div class="field"><label>Profile link</label><input name="profile_link" type="url" value="${esc(d.profile_link)}" placeholder="https://..."></div>
-          <div class="field"><label>Post link</label><input name="post_link" type="url" value="${esc(d.post_link)}" placeholder="https://..."></div>
-          <div class="field"><label>Finished website</label><input name="finished_website" type="url" value="${esc(d.finished_website)}" placeholder="https://..."></div>
-          <div class="field"><label>Manager</label><select name="manager">${managerOpts}</select></div>
-          <div class="field"><label>Web status</label><select name="web_status">${wsOpts}</select></div>
-          <div class="field"><label>Client status</label><select name="client_status">${csOpts}</select></div>
-          <div class="field"><label>Motivation</label><select name="motivation">${moOpts}</select></div>
-          <div class="field-row">
-            <div class="field"><label>Follow-up date</label><input name="fu_date" type="date" value="${esc(fuDate)}"></div>
-            <div class="field"><label>Follow-up time</label><input name="fu_time" type="time" value="${esc(fuTime)}"></div>
-          </div>
-          <div class="field"><label>Follow-up type</label><select name="follow_up_type">${fuTypeOpts}</select></div>
-
-          <h4 style="font-size:13px;text-transform:uppercase;letter-spacing:0.04em;color:#6b7280;margin:18px 0 6px;">Client Notes (last ${NOTE_CAP})</h4>
-          ${renderNotesThread(d.client_notes)}
-          <div class="new-note-box">
-            <textarea name="new_client_note" placeholder="Add a new client note (leaves an entry with today's timestamp)..."></textarea>
-            <div class="hint">Oldest entry auto-drops when you hit ${NOTE_CAP + 1}.</div>
-          </div>
-
-          <h4 style="font-size:13px;text-transform:uppercase;letter-spacing:0.04em;color:#6b7280;margin:18px 0 6px;">Web Notes (last ${NOTE_CAP})</h4>
-          ${renderNotesThread(d.web_notes)}
-          <div class="new-note-box">
-            <textarea name="new_web_note" placeholder="Add a new web/build note..."></textarea>
-          </div>
-
-          <div class="field-error" id="detailError" style="display:none;margin-top:12px;"></div>
-        </div>`;
-
-      detailFooter.innerHTML = `<button class="ghost" id="cancelEditBtn">Cancel</button><button id="saveEditBtn">Save changes</button>`;
-      document.getElementById("cancelEditBtn").addEventListener("click", () => { detailMode = "view"; renderDetail(); });
-      document.getElementById("saveEditBtn").addEventListener("click", saveEdit);
-    }
-
-    async function saveEdit() {
-      const get = (name) => {
-        const el = detailBody.querySelector(`[name="${name}"]`);
-        return el ? el.value.trim() : "";
-      };
-      const update = {
-        company_name: get("company_name") || null,
-        business_type: get("business_type") || null,
-        client_name: get("client_name") || null,
-        phone: get("phone") || null,
-        profile_link: get("profile_link") || null,
-        post_link: get("post_link") || null,
-        finished_website: get("finished_website") || null,
-        manager: get("manager") || null,
-        web_status: get("web_status") || "Not Started",
-        client_status: get("client_status") || "New Lead",
-        motivation: get("motivation") || "Not Set",
-        follow_up_type: get("follow_up_type") || "Follow-up",
-      };
-      const fuDate = get("fu_date");
-      const fuTime = get("fu_time");
-      update.follow_up_at = fuDate ? combineDateTime(fuDate, fuTime) : null;
-
-      if (!update.company_name) {
-        const err = document.getElementById("detailError");
-        err.textContent = "Company name is required."; err.style.display = "block"; return;
+      // State B (something scheduled, view mode)
+      if (hasSchedule && detailScheduleMode === "view") {
+        const icon = c.follow_up_type === "Appointment" ? "📞" : "📅";
+        const note = state === "overdue" ? " (overdue)" : (state === "today" ? " (today)" : "");
+        return `
+          <div class="schedule-block${overdueClass}">
+            <div class="schedule-current">
+              <div class="source-of-truth${overdueClass}">${icon} ${esc(c.follow_up_type || "Follow-up")} — ${esc(formatDateTime(c.follow_up_at))}${note}</div>
+              <button class="icon-btn" data-action="schedule-menu">Edit</button>
+            </div>
+          </div>`;
       }
+      // State B' (menu mode — Reschedule / Cancel / Back)
+      if (hasSchedule && detailScheduleMode === "menu") {
+        const icon = c.follow_up_type === "Appointment" ? "📞" : "📅";
+        return `
+          <div class="schedule-block${overdueClass}">
+            <div class="schedule-current">
+              <div class="source-of-truth${overdueClass}">${icon} ${esc(c.follow_up_type || "Follow-up")} — ${esc(formatDateTime(c.follow_up_at))}</div>
+            </div>
+            <div class="schedule-edit-menu">
+              <button data-action="schedule-reschedule">Reschedule</button>
+              <button class="danger" data-action="schedule-cancel">Cancel Schedule</button>
+              <button class="ghost" data-action="schedule-back">Back</button>
+            </div>
+          </div>`;
+      }
+      // State A (no schedule) OR State C (edit/reschedule mode)
+      const draft = detailScheduleDraft || (() => {
+        const parts = splitDateTime(c.follow_up_at);
+        return { date: parts.date, time: parts.time || "09:00", type: c.follow_up_type || "Follow-up" };
+      })();
+      const isReschedule = hasSchedule && detailScheduleMode === "edit";
+      return `
+        <div class="schedule-block">
+          ${!isReschedule ? '<div class="source-of-truth empty">Not scheduled</div>' : ""}
+          <div class="schedule-form">
+            <div class="pill-bar">
+              <button class="pill p-fut-Followup${draft.type === "Follow-up" ? " active" : ""}" data-action="schedule-type" data-value="Follow-up">Follow-up</button>
+              <button class="pill p-fut-Appointment${draft.type === "Appointment" ? " active" : ""}" data-action="schedule-type" data-value="Appointment">Appointment</button>
+            </div>
+            <div class="date-time-row">
+              <input type="date" id="scheduleDate" value="${esc(draft.date)}">
+              <input type="time" id="scheduleTime" value="${esc(draft.time)}">
+            </div>
+            <div class="form-actions">
+              ${isReschedule ? '<button class="ghost" data-action="schedule-cancel-edit">Cancel</button>' : ""}
+              <button data-action="schedule-save">${isReschedule ? "Save" : "Schedule"}</button>
+            </div>
+          </div>
+        </div>`;
+    }
 
-      const p = normPhone(update.phone);
-      if (p) {
-        const existing = allClients.find((c) => c.id !== detailId && normPhone(c.phone) === p);
-        if (existing) {
-          const err = document.getElementById("detailError");
-          err.textContent = `This phone is already registered under "${existing.company_name}".`;
-          err.style.display = "block"; return;
+    // ---- Web Status tab ----
+    function renderWebStatusTab(c) {
+      return `
+        <div class="field-block">
+          <div class="field-block-title">Web Status</div>
+          <div class="pill-bar">
+            ${WEB_STATUSES.map((o) => {
+              const active = (c.web_status || "Not Started") === o;
+              return `<button class="pill p-ws-${slug(o)}${active ? " active" : ""}" data-action="pill" data-field="web_status" data-value="${esc(o)}">${esc(o)}</button>`;
+            }).join("")}
+          </div>
+        </div>
+
+        <div class="field-block">
+          <div class="field-block-title">Finished Website</div>
+          ${renderInfoRow("URL", c.finished_website, "finished_website", "url")}
+        </div>
+      `;
+    }
+
+    // ---- Right panel event handling ----
+    rightContent.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-action]");
+      if (!btn) return;
+      const action = btn.dataset.action;
+
+      if (action === "pill") {
+        await handlePillClick(btn.dataset.field, btn.dataset.value);
+      } else if (action === "edit") {
+        detailEditingField = btn.dataset.field;
+        renderProfile();
+      } else if (action === "cancel-edit") {
+        detailEditingField = null;
+        renderProfile();
+      } else if (action === "save-edit") {
+        await handleSaveInlineEdit(btn.dataset.field);
+      } else if (action === "copy") {
+        await handleCopy(btn, btn.dataset.value);
+      } else if (action === "schedule-menu") {
+        detailScheduleMode = "menu"; renderProfile();
+      } else if (action === "schedule-back") {
+        detailScheduleMode = "view"; detailScheduleDraft = null; renderProfile();
+      } else if (action === "schedule-reschedule") {
+        detailScheduleMode = "edit";
+        const c = getCurrentClient();
+        const parts = splitDateTime(c.follow_up_at);
+        detailScheduleDraft = { date: parts.date, time: parts.time || "09:00", type: c.follow_up_type || "Follow-up" };
+        renderProfile();
+      } else if (action === "schedule-cancel-edit") {
+        detailScheduleMode = "view"; detailScheduleDraft = null; renderProfile();
+      } else if (action === "schedule-cancel") {
+        if (!confirm("Cancel this schedule? It will be removed.")) return;
+        await updateClientField({ follow_up_at: null });
+        detailScheduleMode = "view"; detailScheduleDraft = null;
+        renderProfile();
+      } else if (action === "schedule-type") {
+        const c = getCurrentClient();
+        if (!detailScheduleDraft) {
+          const parts = splitDateTime(c.follow_up_at);
+          detailScheduleDraft = { date: parts.date, time: parts.time || "09:00", type: c.follow_up_type || "Follow-up" };
+        }
+        detailScheduleDraft.type = btn.dataset.value;
+        renderProfile();
+      } else if (action === "schedule-save") {
+        await handleScheduleSave();
+      }
+    });
+
+    // Capture date/time edits into the draft so re-renders preserve them
+    rightContent.addEventListener("input", (e) => {
+      if (e.target.id === "scheduleDate" || e.target.id === "scheduleTime") {
+        const c = getCurrentClient();
+        if (!detailScheduleDraft) {
+          const parts = splitDateTime(c?.follow_up_at);
+          detailScheduleDraft = { date: parts.date, time: parts.time || "09:00", type: (c && c.follow_up_type) || "Follow-up" };
+        }
+        if (e.target.id === "scheduleDate") detailScheduleDraft.date = e.target.value;
+        else detailScheduleDraft.time = e.target.value;
+      }
+    });
+
+    // Inline edit save on Enter / cancel on Escape
+    rightContent.addEventListener("keydown", (e) => {
+      if (!detailEditingField) return;
+      if (e.target.matches('input[data-edit]')) {
+        if (e.key === "Enter") { e.preventDefault(); handleSaveInlineEdit(detailEditingField); }
+        else if (e.key === "Escape") { e.preventDefault(); detailEditingField = null; renderProfile(); }
+      }
+    });
+    // Save on blur
+    rightContent.addEventListener("blur", (e) => {
+      if (!detailEditingField) return;
+      if (e.target.matches('input[data-edit]')) {
+        // Slight delay so a click on the cancel button isn't pre-empted by blur-save
+        setTimeout(() => {
+          if (detailEditingField && document.contains(e.target)) handleSaveInlineEdit(detailEditingField);
+        }, 120);
+      }
+    }, true);
+
+    async function handlePillClick(field, value) {
+      const c = getCurrentClient();
+      if (!c) return;
+      // No-op if already this value
+      if ((c[field] || "") === value || (field === "manager" && (c.manager || "") === value)) {
+        // Optimistically refresh UI to ensure visual sync
+        renderProfile(); return;
+      }
+      const updates = {};
+      updates[field] = value === "" ? null : value;
+      await updateClientField(updates);
+      renderProfile();
+    }
+
+    async function handleSaveInlineEdit(field) {
+      const inp = rightContent.querySelector(`input[data-edit="${field}"]`);
+      if (!inp) { detailEditingField = null; renderProfile(); return; }
+      let value = inp.value.trim();
+
+      // Phone: dedupe check
+      if (field === "phone") {
+        const p = normPhone(value);
+        if (p) {
+          const dup = allClients.find((c) => c.id !== detailId && normPhone(c.phone) === p);
+          if (dup) {
+            alert(`This phone is already registered under "${dup.company_name}".`);
+            return;
+          }
         }
       }
+      // Required: company_name
+      if (field === "company_name" && !value) {
+        alert("Company name cannot be empty.");
+        return;
+      }
+      const updates = {};
+      updates[field] = value === "" ? null : value;
+      detailEditingField = null;
+      await updateClientField(updates);
+      renderProfile();
+    }
 
-      // Notes: append new entries if any
-      const current = getCurrentClient() || {};
-      const newClientNote = get("new_client_note");
-      const newWebNote = get("new_web_note");
-      update.client_notes = newClientNote ? appendNote(current.client_notes, newClientNote) : trimNotes(current.client_notes);
-      update.web_notes = newWebNote ? appendNote(current.web_notes, newWebNote) : trimNotes(current.web_notes);
+    async function handleScheduleSave() {
+      const c = getCurrentClient();
+      if (!c) return;
+      const draft = detailScheduleDraft || (() => {
+        const parts = splitDateTime(c.follow_up_at);
+        return { date: parts.date, time: parts.time || "09:00", type: c.follow_up_type || "Follow-up" };
+      })();
+      // Pull live values from inputs in case they changed
+      const dateInp = document.getElementById("scheduleDate");
+      const timeInp = document.getElementById("scheduleTime");
+      if (dateInp) draft.date = dateInp.value;
+      if (timeInp) draft.time = timeInp.value;
 
-      const saveBtn = document.getElementById("saveEditBtn");
-      saveBtn.disabled = true; saveBtn.textContent = "Saving...";
-      const { error } = await sb.from("clients").update(update).eq("id", detailId);
-      saveBtn.disabled = false; saveBtn.textContent = "Save changes";
+      if (!draft.date) { alert("Pick a date first."); return; }
+      const iso = combineDateTime(draft.date, draft.time || "09:00");
+      await updateClientField({ follow_up_at: iso, follow_up_type: draft.type || "Follow-up" });
+      detailScheduleMode = "view";
+      detailScheduleDraft = null;
+      renderProfile();
+    }
+
+    async function handleCopy(btnEl, value) {
+      try {
+        await navigator.clipboard.writeText(value || "");
+        const original = btnEl.innerHTML;
+        btnEl.classList.add("copied");
+        btnEl.innerHTML = "✓ Copied";
+        setTimeout(() => { btnEl.classList.remove("copied"); btnEl.innerHTML = original; }, 1200);
+      } catch {
+        alert("Could not copy. Browser blocked clipboard access.");
+      }
+    }
+
+    async function updateClientField(updates) {
+      // Optimistic local update
+      const c = getCurrentClient();
+      if (c) Object.assign(c, updates);
+      const { error } = await sb.from("clients").update(updates).eq("id", detailId);
       if (error) {
-        const err = document.getElementById("detailError");
-        err.textContent = "Save failed: " + error.message; err.style.display = "block"; return;
+        alert("Update failed: " + error.message);
+        await load(); return;
       }
-      await load();
-      detailMode = "view";
-      renderDetail();
+      // Reflect in table + calendar
+      render();
+      refreshCalendar();
     }
 
-    // ---------- Schedule mini-wizard (date -> time -> type) ----------
-    const scheduleOverlay = document.getElementById("scheduleOverlay");
-    const scheduleMeta = document.getElementById("scheduleMeta");
-    const scheduleBody = document.getElementById("scheduleBody");
-    const scheduleProgress = document.getElementById("scheduleProgress");
-    const scheduleBack = document.getElementById("scheduleBack");
-    const scheduleNext = document.getElementById("scheduleNext");
+    // Right-panel tab clicks
+    document.querySelector(".right-tabs").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-rtab]");
+      if (!b) return;
+      detailRightTab = b.dataset.rtab;
+      detailEditingField = null;
+      renderProfile();
+    });
 
-    let scheduleClientId = null;
-    let scheduleStep = 0;
-    let scheduleData = { date: "", time: "09:00", type: "Follow-up" };
+    // Notes panel events
+    document.getElementById("notesTabClient").addEventListener("click", () => { detailNotesTab = "client"; renderProfile(); });
+    document.getElementById("notesTabWeb").addEventListener("click", () => { detailNotesTab = "web"; renderProfile(); });
 
-    function openSchedule(clientId) {
-      scheduleClientId = clientId;
-      scheduleStep = 0;
-      const c = allClients.find((x) => x.id === clientId);
-      const parts = splitDateTime(c && c.follow_up_at);
-      scheduleData = { date: parts.date || "", time: parts.time || "09:00", type: (c && c.follow_up_type) || "Follow-up" };
-      // Close detail modal so they're focused on scheduling; reopen after save.
-      detailOverlay.classList.remove("open");
-      renderScheduleStep();
-      scheduleOverlay.classList.add("open");
+    async function sendNote() {
+      const text = noteInput.value.trim();
+      if (!text) return;
+      const c = getCurrentClient();
+      if (!c) return;
+      const field = detailNotesTab === "client" ? "client_notes" : "web_notes";
+      const newArr = appendNote(c[field] || [], text);
+      noteInput.value = "";
+      await updateClientField({ [field]: newArr });
+      renderProfile();
     }
-    function closeSchedule() { scheduleOverlay.classList.remove("open"); }
-
-    function renderScheduleStep() {
-      scheduleMeta.textContent = `Step ${scheduleStep + 1} of 3`;
-      scheduleProgress.style.width = `${((scheduleStep + 1) / 3) * 100}%`;
-      if (scheduleStep === 0) {
-        scheduleBody.innerHTML = `
-          <h2 class="step-title">Pick a date</h2>
-          <p class="step-desc">Which day should this be scheduled for?</p>
-          <div class="field"><label>Date</label><input id="s_date" type="date" value="${esc(scheduleData.date)}"></div>`;
-        setTimeout(() => document.getElementById("s_date").focus(), 50);
-      } else if (scheduleStep === 1) {
-        scheduleBody.innerHTML = `
-          <h2 class="step-title">Pick a time</h2>
-          <p class="step-desc">What time of day?</p>
-          <div class="field"><label>Time</label><input id="s_time" type="time" value="${esc(scheduleData.time)}"></div>`;
-        setTimeout(() => document.getElementById("s_time").focus(), 50);
-      } else {
-        const opts = FOLLOW_UP_TYPES.map((o) => `<option value="${esc(o)}"${scheduleData.type === o ? " selected" : ""}>${o}</option>`).join("");
-        scheduleBody.innerHTML = `
-          <h2 class="step-title">What kind?</h2>
-          <p class="step-desc">Follow-up is a casual check-in. Appointment is a firm commitment.</p>
-          <div class="field"><label>Type</label><select id="s_type">${opts}</select></div>`;
+    document.getElementById("sendNoteBtn").addEventListener("click", sendNote);
+    noteInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendNote();
       }
-      scheduleBack.disabled = scheduleStep === 0;
-      scheduleNext.textContent = scheduleStep === 2 ? "Save" : "Next";
-    }
-
-    async function scheduleGoNext() {
-      if (scheduleStep === 0) {
-        const v = document.getElementById("s_date").value;
-        if (!v) { alert("Pick a date first."); return; }
-        scheduleData.date = v;
-        scheduleStep = 1; renderScheduleStep(); return;
-      }
-      if (scheduleStep === 1) {
-        scheduleData.time = document.getElementById("s_time").value || "09:00";
-        scheduleStep = 2; renderScheduleStep(); return;
-      }
-      scheduleData.type = document.getElementById("s_type").value || "Follow-up";
-      const fuIso = combineDateTime(scheduleData.date, scheduleData.time);
-      scheduleNext.disabled = true; scheduleNext.textContent = "Saving...";
-      const { error } = await sb.from("clients")
-        .update({ follow_up_at: fuIso, follow_up_type: scheduleData.type })
-        .eq("id", scheduleClientId);
-      scheduleNext.disabled = false; scheduleNext.textContent = "Save";
-      if (error) { alert("Save failed: " + error.message); return; }
-      closeSchedule();
-      const id = scheduleClientId;
-      await load();
-      // Reopen detail to show the new schedule
-      openDetail(id);
-    }
-    function scheduleGoBack() {
-      if (scheduleStep === 0) return;
-      if (scheduleStep === 1) scheduleData.date = document.getElementById("s_date")?.value || scheduleData.date;
-      if (scheduleStep === 2) scheduleData.time = document.getElementById("s_time")?.value || scheduleData.time;
-      scheduleStep--; renderScheduleStep();
-    }
+    });
 
     // ---------- Filter modal ----------
     const filterOverlay = document.getElementById("filterOverlay");
 
     function populateFilterModalOptions() {
-      const btSelect = document.getElementById("f_business_type");
       const types = Array.from(new Set(allClients.map((c) => c.business_type).filter(Boolean))).sort();
-      btSelect.innerHTML = `<option value="">Any</option>` + types.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
-      document.getElementById("f_web_status").innerHTML = `<option value="">Any</option>` + WEB_STATUSES.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("");
+      document.getElementById("f_business_type").innerHTML = `<option value="">Any</option>` + types.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
+      document.getElementById("f_web_status").innerHTML    = `<option value="">Any</option>` + WEB_STATUSES.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("");
       document.getElementById("f_client_status").innerHTML = `<option value="">Any</option>` + CLIENT_STATUSES.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("");
-      document.getElementById("f_motivation").innerHTML = `<option value="">Any</option>` + MOTIVATIONS.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("");
+      document.getElementById("f_motivation").innerHTML    = `<option value="">Any</option>` + MOTIVATIONS.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("");
     }
-
     function openFilterModal() {
       document.getElementById("f_business_type").value = filters.business_type;
       document.getElementById("f_manager").value = filters.manager;
@@ -1254,7 +1480,6 @@
       filterOverlay.classList.add("open");
     }
     function closeFilterModal() { filterOverlay.classList.remove("open"); }
-
     function applyFilterFromModal() {
       filters = {
         business_type: document.getElementById("f_business_type").value,
@@ -1264,25 +1489,14 @@
         motivation: document.getElementById("f_motivation").value,
         followup: document.getElementById("f_followup").value,
       };
-      closeFilterModal();
-      render();
-      refreshCalendar();
+      closeFilterModal(); render(); refreshCalendar();
     }
     function resetFiltersModal() {
-      document.getElementById("f_business_type").value = "";
-      document.getElementById("f_manager").value = "";
-      document.getElementById("f_web_status").value = "";
-      document.getElementById("f_client_status").value = "";
-      document.getElementById("f_motivation").value = "";
-      document.getElementById("f_followup").value = "";
+      ["f_business_type","f_manager","f_web_status","f_client_status","f_motivation","f_followup"].forEach((id) => document.getElementById(id).value = "");
     }
-    function clearAllFilters() {
-      filters = { ...DEFAULT_FILTERS };
-      render();
-      refreshCalendar();
-    }
+    function clearAllFilters() { filters = { ...DEFAULT_FILTERS }; render(); refreshCalendar(); }
 
-    // ---------- Tabs + Calendar ----------
+    // ---------- Tabs (List/Calendar) + Calendar ----------
     let calendarInstance = null;
 
     function switchTab(name) {
@@ -1296,21 +1510,13 @@
 
     function buildCalendarEvents() {
       const visible = applyFiltersToClients(allClients);
-      return visible
-        .filter((c) => c.follow_up_at)
-        .map((c) => {
-          const state = fupState(c.follow_up_at);
-          const isAppt = c.follow_up_type === "Appointment";
-          const color = state === "overdue" ? "#dc2626" : (isAppt ? "#f97316" : "#3b82f6");
-          const prefix = isAppt ? "📞 " : "";
-          return {
-            id: c.id,
-            title: prefix + (c.company_name || "(no name)"),
-            start: c.follow_up_at,
-            allDay: false,
-            color,
-          };
-        });
+      return visible.filter((c) => c.follow_up_at).map((c) => {
+        const state = fupState(c.follow_up_at);
+        const isAppt = c.follow_up_type === "Appointment";
+        const color = state === "overdue" ? "#dc2626" : (isAppt ? "#f97316" : "#3b82f6");
+        const prefix = isAppt ? "📞 " : "";
+        return { id: c.id, title: prefix + (c.company_name || "(no name)"), start: c.follow_up_at, allDay: false, color };
+      });
     }
 
     function initCalendar() {
@@ -1318,14 +1524,10 @@
       const el = document.getElementById("calendar");
       calendarInstance = new FullCalendar.Calendar(el, {
         initialView: "dayGridMonth",
-        headerToolbar: {
-          left: "prev,next today",
-          center: "title",
-          right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
-        },
+        headerToolbar: { left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek" },
         height: "auto",
         events: buildCalendarEvents(),
-        eventClick: (info) => { info.jsEvent.preventDefault(); openDetail(info.event.id); },
+        eventClick: (info) => { info.jsEvent.preventDefault(); openDetail(info.event.id, "client_status"); },
       });
       calendarInstance.render();
     }
@@ -1348,11 +1550,6 @@
     document.getElementById("closeDetail").addEventListener("click", closeDetail);
     detailOverlay.addEventListener("click", (e) => { if (e.target === detailOverlay) closeDetail(); });
 
-    document.getElementById("closeSchedule").addEventListener("click", closeSchedule);
-    scheduleOverlay.addEventListener("click", (e) => { if (e.target === scheduleOverlay) closeSchedule(); });
-    scheduleBack.addEventListener("click", scheduleGoBack);
-    scheduleNext.addEventListener("click", scheduleGoNext);
-
     document.getElementById("openFilters").addEventListener("click", openFilterModal);
     document.getElementById("closeFilter").addEventListener("click", closeFilterModal);
     filterOverlay.addEventListener("click", (e) => { if (e.target === filterOverlay) closeFilterModal(); });
@@ -1362,12 +1559,11 @@
 
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
-        if (scheduleOverlay.classList.contains("open")) closeSchedule();
-        else if (filterOverlay.classList.contains("open")) closeFilterModal();
+        if (filterOverlay.classList.contains("open")) closeFilterModal();
         else if (wizardOverlay.classList.contains("open")) closeWizard();
         else if (detailOverlay.classList.contains("open")) closeDetail();
       }
-      if (e.key === "Enter" && wizardOverlay.classList.contains("open") && e.target.tagName !== "TEXTAREA") {
+      if (e.key === "Enter" && wizardOverlay.classList.contains("open") && e.target.tagName !== "TEXTAREA" && e.target !== noteInput) {
         e.preventDefault(); goNext();
       }
     });
