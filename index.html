@@ -417,6 +417,89 @@
     .review-row .k { color: #6b7280; font-weight: 500; }
     .review-row .v { color: #1f2937; word-break: break-word; }
     .review-row .v.muted { color: #9ca3af; font-style: italic; }
+
+    /* === SEKRETARY (Chunk 1: UI shell only, no AI yet) === */
+    .sekretary-card { padding: 0; overflow: hidden; }
+    .sekretary-layout {
+      display: grid;
+      grid-template-columns: 32% 68%;
+      height: calc(100vh - 230px);
+      min-height: 500px;
+    }
+    @media (max-width: 720px) {
+      .sekretary-layout { grid-template-columns: 1fr; height: auto; }
+    }
+    .sek-chat {
+      display: flex; flex-direction: column;
+      border-right: 1px solid #e5e7eb;
+      background: #f9fafb;
+      overflow: hidden;
+    }
+    .sek-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e5e7eb;
+      background: #fff;
+    }
+    .sek-title { font-size: 15px; font-weight: 600; color: #111827; }
+    .sek-status { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+    .sek-thread {
+      flex: 1; overflow-y: auto; padding: 14px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .sek-thread.empty {
+      align-items: center; justify-content: center;
+      color: #9ca3af; font-size: 13px; font-style: italic; text-align: center;
+    }
+    .sek-bubble-wrap { display: flex; flex-direction: column; max-width: 90%; gap: 1px; }
+    .sek-bubble-wrap.user { align-self: flex-end; align-items: flex-end; }
+    .sek-bubble-wrap.assistant { align-self: flex-start; align-items: flex-start; }
+    .sek-bubble {
+      padding: 8px 12px; border-radius: 16px;
+      font-size: 13px; word-break: break-word; white-space: pre-wrap;
+      line-height: 1.4;
+    }
+    .sek-bubble.user {
+      background: #6366f1; color: white;
+      border-bottom-right-radius: 4px;
+    }
+    .sek-bubble.assistant {
+      background: #fff; color: #1f2937;
+      border: 1px solid #e5e7eb;
+      border-bottom-left-radius: 4px;
+    }
+    .sek-bubble-time { font-size: 10px; color: #9ca3af; padding: 0 8px; }
+    .sek-input-bar {
+      border-top: 1px solid #e5e7eb;
+      padding: 10px; background: #fff;
+      display: flex; gap: 6px; align-items: flex-end;
+    }
+    .sek-input-bar textarea {
+      flex: 1; padding: 8px 14px;
+      border: 1px solid #d1d5db; border-radius: 18px;
+      font-size: 13px; font-family: inherit; resize: none;
+      min-height: 36px; max-height: 100px;
+    }
+    .sek-input-bar textarea:focus { outline: none; border-color: #6366f1; }
+    .sek-input-bar button { padding: 8px 16px; font-size: 13px; border-radius: 18px; }
+    .sek-result {
+      overflow-y: auto;
+      padding: 24px;
+      background: #fff;
+    }
+    .sek-result-empty {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100%; min-height: 400px; text-align: center; color: #9ca3af;
+    }
+    .sek-result-empty .icon { font-size: 56px; opacity: 0.25; }
+    .sek-result-empty .lead { margin-top: 16px; font-size: 15px; color: #6b7280; }
+    .sek-result-empty .sub { margin-top: 6px; font-size: 13px; color: #9ca3af; }
+    .sek-shell-banner {
+      background: #fef3c7; color: #92400e;
+      border: 1px solid #fde68a; border-radius: 6px;
+      padding: 6px 10px; margin-top: 8px; font-size: 11px;
+      display: inline-block;
+    }
   </style>
 </head>
 <body>
@@ -460,6 +543,7 @@
   <div class="tabs">
     <button class="tab active" data-view="list">📋 List</button>
     <button class="tab" data-view="calendar">📅 Calendar</button>
+    <button class="tab" data-view="sekretary">🤖 Sekretary</button>
   </div>
 
   <div id="filterChips" class="filter-chips"></div>
@@ -491,6 +575,37 @@
   <div class="tab-content" data-view="calendar">
     <div class="card">
       <div id="calendar"></div>
+    </div>
+  </div>
+
+  <div class="tab-content" data-view="sekretary">
+    <div class="card sekretary-card">
+      <div class="sekretary-layout">
+        <!-- Left 30% — chat panel -->
+        <div class="sek-chat">
+          <div class="sek-header">
+            <div class="sek-title">🤖 Sekretary</div>
+            <div class="sek-status">UI shell — no AI loaded yet (Chunk 1)</div>
+          </div>
+          <div id="sekThread" class="sek-thread empty">
+            Type something below to test the chat layout.<br>
+            (Replies are echoes for now — AI hookup comes in Chunk 2.)
+          </div>
+          <div class="sek-input-bar">
+            <textarea id="sekInput" placeholder="Ask anything... (Enter to send, Shift+Enter for newline)"></textarea>
+            <button id="sekSendBtn">Send</button>
+          </div>
+        </div>
+        <!-- Right 70% — adaptive result panel (placeholder for now) -->
+        <div class="sek-result" id="sekResult">
+          <div class="sek-result-empty">
+            <div class="icon">🤖</div>
+            <div class="lead">Ask me anything on the left.</div>
+            <div class="sub">Adaptive result views will render here.</div>
+            <div class="sek-shell-banner">Chunk 1 of 6 — UI shell only</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1565,6 +1680,52 @@
       }
       if (e.key === "Enter" && wizardOverlay.classList.contains("open") && e.target.tagName !== "TEXTAREA" && e.target !== noteInput) {
         e.preventDefault(); goNext();
+      }
+    });
+
+    // ---------- Sekretary (Chunk 1: UI shell, echo behavior only) ----------
+    const sekThread = document.getElementById("sekThread");
+    const sekInput = document.getElementById("sekInput");
+    const sekSendBtn = document.getElementById("sekSendBtn");
+
+    function sekTime() {
+      return new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    }
+
+    function appendSekBubble(role, text) {
+      sekThread.classList.remove("empty");
+      const wrap = document.createElement("div");
+      wrap.className = `sek-bubble-wrap ${role}`;
+      const bubble = document.createElement("div");
+      bubble.className = `sek-bubble ${role}`;
+      bubble.textContent = text;
+      const time = document.createElement("div");
+      time.className = "sek-bubble-time";
+      time.textContent = sekTime();
+      wrap.appendChild(bubble);
+      wrap.appendChild(time);
+      sekThread.appendChild(wrap);
+      sekThread.scrollTop = sekThread.scrollHeight;
+    }
+
+    function sendSekretary() {
+      const text = sekInput.value.trim();
+      if (!text) return;
+      appendSekBubble("user", text);
+      sekInput.value = "";
+      // Echo placeholder — no AI yet
+      setTimeout(() => {
+        appendSekBubble("assistant",
+          `(echo) Heard: "${text}"\n\nNo AI loaded yet — this is the UI shell. Chunk 2 will load Gemma 4 E2B and start replying for real.`
+        );
+      }, 250);
+    }
+
+    sekSendBtn.addEventListener("click", sendSekretary);
+    sekInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendSekretary();
       }
     });
 
