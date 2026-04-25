@@ -699,6 +699,49 @@
     }
     .sek-stats-bar .cnt { color: #6b7280; text-align: right; font-variant-numeric: tabular-nums; }
 
+    /* Welcome / language picker (shown on first tab click) */
+    .sek-welcome {
+      max-width: 540px; margin: 32px auto; padding: 32px;
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+      text-align: center;
+    }
+    .sek-welcome .icon { font-size: 48px; }
+    .sek-welcome h3 { font-size: 20px; font-weight: 700; margin: 12px 0 6px; color: #111827; }
+    .sek-welcome p { color: #6b7280; font-size: 14px; line-height: 1.5; margin: 0 0 20px; }
+    .sek-welcome .download-btn {
+      padding: 12px 24px; font-size: 15px; font-weight: 500;
+      background: #6366f1; color: white; border: none; border-radius: 8px;
+      cursor: pointer; transition: all 120ms;
+    }
+    .sek-welcome .download-btn:hover { background: #4f46e5; }
+    .sek-lang-options {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+      margin-top: 16px;
+    }
+    .sek-lang-btn {
+      padding: 16px 14px; font-size: 15px; font-weight: 500;
+      background: #fff; color: #1f2937; border: 2px solid #e5e7eb; border-radius: 10px;
+      cursor: pointer; transition: all 120ms;
+    }
+    .sek-lang-btn:hover { border-color: #6366f1; background: #eef2ff; transform: translateY(-2px); }
+    .sek-lang-btn.selected { border-color: #6366f1; background: #eef2ff; }
+    @media (max-width: 540px) {
+      .sek-lang-options { grid-template-columns: 1fr; }
+    }
+    .sek-back-link {
+      display: inline-block; margin-top: 16px; font-size: 13px;
+      color: #6b7280; cursor: pointer; text-decoration: underline;
+    }
+
+    /* Language toggle button in chat header */
+    .sek-lang-btn-header {
+      background: transparent; border: 1px solid #d1d5db;
+      padding: 4px 10px; border-radius: 14px;
+      font-size: 11px; color: #6b7280; cursor: pointer;
+      transition: all 120ms;
+    }
+    .sek-lang-btn-header:hover { background: #f3f4f6; color: #1f2937; border-color: #9ca3af; }
+
     /* New-client wizard (split layout in right panel) */
     .sek-wizard-layout {
       display: grid;
@@ -944,7 +987,10 @@
         <!-- Left 30% — chat panel -->
         <div class="sek-chat">
           <div class="sek-header">
-            <div class="sek-title">🤖 Sekretary</div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+              <div class="sek-title">🤖 Sekretary</div>
+              <button id="sekLangBtn" class="sek-lang-btn-header" style="display:none;" title="Switch language">🌐 EN</button>
+            </div>
             <div class="sek-status-row">
               <div class="sek-status-dot" id="sekStatusDot"></div>
               <div id="sekStatusText">Idle — open this tab to load the model</div>
@@ -1078,6 +1124,226 @@
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const tbody = document.getElementById("rows");
     const emptyEl = document.getElementById("empty");
+
+    // ---- i18n ----
+    let sekLang = null;       // 'en' | 'es-MX'
+    let sekShowWelcome = true; // welcome screen until user clicks Download
+    try { sekLang = localStorage.getItem("sekLang") || null; } catch {}
+
+    const TRANSLATIONS = {
+      en: {
+        welcomeTitle: "Welcome to your AI assistant",
+        welcomeBody: "I run entirely on your device using Gemma 4. The model is ~1.5 GB and only downloads once per device.",
+        downloadBtn: "Download AI Model",
+        pickLangTitle: "Choose your language",
+        pickLangSub: "You can switch languages anytime later.",
+        langEn: "🇺🇸 English",
+        langEs: "🇲🇽 Español (México)",
+        statusIdleNoLang: "Click the Sekretary tab to get started",
+        statusReady: "Ready",
+        statusLoading: "Loading model...",
+        sendBtn: "Send",
+        inputPlaceholderReady: "Ask anything... (Enter to send, Shift+Enter for newline)",
+        inputPlaceholderLoading: "Loading model...",
+        chatGreeting: "Hi! I can read, change, and create clients in your CRM. Try things like:\n\n📖 Read:\n• \"Show me hot leads\"\n• \"Tell me about [client]\"\n• \"What's on my calendar today?\"\n\n✏️ Write:\n• \"Mark Acme as Hot\"\n• \"Add note for John: Wants to push deadline\"\n• \"Schedule Acme for Tuesday 2pm\"\n• \"Cancel Acme's appointment\"\n\n➕ Create new client:\n• \"Add a new client\" — launches a guided step-by-step wizard",
+        wizardHintHeader: "Type your answer in the chat. Or:",
+        wizardHintSkip: "skip",
+        wizardHintSkipDesc: "skip this field (optional only)",
+        wizardHintBack: "back",
+        wizardHintBackDesc: "go to the previous field",
+        wizardHintCancel: "cancel",
+        wizardHintCancelDesc: "abort the wizard",
+        wizardStepNum: (n, total) => `Step ${n} of ${total}`,
+        stepCompanyInfo: "Company Info",
+        stepContact: "Contact",
+        stepLinks: "Links",
+        stepAssignment: "Assignment",
+        stepSchedule: "Schedule",
+        stepNotes: "Notes",
+        stepFinalReview: "Final Review",
+        fieldCompanyName: "Company name",
+        fieldBusinessType: "Business type",
+        fieldClientName: "Client name",
+        fieldPhone: "Phone",
+        fieldProfileLink: "Profile link",
+        fieldPostLink: "Post link",
+        fieldFinishedWebsite: "Finished website",
+        fieldManager: "Manager",
+        fieldWebStatus: "Web status",
+        fieldClientStatus: "Client status",
+        fieldMotivation: "Motivation",
+        fieldFollowUpDate: "Date",
+        fieldFollowUpTime: "Time",
+        fieldFollowUpType: "Type",
+        fieldClientNote: "Client note",
+        fieldWebNote: "Web note",
+        qCompanyName: "What's the company name?",
+        qBusinessType: "What's the business type? (e.g., Pavers, Roofing, Landscaping — or say 'skip')",
+        qClientName: "Who's the contact person? (or 'skip')",
+        qPhone: "What's the phone number? (or 'skip')",
+        qProfileLink: "Profile / social media link? (or 'skip')",
+        qPostLink: "Specific post link? (or 'skip')",
+        qFinishedWebsite: "Finished website URL? (or 'skip')",
+        qManager: "Manager — Ivan, Hector, or 'skip' for unassigned?",
+        qWebStatus: "Web status? (Not Started, In Progress, Review, Needs Fixing, Finished — or 'skip' for Not Started)",
+        qClientStatus: "Client status? (New Lead, Contacted, Interested, Proposal Sent, Negotiation, Follow Up, Closed Won, Closed Lost, Nurture — or 'skip' for New Lead)",
+        qMotivation: "Motivation? (Not Set, Dead, Cold, Warm, Hot, VIP — or 'skip' for Not Set)",
+        qFollowUpDate: "Want to schedule a follow-up? Give a date (YYYY-MM-DD) or 'skip' for none.",
+        qFollowUpTime: "What time? (HH:MM in 24-hour, e.g., '14:00' for 2pm — or 'skip' for 09:00)",
+        qFollowUpType: "Follow-up or Appointment?",
+        qClientNote: "Initial client note? (or 'skip')",
+        qWebNote: "Initial web/build note? (or 'skip')",
+        wizardLetsStart: (total, name, q) => `Let's create a new client step by step. Step 1 of ${total}: ${name}.\n\n${q}`,
+        wizardNextStep: (n, total, name, q) => `Step ${n} of ${total}: ${name}.\n\n${q}`,
+        wizardFixThat: (q) => `OK, let's fix that. ${q}`,
+        wizardGoingBack: (q) => `Going back. ${q}`,
+        wizardStepDoneChat: (name) => `"${name}" step done. Review on the right — say 'yes' to continue, 'no' to fix.`,
+        wizardAllDoneChat: "All steps done! Review everything on the right. Say 'yes' to save, or 'no' to cancel.",
+        wizardConfirmStepHelp: "Yes to confirm and continue, or no to fix something.",
+        wizardConfirmFinalHelp: "Yes to save the client, or no to cancel.",
+        wizardOnFirstField: "Already on the very first field — say 'cancel' to abort the whole wizard.",
+        wizardSkipRequired: (label) => `${label} is required — please provide a value.`,
+        wizardChoicePrompt: (choices) => `Please pick one of: ${choices.join(", ")}. Or say 'skip'.`,
+        wizardRequiredField: (label) => `${label} is required.`,
+        wizardSaving: "Saving...",
+        wizardCreated: (name) => `🎉 Created "${name}". Anything else?`,
+        wizardSaveFailed: (msg) => `❌ Save failed: ${msg}. Wizard still active — say 'cancel' or 'back' to fix.`,
+        wizardCancelledTitle: "Wizard cancelled",
+        wizardCancelledSub: "No client was created.",
+        wizardCancelledChat: "Cancelled. No client was created.",
+        wizardThisStep: "This step",
+        wizardEarlierSteps: "Earlier steps",
+        wizardNothingYet: "Nothing yet — answer the question on the left.",
+        wizardNewClientPreview: "New client preview",
+        wizardStepDoneTitle: "Step done — confirm to continue",
+        wizardStepDoneSub: "Review on the right. Type yes to move on, no to fix the last answer.",
+        wizardReadyTitle: "Ready to save",
+        wizardReadySub: "Review everything on the right. Type yes to save, or no to cancel.",
+        pendingValue: "— pending —",
+        unassigned: "Unassigned",
+      },
+      "es-MX": {
+        welcomeTitle: "Bienvenido a tu asistente IA",
+        welcomeBody: "Funciono completamente en tu dispositivo usando Gemma 4. El modelo pesa ~1.5 GB y solo se descarga una vez por dispositivo.",
+        downloadBtn: "Descargar modelo de IA",
+        pickLangTitle: "Elige tu idioma",
+        pickLangSub: "Puedes cambiar el idioma en cualquier momento.",
+        langEn: "🇺🇸 English",
+        langEs: "🇲🇽 Español (México)",
+        statusIdleNoLang: "Haz clic en la pestaña Sekretary para empezar",
+        statusReady: "Listo",
+        statusLoading: "Cargando modelo...",
+        sendBtn: "Enviar",
+        inputPlaceholderReady: "Pregunta lo que sea... (Enter para enviar, Shift+Enter para nueva línea)",
+        inputPlaceholderLoading: "Cargando modelo...",
+        chatGreeting: "¡Hola! Puedo leer, cambiar y crear clientes en tu CRM. Prueba cosas como:\n\n📖 Leer:\n• \"Muéstrame los leads calientes\"\n• \"Háblame de [cliente]\"\n• \"¿Qué tengo agendado hoy?\"\n\n✏️ Cambiar:\n• \"Marca Acme como Hot\"\n• \"Agrega una nota para John: Quiere posponer la fecha\"\n• \"Agenda Acme el martes a las 2pm\"\n• \"Cancela la cita de Acme\"\n\n➕ Crear cliente nuevo:\n• \"Agrega un nuevo cliente\" — abre el asistente paso a paso",
+        wizardHintHeader: "Escribe tu respuesta en el chat. O:",
+        wizardHintSkip: "skip",
+        wizardHintSkipDesc: "saltar este campo (solo opcionales)",
+        wizardHintBack: "back",
+        wizardHintBackDesc: "regresar al campo anterior",
+        wizardHintCancel: "cancel",
+        wizardHintCancelDesc: "cancelar el asistente",
+        wizardStepNum: (n, total) => `Paso ${n} de ${total}`,
+        stepCompanyInfo: "Información de la empresa",
+        stepContact: "Contacto",
+        stepLinks: "Enlaces",
+        stepAssignment: "Asignación",
+        stepSchedule: "Agenda",
+        stepNotes: "Notas",
+        stepFinalReview: "Revisión final",
+        fieldCompanyName: "Nombre de la empresa",
+        fieldBusinessType: "Tipo de negocio",
+        fieldClientName: "Nombre del cliente",
+        fieldPhone: "Teléfono",
+        fieldProfileLink: "Enlace del perfil",
+        fieldPostLink: "Enlace de la publicación",
+        fieldFinishedWebsite: "Sitio web terminado",
+        fieldManager: "Encargado",
+        fieldWebStatus: "Estado del sitio",
+        fieldClientStatus: "Estado del cliente",
+        fieldMotivation: "Motivación",
+        fieldFollowUpDate: "Fecha",
+        fieldFollowUpTime: "Hora",
+        fieldFollowUpType: "Tipo",
+        fieldClientNote: "Nota del cliente",
+        fieldWebNote: "Nota del sitio",
+        qCompanyName: "¿Cómo se llama la empresa?",
+        qBusinessType: "¿Cuál es el tipo de negocio? (ej., Pavers, Roofing, Landscaping — o di 'skip')",
+        qClientName: "¿Quién es la persona de contacto? (o 'skip')",
+        qPhone: "¿Cuál es el número de teléfono? (o 'skip')",
+        qProfileLink: "¿Enlace de perfil / red social? (o 'skip')",
+        qPostLink: "¿Enlace de publicación específica? (o 'skip')",
+        qFinishedWebsite: "¿URL del sitio web terminado? (o 'skip')",
+        qManager: "Encargado — ¿Ivan, Hector, o 'skip' para sin asignar?",
+        qWebStatus: "¿Estado del sitio? (Not Started, In Progress, Review, Needs Fixing, Finished — o 'skip' para Not Started)",
+        qClientStatus: "¿Estado del cliente? (New Lead, Contacted, Interested, Proposal Sent, Negotiation, Follow Up, Closed Won, Closed Lost, Nurture — o 'skip' para New Lead)",
+        qMotivation: "¿Motivación? (Not Set, Dead, Cold, Warm, Hot, VIP — o 'skip' para Not Set)",
+        qFollowUpDate: "¿Quieres agendar un seguimiento? Da una fecha (YYYY-MM-DD) o 'skip' para ninguno.",
+        qFollowUpTime: "¿A qué hora? (HH:MM en formato 24 horas, ej. '14:00' para 2pm — o 'skip' para 09:00)",
+        qFollowUpType: "¿Follow-up o Appointment?",
+        qClientNote: "¿Nota inicial del cliente? (o 'skip')",
+        qWebNote: "¿Nota inicial del sitio/desarrollo? (o 'skip')",
+        wizardLetsStart: (total, name, q) => `Vamos a crear un cliente nuevo paso a paso. Paso 1 de ${total}: ${name}.\n\n${q}`,
+        wizardNextStep: (n, total, name, q) => `Paso ${n} de ${total}: ${name}.\n\n${q}`,
+        wizardFixThat: (q) => `OK, vamos a corregir eso. ${q}`,
+        wizardGoingBack: (q) => `Regresando. ${q}`,
+        wizardStepDoneChat: (name) => `Paso "${name}" terminado. Revisa a la derecha — di 'yes' para continuar, 'no' para corregir.`,
+        wizardAllDoneChat: "¡Todos los pasos terminados! Revisa todo a la derecha. Di 'yes' para guardar, o 'no' para cancelar.",
+        wizardConfirmStepHelp: "Yes para confirmar y continuar, o no para corregir algo.",
+        wizardConfirmFinalHelp: "Yes para guardar el cliente, o no para cancelar.",
+        wizardOnFirstField: "Ya estás en el primer campo — di 'cancel' para abortar el asistente.",
+        wizardSkipRequired: (label) => `${label} es obligatorio — por favor da un valor.`,
+        wizardChoicePrompt: (choices) => `Por favor escoge uno de: ${choices.join(", ")}. O di 'skip'.`,
+        wizardRequiredField: (label) => `${label} es obligatorio.`,
+        wizardSaving: "Guardando...",
+        wizardCreated: (name) => `🎉 Cliente "${name}" creado. ¿Algo más?`,
+        wizardSaveFailed: (msg) => `❌ Falló al guardar: ${msg}. El asistente sigue activo — di 'cancel' o 'back' para corregir.`,
+        wizardCancelledTitle: "Asistente cancelado",
+        wizardCancelledSub: "No se creó ningún cliente.",
+        wizardCancelledChat: "Cancelado. No se creó ningún cliente.",
+        wizardThisStep: "Este paso",
+        wizardEarlierSteps: "Pasos anteriores",
+        wizardNothingYet: "Nada aún — responde la pregunta a la izquierda.",
+        wizardNewClientPreview: "Vista previa del cliente nuevo",
+        wizardStepDoneTitle: "Paso terminado — confirma para continuar",
+        wizardStepDoneSub: "Revisa a la derecha. Escribe yes para continuar, no para corregir la última respuesta.",
+        wizardReadyTitle: "Listo para guardar",
+        wizardReadySub: "Revisa todo a la derecha. Escribe yes para guardar, o no para cancelar.",
+        pendingValue: "— pendiente —",
+        unassigned: "Sin asignar",
+      },
+    };
+
+    function t(key, ...args) {
+      const lang = sekLang || "en";
+      const v = (TRANSLATIONS[lang] && TRANSLATIONS[lang][key]) ?? TRANSLATIONS.en[key] ?? key;
+      return typeof v === "function" ? v(...args) : v;
+    }
+
+    function setSekLang(newLang, opts = {}) {
+      sekLang = newLang;
+      try { localStorage.setItem("sekLang", newLang); } catch {}
+      // Update STT
+      if (sekRecognition) sekRecognition.lang = newLang === "es-MX" ? "es-MX" : "en-US";
+      // Update language toggle button
+      const langBtn = document.getElementById("sekLangBtn");
+      if (langBtn) langBtn.textContent = "🌐 " + (newLang === "es-MX" ? "ES" : "EN");
+      // Update placeholder text
+      if (sekState === "ready") {
+        sekInput.placeholder = t("inputPlaceholderReady");
+      } else if (sekState === "loading") {
+        sekInput.placeholder = t("inputPlaceholderLoading");
+      }
+      // Update send button
+      const sendBtn = document.getElementById("sekSendBtn");
+      if (sendBtn) sendBtn.textContent = t("sendBtn");
+      // If wizard active, re-render
+      if (sekWizardState && sekWizardState.active) renderWizardView();
+      if (opts.notify && sekState === "ready") {
+        appendSekBubble("assistant", newLang === "es-MX" ? "Cambié al español. ¿En qué te ayudo?" : "Switched to English. How can I help?");
+      }
+    }
 
     // ---- Constants ----
     const WEB_STATUSES    = ["Not Started", "In Progress", "Review", "Needs Fixing", "Finished"];
@@ -2080,7 +2346,7 @@
       sekStatusText.textContent = text;
       const ready = state === "ready";
       sekInputBar.classList.toggle("disabled", !ready);
-      sekInput.placeholder = ready ? "Ask anything... (Enter to send, Shift+Enter for newline)" : text;
+      sekInput.placeholder = ready ? t("inputPlaceholderReady") : text;
     }
 
     // Check whether this device qualifies to run the on-device AI model.
@@ -2206,22 +2472,32 @@
           },
         });
 
-        setSekStatus("ready", "Ready");
+        setSekStatus("ready", t("statusReady"));
         sekProgress.classList.remove("show");
         sekProgressDetail.textContent = "";
+
+        // Show language toggle button now that model is ready
+        const langBtn = document.getElementById("sekLangBtn");
+        if (langBtn) {
+          langBtn.style.display = "";
+          langBtn.textContent = "🌐 " + (sekLang === "es-MX" ? "ES" : "EN");
+        }
+
+        // Set send button + placeholder
+        sekSendBtn.textContent = t("sendBtn");
+        sekInput.placeholder = t("inputPlaceholderReady");
 
         // Reset right panel to idle prompt
         sekResult.innerHTML = `
           <div class="sek-result-empty">
             <div class="icon">🤖</div>
-            <div class="lead">Ask me anything on the left.</div>
-            <div class="sub">No tool calls yet — just plain text replies for now (Chunk 2).</div>
+            <div class="lead">${esc(sekLang === "es-MX" ? "Pregúntame lo que sea a la izquierda." : "Ask me anything on the left.")}</div>
           </div>`;
 
         // Reset thread message
         sekThread.classList.remove("empty");
         sekThread.innerHTML = "";
-        appendSekBubble("assistant", "Hi! I can read, change, and create clients in your CRM. Try things like:\n\n📖 Read:\n• \"Show me hot leads\"\n• \"Tell me about [client]\"\n• \"What's on my calendar today?\"\n\n✏️ Write:\n• \"Mark Acme as Hot\"\n• \"Add note for John: Wants to push deadline\"\n• \"Schedule Acme for Tuesday 2pm\"\n• \"Cancel Acme's appointment\"\n\n➕ Create new client:\n• \"Add a new client\" — launches a guided step-by-step wizard");
+        appendSekBubble("assistant", t("chatGreeting"));
       } catch (err) {
         console.error("Sekretary load error:", err);
         setSekStatus("error", "Load failed");
@@ -2543,25 +2819,31 @@
     // ============================================================
     let sekWizardState = null;
 
+    // Wizard steps now use translation KEYS instead of hardcoded strings.
+    // step.name and field.label/question are resolved via t() at render time, so language toggle re-renders correctly.
     const WIZARD_STEPS = [
       {
-        name: "Company Info",
+        nameKey: "stepCompanyInfo",
         fields: [
-          { name: "company_name",  label: "Company name",   question: "What's the company name?",                   required: true },
-          { name: "business_type", label: "Business type",  question: "What's the business type? (e.g., Pavers, Roofing, Landscaping — or say 'skip')" },
+          { name: "company_name",  labelKey: "fieldCompanyName",  questionKey: "qCompanyName",  required: true },
+          { name: "business_type", labelKey: "fieldBusinessType", questionKey: "qBusinessType" },
         ],
       },
       {
-        name: "Contact",
+        nameKey: "stepContact",
         fields: [
-          { name: "client_name", label: "Client name", question: "Who's the contact person? (or 'skip')" },
-          { name: "phone",       label: "Phone",       question: "What's the phone number? (or 'skip')",
+          { name: "client_name", labelKey: "fieldClientName", questionKey: "qClientName" },
+          { name: "phone",       labelKey: "fieldPhone",      questionKey: "qPhone",
             validate: (v) => {
               if (!v) return null;
               const p = normPhone(v);
               if (!p) return null;
               const existing = (allClients || []).find((c) => normPhone(c.phone) === p);
-              if (existing) return `That phone is already used by "${existing.company_name}". Enter a different number, or say 'skip'.`;
+              if (existing) {
+                return sekLang === "es-MX"
+                  ? `Ese teléfono ya está en uso por "${existing.company_name}". Pon otro número, o di 'skip'.`
+                  : `That phone is already used by "${existing.company_name}". Enter a different number, or say 'skip'.`;
+              }
               return null;
             },
             transform: (v) => formatPhone(v) || v,
@@ -2569,54 +2851,59 @@
         ],
       },
       {
-        name: "Links",
+        nameKey: "stepLinks",
         fields: [
-          { name: "profile_link",     label: "Profile link",     question: "Profile / social media link? (or 'skip')" },
-          { name: "post_link",        label: "Post link",        question: "Specific post link? (or 'skip')" },
-          { name: "finished_website", label: "Finished website", question: "Finished website URL? (or 'skip')" },
+          { name: "profile_link",     labelKey: "fieldProfileLink",     questionKey: "qProfileLink" },
+          { name: "post_link",        labelKey: "fieldPostLink",        questionKey: "qPostLink" },
+          { name: "finished_website", labelKey: "fieldFinishedWebsite", questionKey: "qFinishedWebsite" },
         ],
       },
       {
-        name: "Assignment",
+        nameKey: "stepAssignment",
         fields: [
-          { name: "manager",       label: "Manager",       question: "Manager — Ivan, Hector, or 'skip' for unassigned?", choices: ["Ivan", "Hector"] },
-          { name: "web_status",    label: "Web status",    question: "Web status? (Not Started, In Progress, Review, Needs Fixing, Finished — or 'skip' for Not Started)", choices: WEB_STATUSES },
-          { name: "client_status", label: "Client status", question: "Client status? (New Lead, Contacted, Interested, Proposal Sent, Negotiation, Follow Up, Closed Won, Closed Lost, Nurture — or 'skip' for New Lead)", choices: CLIENT_STATUSES },
-          { name: "motivation",    label: "Motivation",    question: "Motivation? (Not Set, Dead, Cold, Warm, Hot, VIP — or 'skip' for Not Set)", choices: MOTIVATIONS },
+          { name: "manager",       labelKey: "fieldManager",       questionKey: "qManager",       choices: ["Ivan", "Hector"] },
+          { name: "web_status",    labelKey: "fieldWebStatus",     questionKey: "qWebStatus",     choices: WEB_STATUSES },
+          { name: "client_status", labelKey: "fieldClientStatus",  questionKey: "qClientStatus",  choices: CLIENT_STATUSES },
+          { name: "motivation",    labelKey: "fieldMotivation",    questionKey: "qMotivation",    choices: MOTIVATIONS },
         ],
       },
       {
-        name: "Schedule",
+        nameKey: "stepSchedule",
         fields: [
-          { name: "follow_up_date", label: "Date",  question: "Want to schedule a follow-up? Give a date (YYYY-MM-DD) or 'skip' for none.",
+          { name: "follow_up_date", labelKey: "fieldFollowUpDate", questionKey: "qFollowUpDate",
             validate: (v) => {
               if (!v) return null;
-              if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return "Please use YYYY-MM-DD format (e.g., 2026-04-28), or 'skip'.";
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return sekLang === "es-MX" ? "Usa el formato YYYY-MM-DD (ej., 2026-04-28), o 'skip'." : "Please use YYYY-MM-DD format (e.g., 2026-04-28), or 'skip'.";
               return null;
             },
           },
-          { name: "follow_up_time", label: "Time",  question: "What time? (HH:MM in 24-hour, e.g., '14:00' for 2pm — or 'skip' for 09:00)", dependsOn: "follow_up_date",
+          { name: "follow_up_time", labelKey: "fieldFollowUpTime", questionKey: "qFollowUpTime", dependsOn: "follow_up_date",
             validate: (v) => {
               if (!v) return null;
-              if (!/^\d{1,2}:\d{2}$/.test(v)) return "Please use HH:MM 24-hour format (e.g., 14:00), or 'skip'.";
+              if (!/^\d{1,2}:\d{2}$/.test(v)) return sekLang === "es-MX" ? "Usa el formato HH:MM 24 horas (ej., 14:00), o 'skip'." : "Please use HH:MM 24-hour format (e.g., 14:00), or 'skip'.";
               return null;
             },
           },
-          { name: "follow_up_type", label: "Type",  question: "Follow-up or Appointment?", dependsOn: "follow_up_date", choices: FOLLOW_UP_TYPES },
+          { name: "follow_up_type", labelKey: "fieldFollowUpType", questionKey: "qFollowUpType", dependsOn: "follow_up_date", choices: FOLLOW_UP_TYPES },
         ],
       },
       {
-        name: "Notes",
+        nameKey: "stepNotes",
         fields: [
-          { name: "initial_client_note", label: "Client note", question: "Initial client note? (or 'skip')" },
-          { name: "initial_web_note",    label: "Web note",    question: "Initial web/build note? (or 'skip')" },
+          { name: "initial_client_note", labelKey: "fieldClientNote", questionKey: "qClientNote" },
+          { name: "initial_web_note",    labelKey: "fieldWebNote",    questionKey: "qWebNote" },
         ],
       },
       {
-        name: "Final Review",
-        fields: [], // special — full review, just yes/no
+        nameKey: "stepFinalReview",
+        fields: [],
       },
     ];
+
+    // Helper accessors (so existing code can grab live-translated step.name / field.label / field.question)
+    function wizStepName(step) { return t(step.nameKey); }
+    function wizFieldLabel(field) { return t(field.labelKey); }
+    function wizFieldQuestion(field) { return t(field.questionKey); }
 
     function sekWizardStart() {
       sekWizardState = {
@@ -2629,7 +2916,7 @@
       renderWizardView();
       const step = WIZARD_STEPS[0];
       const f = step.fields[0];
-      appendSekBubble("assistant", `Let's create a new client step by step. Step 1 of ${WIZARD_STEPS.length}: ${step.name}.\n\n${f.question}`);
+      appendSekBubble("assistant", t("wizardLetsStart", WIZARD_STEPS.length, wizStepName(step), wizFieldQuestion(f)));
     }
 
     function getCurrentWizardField() {
@@ -2657,29 +2944,29 @@
 
       // Final review: yes/no only
       if (isFinalReviewStep()) {
-        if (/^(yes|y|yeah|yep|confirm|save|create|ok|okay|sure|do it|go|done)\b/.test(lower)) {
+        if (/^(yes|y|yeah|yep|sí|si|confirm|confirmar|save|guardar|create|crear|ok|okay|sure|do it|go|done|listo)\b/.test(lower)) {
           await sekWizardSave();
-        } else if (/^(no|n|nope|cancel)\b/.test(lower)) {
+        } else if (/^(no|n|nope|cancel|cancelar)\b/.test(lower)) {
           sekWizardCancel();
         } else {
-          appendSekBubble("assistant", "Yes to save the client, or no to cancel.");
+          appendSekBubble("assistant", t("wizardConfirmFinalHelp"));
         }
         return;
       }
 
       // Step confirm phase: yes/no only
       if (sekWizardState.awaitingStepConfirm) {
-        if (/^(yes|y|yeah|yep|confirm|ok|okay|sure|good|next|continue)\b/.test(lower)) {
+        if (/^(yes|y|yeah|yep|sí|si|confirm|confirmar|ok|okay|sure|good|next|continue|continuar)\b/.test(lower)) {
           sekWizardConfirmStep();
-        } else if (/^(no|n|nope|change|fix|edit|wait)\b/.test(lower)) {
+        } else if (/^(no|n|nope|change|fix|edit|corregir|wait|cambiar)\b/.test(lower)) {
           // Re-ask the last field of this step so they can fix it
           sekWizardState.awaitingStepConfirm = false;
           sekWizardState.fieldIndex = WIZARD_STEPS[sekWizardState.stepIndex].fields.length - 1;
           renderWizardView();
           const f = getCurrentWizardField();
-          if (f) appendSekBubble("assistant", `OK, let's fix that. ${f.question}`);
+          if (f) appendSekBubble("assistant", t("wizardFixThat", wizFieldQuestion(f)));
         } else {
-          appendSekBubble("assistant", "Yes to confirm and continue, or no to fix something.");
+          appendSekBubble("assistant", t("wizardConfirmStepHelp"));
         }
         return;
       }
@@ -2691,7 +2978,7 @@
       // Skip command (only allowed for non-required fields)
       if (/^skip\b/.test(lower)) {
         if (field.required) {
-          appendSekBubble("assistant", `${field.label} is required — please provide a value.`);
+          appendSekBubble("assistant", t("wizardSkipRequired", wizFieldLabel(field)));
           return;
         }
         sekWizardState.fields[field.name] = null;
@@ -2704,7 +2991,7 @@
       if (field.choices) {
         const matched = field.choices.find((c) => c.toLowerCase() === value.toLowerCase());
         if (!matched) {
-          appendSekBubble("assistant", `Please pick one of: ${field.choices.join(", ")}. Or say 'skip'.`);
+          appendSekBubble("assistant", t("wizardChoicePrompt", field.choices));
           return;
         }
         value = matched;
@@ -2712,7 +2999,7 @@
 
       // Required check
       if (field.required && !value) {
-        appendSekBubble("assistant", `${field.label} is required.`);
+        appendSekBubble("assistant", t("wizardRequiredField", wizFieldLabel(field)));
         return;
       }
 
@@ -2754,11 +3041,11 @@
           sekWizardState.stepIndex++;
           sekWizardState.fieldIndex = 0;
           renderWizardView();
-          appendSekBubble("assistant", "All steps done! Review everything on the right. Say 'yes' to save, or 'no' to cancel.");
+          appendSekBubble("assistant", t("wizardAllDoneChat"));
         } else {
           sekWizardState.awaitingStepConfirm = true;
           renderWizardView();
-          appendSekBubble("assistant", `"${step.name}" step done. Review on the right — say 'yes' to continue, 'no' to fix.`);
+          appendSekBubble("assistant", t("wizardStepDoneChat", wizStepName(step)));
         }
         return;
       }
@@ -2766,7 +3053,7 @@
       // Ask next field
       renderWizardView();
       const f = step.fields[sekWizardState.fieldIndex];
-      appendSekBubble("assistant", f.question);
+      appendSekBubble("assistant", wizFieldQuestion(f));
     }
 
     function sekWizardConfirmStep() {
@@ -2777,7 +3064,7 @@
       // Handle Final Review (no fields)
       if (sekWizardState.stepIndex === WIZARD_STEPS.length - 1) {
         renderWizardView();
-        appendSekBubble("assistant", "All steps done! Review everything on the right. Say 'yes' to save, or 'no' to cancel.");
+        appendSekBubble("assistant", t("wizardAllDoneChat"));
         return;
       }
 
@@ -2794,7 +3081,7 @@
       }
       renderWizardView();
       const f = step.fields[sekWizardState.fieldIndex];
-      if (f) appendSekBubble("assistant", `Step ${sekWizardState.stepIndex + 1} of ${WIZARD_STEPS.length}: ${step.name}.\n\n${f.question}`);
+      if (f) appendSekBubble("assistant", t("wizardNextStep", sekWizardState.stepIndex + 1, WIZARD_STEPS.length, wizStepName(step), wizFieldQuestion(f)));
     }
 
     function sekWizardBack() {
@@ -2814,12 +3101,12 @@
         sekWizardState.stepIndex--;
         sekWizardState.fieldIndex = WIZARD_STEPS[sekWizardState.stepIndex].fields.length - 1;
       } else {
-        appendSekBubble("assistant", "Already on the very first field — say 'cancel' to abort the whole wizard.");
+        appendSekBubble("assistant", t("wizardOnFirstField"));
         return;
       }
       renderWizardView();
       const f = getCurrentWizardField();
-      if (f) appendSekBubble("assistant", `Going back. ${f.question}`);
+      if (f) appendSekBubble("assistant", t("wizardGoingBack", wizFieldQuestion(f)));
     }
 
     function sekWizardCancel() {
@@ -2827,10 +3114,10 @@
       sekResult.innerHTML = `
         <div class="sek-success-view" style="background:#f3f4f6;color:#4b5563;border-color:#e5e7eb;">
           <div class="icon">✕</div>
-          <h3>Wizard cancelled</h3>
-          <div class="detail">No client was created.</div>
+          <h3>${esc(t("wizardCancelledTitle"))}</h3>
+          <div class="detail">${esc(t("wizardCancelledSub"))}</div>
         </div>`;
-      appendSekBubble("assistant", "Cancelled. No client was created.");
+      appendSekBubble("assistant", t("wizardCancelledChat"));
     }
 
     async function sekWizardSave() {
@@ -2854,10 +3141,10 @@
         web_notes:        f.initial_web_note    ? appendNote([], f.initial_web_note)    : [],
       };
 
-      appendSekBubble("assistant", "Saving...");
+      appendSekBubble("assistant", t("wizardSaving"));
       const { data, error } = await sb.from("clients").insert(row).select();
       if (error) {
-        appendSekBubble("assistant", `❌ Save failed: ${error.message}. Wizard still active — say 'cancel' or 'back' to fix.`);
+        appendSekBubble("assistant", t("wizardSaveFailed", error.message));
         return;
       }
       await load();
@@ -2865,7 +3152,7 @@
       const companyName = row.company_name;
       sekWizardState = null;
       renderWriteSuccess("create_client", { success: true, action: "created", client: { id: newId, company_name: companyName } });
-      appendSekBubble("assistant", `🎉 Created "${companyName}". Anything else?`);
+      appendSekBubble("assistant", t("wizardCreated", companyName));
     }
 
     // ---- DB helper for write tools ----
@@ -2887,6 +3174,11 @@
     }
 
     function sekSystemPrompt() {
+      if (sekLang === "es-MX") return sekSystemPromptEs();
+      return sekSystemPromptEn();
+    }
+
+    function sekSystemPromptEn() {
       const todayIso = new Date().toISOString().slice(0, 10);
       const todayName = new Date().toLocaleDateString(undefined, { weekday: "long" });
       return `You are the Sekretary, an AI assistant inside a small CRM app for a web design agency.
@@ -3002,6 +3294,110 @@ I will send back a message starting with "[Tool result]". Then respond in PLAIN 
 # When NOT to use a tool
 
 ONLY for pure chitchat (greetings, "how are you", "what can you do", general questions about yourself). For ANY question about CRM data, use a tool.`;
+    }
+
+    function sekSystemPromptEs() {
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const todayName = new Date().toLocaleDateString("es-MX", { weekday: "long" });
+      return `Eres el Sekretary, un asistente de IA dentro de una app de CRM para una agencia de diseño web.
+
+# Fecha de hoy
+Hoy es ${todayName}, ${todayIso}. Úsala para calcular fechas relativas como "mañana", "el martes", "el viernes".
+
+# REGLA CRÍTICA
+Si el usuario pregunta CUALQUIER COSA sobre sus clientes/negocios/agenda/notas/pipeline o te pide cambiar/actualizar/agendar/notar algo, DEBES responder con SOLO una llamada de herramienta JSON — sin prosa, sin explicación. Solo el JSON, nada antes ni después.
+
+Si te encuentras empezando con "Voy a", "Claro", "Déjame", "Encontré", "Aquí están" — DETENTE. Da el JSON de la herramienta.
+
+# Idioma
+El usuario puede hablar en español o inglés. Tu respuesta de chat (después de que la herramienta se ejecute) debe ser en español. PERO los nombres de las herramientas, los argumentos y los valores enum (como "Hot", "Cold", "Ivan", "Hector", "Concrete", "In Progress") siempre van en INGLÉS — están atados a la base de datos. NUNCA traduzcas valores enum.
+
+# Herramientas disponibles
+
+${sekToolsDescription()}
+
+# Formato JSON
+
+{"tool": "tool_name", "args": { ... }}
+
+# Disparadores que REQUIEREN una llamada de herramienta
+
+mostrar, listar, encontrar, buscar, ver, dame, dime, cuántos, quién, qué, cuál, cuándo, dónde, mostrame, muéstrame, abrir
++ cualquier tipo de negocio (landscaping, concrete, roofing, etc.)
++ cualquier estado (hot, warm, finished, in progress, etc.)
++ palabras de tiempo (hoy, esta semana, atrasado, agendado)
+
+# Ejemplos
+
+Usuario: "Muéstrame los leads calientes"
+Tú: {"tool": "list_clients", "args": {"motivation": "Hot"}}
+
+Usuario: "Muéstrame todos los negocios de landscaping"
+Tú: {"tool": "list_clients", "args": {"business_type": "Landscaping"}}
+
+Usuario: "Lista los clientes de Ivan en negociación"
+Tú: {"tool": "list_clients", "args": {"manager": "Ivan", "client_status": "Negotiation"}}
+
+Usuario: "Clientes de concreto que aún tengo que terminar"
+Tú: {"tool": "list_clients", "args": {"business_type": "Concrete", "web_status_not": "Finished"}}
+
+Usuario: "Háblame de Acme Paving"
+Tú: {"tool": "get_client", "args": {"query": "Acme Paving"}}
+
+Usuario: "¿Cuáles son las notas web de John?"
+Tú: {"tool": "get_client_notes", "args": {"query": "John", "kind": "web"}}
+
+Usuario: "¿Qué tengo agendado hoy?"
+Tú: {"tool": "get_schedule", "args": {"when": "today"}}
+
+Usuario: "¿Algo atrasado?"
+Tú: {"tool": "get_schedule", "args": {"when": "overdue"}}
+
+Usuario: "Resumen del pipeline"
+Tú: {"tool": "get_pipeline_summary", "args": {}}
+
+# Acciones de escritura
+
+Usuario: "Marca Acme como Hot"
+Tú: {"tool": "update_client", "args": {"query": "Acme", "field": "motivation", "value": "Hot"}}
+
+Usuario: "Cambia el web status de Acme a Finished"
+Tú: {"tool": "update_client", "args": {"query": "Acme", "field": "web_status", "value": "Finished"}}
+
+Usuario: "Asigna John a Ivan"
+Tú: {"tool": "update_client", "args": {"query": "John", "field": "manager", "value": "Ivan"}}
+
+Usuario: "Agrega una nota para Acme: el cliente quiere posponer"
+Tú: {"tool": "add_note", "args": {"query": "Acme", "kind": "client", "text": "el cliente quiere posponer"}}
+
+Usuario: "Agenda Acme para el martes 2pm"
+(Calcula la fecha del martes desde hoy.)
+Tú: {"tool": "schedule_followup", "args": {"query": "Acme", "date": "<YYYY-MM-DD calculado>", "time": "14:00", "type": "Appointment"}}
+
+Usuario: "Cancela la cita de Acme"
+Tú: {"tool": "cancel_followup", "args": {"query": "Acme"}}
+
+# Crear nuevo cliente — SIEMPRE usa el wizard
+
+Cuando el usuario quiera agregar/crear/hacer un cliente nuevo, SIEMPRE llama wizard_start. NO trates de capturar todos los campos tú mismo — el wizard guía al usuario campo por campo en el panel derecho.
+
+Usuario: "Agrega un nuevo cliente"
+Tú: {"tool": "wizard_start", "args": {}}
+
+Usuario: "Crea un nuevo cliente llamado Acme Paving"
+Tú: {"tool": "wizard_start", "args": {}}
+
+# Confirmación
+
+Para schedule_followup, cancel_followup, NUNCA pongas "confirmed": true tú mismo. El frontend maneja la confirmación. Solo da la llamada sin esa bandera.
+
+# Después de que la herramienta se ejecuta
+
+Te enviaré un mensaje empezando con "[Tool result]". Responde en ESPAÑOL natural (1-2 oraciones cortas). NO des JSON en esa respuesta.
+
+# Cuándo NO usar una herramienta
+
+SOLO para charla casual (saludos, "¿cómo estás?", preguntas sobre ti mismo). Para CUALQUIER pregunta sobre datos del CRM, usa una herramienta.`;
     }
 
     function buildToolResultMessage(tool, args, result) {
@@ -3402,40 +3798,40 @@ ONLY for pure chitchat (greetings, "how are you", "what can you do", general que
 
       // ---- Left half: wizard panel ----
       let leftHtml = `
-        <div class="sek-wizard-step-num">Step ${stepIdx + 1} of ${totalSteps}</div>
-        <div class="sek-wizard-step-name">${esc(step.name)}</div>
+        <div class="sek-wizard-step-num">${esc(t("wizardStepNum", stepIdx + 1, totalSteps))}</div>
+        <div class="sek-wizard-step-name">${esc(wizStepName(step))}</div>
         <div class="sek-wizard-progress"><div class="sek-wizard-progress-fill" style="width:${progress}%"></div></div>`;
 
       if (isFinalReviewStep()) {
         leftHtml += `
           <div class="sek-wizard-final-confirm">
-            <div class="title">Ready to save</div>
-            <div class="sub">Review everything on the right. Type <strong>yes</strong> to save, or <strong>no</strong> to cancel.</div>
+            <div class="title">${esc(t("wizardReadyTitle"))}</div>
+            <div class="sub">${esc(t("wizardReadySub"))}</div>
           </div>`;
       } else if (sekWizardState.awaitingStepConfirm) {
         leftHtml += `
           <div class="sek-wizard-step-confirm">
-            <div class="title">Step done — confirm to continue</div>
-            <div class="sub">Review on the right. Type <strong>yes</strong> to move on, <strong>no</strong> to fix the last answer.</div>
+            <div class="title">${esc(t("wizardStepDoneTitle"))}</div>
+            <div class="sub">${esc(t("wizardStepDoneSub"))}</div>
           </div>`;
       } else {
         const f = step.fields[sekWizardState.fieldIndex];
         if (f) {
           leftHtml += `
             <div class="sek-wizard-question-block">
-              <div class="sek-wizard-field-label">${esc(f.label)}${f.required ? " *" : ""}</div>
-              <div class="sek-wizard-question">${esc(f.question)}</div>
+              <div class="sek-wizard-field-label">${esc(wizFieldLabel(f))}${f.required ? " *" : ""}</div>
+              <div class="sek-wizard-question">${esc(wizFieldQuestion(f))}</div>
             </div>`;
         }
       }
 
       leftHtml += `
         <div class="sek-wizard-hints">
-          Type your answer in the chat. Or:
+          ${esc(t("wizardHintHeader"))}
           <ul style="margin: 4px 0; padding-left: 18px;">
-            <li><code>skip</code> — skip this field (optional only)</li>
-            <li><code>back</code> — go to the previous field</li>
-            <li><code>cancel</code> — abort the wizard</li>
+            <li><code>${esc(t("wizardHintSkip"))}</code> — ${esc(t("wizardHintSkipDesc"))}</li>
+            <li><code>${esc(t("wizardHintBack"))}</code> — ${esc(t("wizardHintBackDesc"))}</li>
+            <li><code>${esc(t("wizardHintCancel"))}</code> — ${esc(t("wizardHintCancelDesc"))}</li>
           </ul>
         </div>`;
 
@@ -3453,14 +3849,15 @@ ONLY for pure chitchat (greetings, "how are you", "what can you do", general que
       const currentStepFields = step.fields || [];
       if (!isFinalReviewStep() && currentStepFields.length > 0) {
         const rows = currentStepFields.map((f, i) => {
+          const lbl = wizFieldLabel(f);
           if (i < sekWizardState.fieldIndex || sekWizardState.awaitingStepConfirm) {
-            return fieldRow(f.label, filled[f.name]);
+            return fieldRow(lbl, filled[f.name]);
           }
-          return `<div class="sek-wizard-review-row"><div class="k">${esc(f.label)}</div><div class="v muted">— pending —</div></div>`;
+          return `<div class="sek-wizard-review-row"><div class="k">${esc(lbl)}</div><div class="v muted">${esc(t("pendingValue"))}</div></div>`;
         }).join("");
         currentSection = `
           <div class="sek-wizard-review-section">
-            <h4>This step</h4>
+            <h4>${esc(t("wizardThisStep"))}</h4>
             ${rows}
           </div>`;
       }
@@ -3470,16 +3867,16 @@ ONLY for pure chitchat (greetings, "how are you", "what can you do", general que
       if (stepIdx > 0) {
         const prevStepsHtml = WIZARD_STEPS.slice(0, stepIdx).map((s, i) => {
           if (s.fields.length === 0) return "";
-          const rows = s.fields.map((f) => fieldRow(f.label, filled[f.name])).join("");
+          const rows = s.fields.map((f) => fieldRow(wizFieldLabel(f), filled[f.name])).join("");
           return `
             <details class="sek-wizard-prev-step" ${i === stepIdx - 1 ? "open" : ""}>
-              <summary>${i + 1}. ${esc(s.name)} ✓</summary>
+              <summary>${i + 1}. ${esc(wizStepName(s))} ✓</summary>
               <div class="sek-wizard-prev-step-content">${rows}</div>
             </details>`;
         }).join("");
         prevSection = `
           <div class="sek-wizard-review-section">
-            <h4>Earlier steps</h4>
+            <h4>${esc(t("wizardEarlierSteps"))}</h4>
             ${prevStepsHtml}
           </div>`;
       }
@@ -3489,29 +3886,29 @@ ONLY for pure chitchat (greetings, "how are you", "what can you do", general que
       if (isFinalReviewStep()) {
         const fuIso = filled.follow_up_date ? combineDateTime(filled.follow_up_date, filled.follow_up_time || "09:00") : null;
         const allRows = [
-          ["Company",          filled.company_name],
-          ["Business type",    filled.business_type],
-          ["Client",           filled.client_name],
-          ["Phone",            filled.phone],
-          ["Profile link",     filled.profile_link],
-          ["Post link",        filled.post_link],
-          ["Finished website", filled.finished_website],
-          ["Manager",          filled.manager || "Unassigned"],
-          ["Web status",       filled.web_status || "Not Started"],
-          ["Client status",    filled.client_status || "New Lead"],
-          ["Motivation",       filled.motivation || "Not Set"],
-          ["Follow-up",        fuIso ? `${formatDateTime(fuIso)} (${filled.follow_up_type || "Follow-up"})` : null],
-          ["Client note",      filled.initial_client_note],
-          ["Web note",         filled.initial_web_note],
+          [t("fieldCompanyName"),     filled.company_name],
+          [t("fieldBusinessType"),    filled.business_type],
+          [t("fieldClientName"),      filled.client_name],
+          [t("fieldPhone"),           filled.phone],
+          [t("fieldProfileLink"),     filled.profile_link],
+          [t("fieldPostLink"),        filled.post_link],
+          [t("fieldFinishedWebsite"), filled.finished_website],
+          [t("fieldManager"),         filled.manager || t("unassigned")],
+          [t("fieldWebStatus"),       filled.web_status || "Not Started"],
+          [t("fieldClientStatus"),    filled.client_status || "New Lead"],
+          [t("fieldMotivation"),      filled.motivation || "Not Set"],
+          [t("fieldFollowUpDate"),    fuIso ? `${formatDateTime(fuIso)} (${filled.follow_up_type || "Follow-up"})` : null],
+          [t("fieldClientNote"),      filled.initial_client_note],
+          [t("fieldWebNote"),         filled.initial_web_note],
         ];
         finalSection = `
           <div class="sek-wizard-review-section">
-            <h4>New client preview</h4>
+            <h4>${esc(t("wizardNewClientPreview"))}</h4>
             ${allRows.map(([k, v]) => fieldRow(k, v)).join("")}
           </div>`;
       }
 
-      const rightHtml = (finalSection || currentSection || `<div class="sek-wizard-empty-state">Nothing yet — answer the question on the left.</div>`) + prevSection;
+      const rightHtml = (finalSection || currentSection || `<div class="sek-wizard-empty-state">${esc(t("wizardNothingYet"))}</div>`) + prevSection;
 
       sekResult.innerHTML = `
         <div class="sek-wizard-layout">
@@ -3770,6 +4167,49 @@ ONLY for pure chitchat (greetings, "how are you", "what can you do", general que
       }
     });
 
+    // ---- Welcome / language picker rendering ----
+    function renderWelcomeScreen() {
+      sekResult.innerHTML = `
+        <div class="sek-welcome">
+          <div class="icon">🤖</div>
+          <h3>${esc(t("welcomeTitle"))}</h3>
+          <p>${esc(t("welcomeBody"))}</p>
+          <button class="download-btn" id="sekDownloadBtn">${esc(t("downloadBtn"))}</button>
+        </div>`;
+      document.getElementById("sekDownloadBtn").addEventListener("click", onDownloadClick);
+    }
+
+    function renderLanguagePicker() {
+      sekResult.innerHTML = `
+        <div class="sek-welcome">
+          <div class="icon">🌐</div>
+          <h3>${esc(t("pickLangTitle"))}</h3>
+          <p>${esc(t("pickLangSub"))}</p>
+          <div class="sek-lang-options">
+            <button class="sek-lang-btn" data-lang="en">${TRANSLATIONS.en.langEn}</button>
+            <button class="sek-lang-btn" data-lang="es-MX">${TRANSLATIONS.en.langEs}</button>
+          </div>
+        </div>`;
+      sekResult.querySelectorAll(".sek-lang-btn").forEach((btn) => {
+        btn.addEventListener("click", () => onLangPicked(btn.dataset.lang));
+      });
+    }
+
+    function onDownloadClick() {
+      if (!sekLang) {
+        renderLanguagePicker();
+      } else {
+        sekShowWelcome = false;
+        ensureSekModelLoaded();
+      }
+    }
+
+    function onLangPicked(lang) {
+      setSekLang(lang);
+      sekShowWelcome = false;
+      ensureSekModelLoaded();
+    }
+
     // Run device qualification check on page load — store the result
     let sekQualification = null;
     (async () => {
@@ -3778,18 +4218,33 @@ ONLY for pure chitchat (greetings, "how are you", "what can you do", general que
         const reason = sekQualification.issues[0].title;
         setSekStatus("unsupported", reason);
       } else {
-        setSekStatus("idle", "Click the Sekretary tab to load the model");
+        setSekStatus("idle", t("statusIdleNoLang"));
       }
     })();
 
-    // Tab click: either show the ineligible card OR start loading the model
+    // Tab click: either show the ineligible card, the welcome screen, or load the model
     if (sekTabBtn) {
       sekTabBtn.addEventListener("click", () => {
         if (sekQualification && !sekQualification.qualifies) {
           renderIneligible(sekQualification);
           return;
         }
-        if (sekState === "idle") ensureSekModelLoaded();
+        if (sekState === "idle") {
+          if (sekShowWelcome) {
+            renderWelcomeScreen();
+          } else {
+            ensureSekModelLoaded();
+          }
+        }
+      });
+    }
+
+    // Language toggle button (header) — visible after model is ready
+    const sekLangBtn = document.getElementById("sekLangBtn");
+    if (sekLangBtn) {
+      sekLangBtn.addEventListener("click", () => {
+        const newLang = sekLang === "es-MX" ? "en" : "es-MX";
+        setSekLang(newLang, { notify: true });
       });
     }
 
