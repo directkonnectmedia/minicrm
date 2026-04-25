@@ -699,6 +699,137 @@
     }
     .sek-stats-bar .cnt { color: #6b7280; text-align: right; font-variant-numeric: tabular-nums; }
 
+    /* New-client wizard (split layout in right panel) */
+    .sek-wizard-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      margin: -24px;
+      min-height: calc(100vh - 320px);
+    }
+    @media (max-width: 1100px) {
+      .sek-wizard-layout { grid-template-columns: 1fr; }
+    }
+    .sek-wizard-panel { padding: 22px; border-right: 1px solid #e5e7eb; background: #fff; }
+    .sek-wizard-review-panel { padding: 22px; background: #f9fafb; overflow-y: auto; }
+    .sek-wizard-step-num {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+      color: #6366f1; font-weight: 600;
+    }
+    .sek-wizard-step-name { font-size: 20px; font-weight: 700; color: #111827; margin-top: 2px; }
+    .sek-wizard-progress {
+      height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden;
+      margin: 12px 0 20px;
+    }
+    .sek-wizard-progress-fill {
+      height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6);
+      transition: width 250ms ease;
+    }
+    .sek-wizard-question-block {
+      background: #eef2ff; border: 1px solid #c7d2fe;
+      border-radius: 10px; padding: 16px; margin-bottom: 16px;
+    }
+    .sek-wizard-field-label {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+      color: #4f46e5; font-weight: 600; margin-bottom: 6px;
+    }
+    .sek-wizard-question { font-size: 16px; color: #1e293b; line-height: 1.4; }
+    .sek-wizard-step-confirm {
+      background: #fef3c7; border: 1px solid #fde68a;
+      border-radius: 10px; padding: 16px; margin-bottom: 16px;
+      color: #92400e;
+    }
+    .sek-wizard-step-confirm .title { font-weight: 600; margin-bottom: 4px; font-size: 15px; }
+    .sek-wizard-step-confirm .sub { font-size: 13px; }
+    .sek-wizard-final-confirm {
+      background: #d1fae5; border: 1px solid #6ee7b7;
+      border-radius: 10px; padding: 16px; margin-bottom: 16px;
+      color: #065f46;
+    }
+    .sek-wizard-final-confirm .title { font-weight: 600; margin-bottom: 4px; font-size: 15px; }
+    .sek-wizard-final-confirm .sub { font-size: 13px; }
+    .sek-wizard-hints {
+      font-size: 12px; color: #6b7280; line-height: 1.6;
+      background: #f9fafb; border-radius: 8px; padding: 10px 12px;
+    }
+    .sek-wizard-hints code {
+      background: #fff; border: 1px solid #e5e7eb;
+      padding: 1px 5px; border-radius: 4px;
+      font-size: 11px; color: #1f2937;
+    }
+    .sek-wizard-review-panel h4 {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+      color: #6b7280; font-weight: 600; margin: 0 0 8px;
+    }
+    .sek-wizard-review-section { margin-bottom: 18px; }
+    .sek-wizard-review-row {
+      display: grid; grid-template-columns: 110px 1fr;
+      gap: 8px; padding: 6px 0; font-size: 13px;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .sek-wizard-review-row:last-child { border-bottom: none; }
+    .sek-wizard-review-row .k { color: #6b7280; font-weight: 500; }
+    .sek-wizard-review-row .v { color: #1f2937; word-break: break-word; }
+    .sek-wizard-review-row .v.muted { color: #9ca3af; font-style: italic; }
+    .sek-wizard-prev-step {
+      background: #fff; border: 1px solid #e5e7eb;
+      border-radius: 8px; padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+    .sek-wizard-prev-step summary {
+      cursor: pointer; font-size: 13px; font-weight: 500; color: #374151;
+      list-style: none;
+    }
+    .sek-wizard-prev-step summary::before {
+      content: "▸ "; color: #9ca3af; display: inline-block;
+      transition: transform 150ms;
+    }
+    .sek-wizard-prev-step[open] summary::before { content: "▾ "; }
+    .sek-wizard-prev-step-content { margin-top: 8px; padding-top: 8px; border-top: 1px solid #f3f4f6; }
+    .sek-wizard-empty-state { color: #9ca3af; font-style: italic; font-size: 13px; padding: 8px 0; }
+
+    /* Write-action confirmation / result views */
+    .sek-confirm-view { max-width: 100%; }
+    .sek-confirm-view h3 {
+      font-size: 17px; font-weight: 600; color: #111827;
+      margin: 0 0 12px;
+    }
+    .sek-confirm-card {
+      background: #fef3c7; border: 1px solid #fde68a;
+      border-radius: 10px; padding: 16px; margin-bottom: 12px;
+    }
+    .sek-confirm-card.danger { background: #fee2e2; border-color: #fecaca; }
+    .sek-confirm-row {
+      display: grid; grid-template-columns: 110px 1fr; gap: 10px;
+      padding: 6px 0; font-size: 14px;
+    }
+    .sek-confirm-row .k {
+      color: #92400e; font-weight: 600; font-size: 12px;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      padding-top: 2px;
+    }
+    .sek-confirm-card.danger .sek-confirm-row .k { color: #991b1b; }
+    .sek-confirm-row .v { color: #1f2937; word-break: break-word; }
+    .sek-confirm-actions {
+      display: flex; gap: 10px; justify-content: flex-end;
+      margin-top: 4px;
+    }
+    .sek-success-view {
+      max-width: 480px; margin: 16px auto; padding: 20px;
+      background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7;
+      border-radius: 10px; text-align: center;
+    }
+    .sek-success-view .icon { font-size: 36px; }
+    .sek-success-view h3 { font-size: 16px; font-weight: 600; margin: 8px 0 4px; }
+    .sek-success-view .detail { font-size: 14px; color: #047857; }
+    .sek-success-view .actions { margin-top: 12px; display: flex; gap: 8px; justify-content: center; }
+    .sek-error-view {
+      max-width: 480px; margin: 16px auto; padding: 16px;
+      background: #fef3c7; color: #92400e; border: 1px solid #fde68a;
+      border-radius: 10px; text-align: center; font-size: 14px;
+    }
+    .sek-error-view .title { font-weight: 600; margin-bottom: 6px; }
+
     /* "Searching..." indicator inside a chat bubble */
     .sek-thinking {
       display: inline-flex; gap: 3px; align-items: center;
@@ -838,7 +969,7 @@
             <div class="icon">🤖</div>
             <div class="lead">Ask me anything on the left.</div>
             <div class="sub">Adaptive result views will render here.</div>
-            <div class="sek-shell-banner">Chunk 5 of 6 — read tools active. Try: "show hot leads", "tell me about [name]", "today's schedule", "pipeline overview"</div>
+            <div class="sek-shell-banner">All chunks complete. Try: "Add a new client" (launches wizard), "Mark Acme as Hot", "Schedule Acme Tuesday 2pm", "Show me hot leads"</div>
           </div>
         </div>
       </div>
@@ -2034,7 +2165,7 @@
         // Reset thread message
         sekThread.classList.remove("empty");
         sekThread.innerHTML = "";
-        appendSekBubble("assistant", "Hi! I'm running locally via WebGPU. I can read your CRM. Try things like:\n\n• \"Show me hot leads\"\n• \"Tell me about [client name]\"\n• \"What are John's web notes?\"\n• \"What's on my calendar today?\"\n• \"Pipeline overview\"");
+        appendSekBubble("assistant", "Hi! I can read, change, and create clients in your CRM. Try things like:\n\n📖 Read:\n• \"Show me hot leads\"\n• \"Tell me about [client]\"\n• \"What's on my calendar today?\"\n\n✏️ Write:\n• \"Mark Acme as Hot\"\n• \"Add note for John: Wants to push deadline\"\n• \"Schedule Acme for Tuesday 2pm\"\n• \"Cancel Acme's appointment\"\n\n➕ Create new client:\n• \"Add a new client\" — launches a guided step-by-step wizard");
       } catch (err) {
         console.error("Sekretary load error:", err);
         setSekStatus("error", "Load failed");
@@ -2206,7 +2337,491 @@
           };
         },
       },
+
+      // ---------- WRITE TOOLS (Chunk 6) ----------
+
+      update_client: {
+        description: "Update ONE field on a single client. Use for 'mark X as Y' / 'change X's status to Z'. Field must be one of: motivation, web_status, client_status, manager.",
+        params: {
+          query: "Company name or client name (fuzzy match)",
+          field: "One of: motivation, web_status, client_status, manager",
+          value: "New value — must be valid for the chosen field. For manager, use 'Ivan', 'Hector', or 'Unassigned'.",
+        },
+        tier: "green",
+        execute: async (args) => {
+          const matches = sekFuzzyMatch(args.query);
+          if (matches.length === 0) return { error: "no_match", query: args.query };
+          if (matches.length > 1) return { error: "multiple_matches", query: args.query, matches: matches.map((c) => ({ id: c.id, company_name: c.company_name })) };
+          const c = matches[0];
+          const validFields = {
+            motivation:    MOTIVATIONS,
+            web_status:    WEB_STATUSES,
+            client_status: CLIENT_STATUSES,
+            manager:       ["Ivan", "Hector", "Unassigned"],
+          };
+          if (!validFields[args.field]) return { error: "invalid_field", field: args.field, valid: Object.keys(validFields) };
+          let value = args.value;
+          if (args.field === "manager" && (value === "Unassigned" || value === "")) value = null;
+          if (value !== null && !validFields[args.field].includes(value)) {
+            return { error: "invalid_value", field: args.field, value: args.value, valid: validFields[args.field] };
+          }
+          const oldValue = c[args.field];
+          const update = { [args.field]: value };
+          const dbResult = await sekDbUpdate(c.id, update);
+          if (dbResult.error) return { error: "db_error", message: dbResult.error };
+          return { success: true, action: "updated", client: { id: c.id, company_name: c.company_name }, field: args.field, old_value: oldValue, new_value: value };
+        },
+      },
+
+      add_note: {
+        description: "Append a new note to a client's thread. kind is 'client' (relationship notes) or 'web' (build notes).",
+        params: {
+          query: "Company name or client name (fuzzy match)",
+          kind:  "Either 'client' or 'web'",
+          text:  "The note text",
+        },
+        tier: "green",
+        execute: async (args) => {
+          const matches = sekFuzzyMatch(args.query);
+          if (matches.length === 0) return { error: "no_match", query: args.query };
+          if (matches.length > 1) return { error: "multiple_matches", query: args.query, matches: matches.map((c) => ({ id: c.id, company_name: c.company_name })) };
+          const c = matches[0];
+          if (!args.text || !args.text.trim()) return { error: "empty_text" };
+          const kind = (args.kind === "web") ? "web" : "client";
+          const field = kind === "web" ? "web_notes" : "client_notes";
+          const newNotes = appendNote(c[field] || [], args.text);
+          const dbResult = await sekDbUpdate(c.id, { [field]: newNotes });
+          if (dbResult.error) return { error: "db_error", message: dbResult.error };
+          return { success: true, action: "noted", client: { id: c.id, company_name: c.company_name }, kind, text: args.text };
+        },
+      },
+
+      schedule_followup: {
+        description: "Schedule a follow-up or appointment for a client. Requires user confirmation before saving.",
+        params: {
+          query: "Company name or client name (fuzzy match)",
+          date:  "Date in YYYY-MM-DD format. Compute relative dates from today's date in the system prompt.",
+          time:  "Time in HH:MM (24-hour). Defaults to 09:00 if omitted.",
+          type:  "Either 'Follow-up' (casual check-in) or 'Appointment' (firm meeting). Default 'Follow-up'.",
+          confirmed: "Set to true ONLY if the user has explicitly confirmed via the right-panel button. Otherwise omit.",
+        },
+        tier: "yellow",
+        execute: async (args) => {
+          const matches = sekFuzzyMatch(args.query);
+          if (matches.length === 0) return { error: "no_match", query: args.query };
+          if (matches.length > 1) return { error: "multiple_matches", query: args.query, matches: matches.map((c) => ({ id: c.id, company_name: c.company_name })) };
+          const c = matches[0];
+          if (!args.date) return { error: "missing_date" };
+          const time = args.time || "09:00";
+          const type = args.type === "Appointment" ? "Appointment" : "Follow-up";
+          const iso = combineDateTime(args.date, time);
+
+          if (!args.confirmed) {
+            return {
+              needs_confirmation: true,
+              tier: "yellow",
+              tool: "schedule_followup",
+              preview: {
+                client: c.company_name,
+                client_id: c.id,
+                date: args.date,
+                time,
+                type,
+                friendly_when: formatDateTime(iso),
+              },
+              confirm_args: { ...args, confirmed: true },
+            };
+          }
+          const dbResult = await sekDbUpdate(c.id, { follow_up_at: iso, follow_up_type: type });
+          if (dbResult.error) return { error: "db_error", message: dbResult.error };
+          return { success: true, action: "scheduled", client: { id: c.id, company_name: c.company_name }, when: iso, type };
+        },
+      },
+
+      cancel_followup: {
+        description: "Cancel/clear a scheduled follow-up or appointment. Requires user confirmation.",
+        params: {
+          query: "Company name or client name (fuzzy match)",
+          confirmed: "Set to true ONLY if the user has explicitly confirmed via the right-panel button.",
+        },
+        tier: "yellow",
+        execute: async (args) => {
+          const matches = sekFuzzyMatch(args.query);
+          if (matches.length === 0) return { error: "no_match", query: args.query };
+          if (matches.length > 1) return { error: "multiple_matches", query: args.query, matches: matches.map((c) => ({ id: c.id, company_name: c.company_name })) };
+          const c = matches[0];
+          if (!c.follow_up_at) return { error: "nothing_scheduled", client: c.company_name };
+          if (!args.confirmed) {
+            return {
+              needs_confirmation: true,
+              tier: "yellow",
+              tool: "cancel_followup",
+              preview: {
+                client: c.company_name,
+                client_id: c.id,
+                current_when: formatDateTime(c.follow_up_at),
+                current_type: c.follow_up_type || "Follow-up",
+              },
+              confirm_args: { ...args, confirmed: true },
+            };
+          }
+          const dbResult = await sekDbUpdate(c.id, { follow_up_at: null });
+          if (dbResult.error) return { error: "db_error", message: dbResult.error };
+          return { success: true, action: "cancelled", client: { id: c.id, company_name: c.company_name } };
+        },
+      },
+
+      wizard_start: {
+        description: "Start the new-client creation wizard. Use this whenever the user wants to add, create, or make a new client. The wizard walks them through each field step by step in the right panel.",
+        params: {},
+        tier: "wizard",
+        execute: () => {
+          sekWizardStart();
+          return { success: true, action: "wizard_started" };
+        },
+      },
     };
+
+    // ============================================================
+    // NEW-CLIENT WIZARD (Chunk 7)
+    // ============================================================
+    let sekWizardState = null;
+
+    const WIZARD_STEPS = [
+      {
+        name: "Company Info",
+        fields: [
+          { name: "company_name",  label: "Company name",   question: "What's the company name?",                   required: true },
+          { name: "business_type", label: "Business type",  question: "What's the business type? (e.g., Pavers, Roofing, Landscaping — or say 'skip')" },
+        ],
+      },
+      {
+        name: "Contact",
+        fields: [
+          { name: "client_name", label: "Client name", question: "Who's the contact person? (or 'skip')" },
+          { name: "phone",       label: "Phone",       question: "What's the phone number? (or 'skip')",
+            validate: (v) => {
+              if (!v) return null;
+              const p = normPhone(v);
+              if (!p) return null;
+              const existing = (allClients || []).find((c) => normPhone(c.phone) === p);
+              if (existing) return `That phone is already used by "${existing.company_name}". Enter a different number, or say 'skip'.`;
+              return null;
+            },
+            transform: (v) => formatPhone(v) || v,
+          },
+        ],
+      },
+      {
+        name: "Links",
+        fields: [
+          { name: "profile_link",     label: "Profile link",     question: "Profile / social media link? (or 'skip')" },
+          { name: "post_link",        label: "Post link",        question: "Specific post link? (or 'skip')" },
+          { name: "finished_website", label: "Finished website", question: "Finished website URL? (or 'skip')" },
+        ],
+      },
+      {
+        name: "Assignment",
+        fields: [
+          { name: "manager",       label: "Manager",       question: "Manager — Ivan, Hector, or 'skip' for unassigned?", choices: ["Ivan", "Hector"] },
+          { name: "web_status",    label: "Web status",    question: "Web status? (Not Started, In Progress, Review, Needs Fixing, Finished — or 'skip' for Not Started)", choices: WEB_STATUSES },
+          { name: "client_status", label: "Client status", question: "Client status? (New Lead, Contacted, Interested, Proposal Sent, Negotiation, Follow Up, Closed Won, Closed Lost, Nurture — or 'skip' for New Lead)", choices: CLIENT_STATUSES },
+          { name: "motivation",    label: "Motivation",    question: "Motivation? (Not Set, Dead, Cold, Warm, Hot, VIP — or 'skip' for Not Set)", choices: MOTIVATIONS },
+        ],
+      },
+      {
+        name: "Schedule",
+        fields: [
+          { name: "follow_up_date", label: "Date",  question: "Want to schedule a follow-up? Give a date (YYYY-MM-DD) or 'skip' for none.",
+            validate: (v) => {
+              if (!v) return null;
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return "Please use YYYY-MM-DD format (e.g., 2026-04-28), or 'skip'.";
+              return null;
+            },
+          },
+          { name: "follow_up_time", label: "Time",  question: "What time? (HH:MM in 24-hour, e.g., '14:00' for 2pm — or 'skip' for 09:00)", dependsOn: "follow_up_date",
+            validate: (v) => {
+              if (!v) return null;
+              if (!/^\d{1,2}:\d{2}$/.test(v)) return "Please use HH:MM 24-hour format (e.g., 14:00), or 'skip'.";
+              return null;
+            },
+          },
+          { name: "follow_up_type", label: "Type",  question: "Follow-up or Appointment?", dependsOn: "follow_up_date", choices: FOLLOW_UP_TYPES },
+        ],
+      },
+      {
+        name: "Notes",
+        fields: [
+          { name: "initial_client_note", label: "Client note", question: "Initial client note? (or 'skip')" },
+          { name: "initial_web_note",    label: "Web note",    question: "Initial web/build note? (or 'skip')" },
+        ],
+      },
+      {
+        name: "Final Review",
+        fields: [], // special — full review, just yes/no
+      },
+    ];
+
+    function sekWizardStart() {
+      sekWizardState = {
+        active: true,
+        stepIndex: 0,
+        fieldIndex: 0,
+        fields: {},
+        awaitingStepConfirm: false,
+      };
+      renderWizardView();
+      const step = WIZARD_STEPS[0];
+      const f = step.fields[0];
+      appendSekBubble("assistant", `Let's create a new client step by step. Step 1 of ${WIZARD_STEPS.length}: ${step.name}.\n\n${f.question}`);
+    }
+
+    function getCurrentWizardField() {
+      if (!sekWizardState) return null;
+      const step = WIZARD_STEPS[sekWizardState.stepIndex];
+      if (!step || !step.fields) return null;
+      return step.fields[sekWizardState.fieldIndex] || null;
+    }
+
+    function isFinalReviewStep() {
+      return sekWizardState && sekWizardState.stepIndex === WIZARD_STEPS.length - 1;
+    }
+
+    async function handleWizardInput(text) {
+      const lower = (text || "").toLowerCase().trim();
+
+      if (/^(cancel|stop|abort|quit|exit|nevermind)\b/.test(lower)) {
+        sekWizardCancel();
+        return;
+      }
+      if (/^(back|go back|previous)\b/.test(lower)) {
+        sekWizardBack();
+        return;
+      }
+
+      // Final review: yes/no only
+      if (isFinalReviewStep()) {
+        if (/^(yes|y|yeah|yep|confirm|save|create|ok|okay|sure|do it|go|done)\b/.test(lower)) {
+          await sekWizardSave();
+        } else if (/^(no|n|nope|cancel)\b/.test(lower)) {
+          sekWizardCancel();
+        } else {
+          appendSekBubble("assistant", "Yes to save the client, or no to cancel.");
+        }
+        return;
+      }
+
+      // Step confirm phase: yes/no only
+      if (sekWizardState.awaitingStepConfirm) {
+        if (/^(yes|y|yeah|yep|confirm|ok|okay|sure|good|next|continue)\b/.test(lower)) {
+          sekWizardConfirmStep();
+        } else if (/^(no|n|nope|change|fix|edit|wait)\b/.test(lower)) {
+          // Re-ask the last field of this step so they can fix it
+          sekWizardState.awaitingStepConfirm = false;
+          sekWizardState.fieldIndex = WIZARD_STEPS[sekWizardState.stepIndex].fields.length - 1;
+          renderWizardView();
+          const f = getCurrentWizardField();
+          if (f) appendSekBubble("assistant", `OK, let's fix that. ${f.question}`);
+        } else {
+          appendSekBubble("assistant", "Yes to confirm and continue, or no to fix something.");
+        }
+        return;
+      }
+
+      // Field input phase
+      const field = getCurrentWizardField();
+      if (!field) return; // shouldn't happen
+
+      // Skip command (only allowed for non-required fields)
+      if (/^skip\b/.test(lower)) {
+        if (field.required) {
+          appendSekBubble("assistant", `${field.label} is required — please provide a value.`);
+          return;
+        }
+        sekWizardState.fields[field.name] = null;
+        sekWizardAdvance();
+        return;
+      }
+
+      // Validate enum choice
+      let value = text.trim();
+      if (field.choices) {
+        const matched = field.choices.find((c) => c.toLowerCase() === value.toLowerCase());
+        if (!matched) {
+          appendSekBubble("assistant", `Please pick one of: ${field.choices.join(", ")}. Or say 'skip'.`);
+          return;
+        }
+        value = matched;
+      }
+
+      // Required check
+      if (field.required && !value) {
+        appendSekBubble("assistant", `${field.label} is required.`);
+        return;
+      }
+
+      // Custom validate
+      if (field.validate) {
+        const err = field.validate(value, sekWizardState.fields);
+        if (err) {
+          appendSekBubble("assistant", err);
+          return;
+        }
+      }
+
+      // Optional transform (e.g. format phone)
+      if (field.transform) value = field.transform(value);
+
+      sekWizardState.fields[field.name] = value;
+      sekWizardAdvance();
+    }
+
+    function sekWizardAdvance() {
+      sekWizardState.fieldIndex++;
+      const step = WIZARD_STEPS[sekWizardState.stepIndex];
+
+      // Skip dependent fields whose dependency is empty
+      while (sekWizardState.fieldIndex < step.fields.length) {
+        const f = step.fields[sekWizardState.fieldIndex];
+        if (f.dependsOn && !sekWizardState.fields[f.dependsOn]) {
+          sekWizardState.fields[f.name] = null;
+          sekWizardState.fieldIndex++;
+          continue;
+        }
+        break;
+      }
+
+      if (sekWizardState.fieldIndex >= step.fields.length) {
+        // Step done
+        if (sekWizardState.stepIndex === WIZARD_STEPS.length - 2) {
+          // Just finished Notes — go straight to Final Review
+          sekWizardState.stepIndex++;
+          sekWizardState.fieldIndex = 0;
+          renderWizardView();
+          appendSekBubble("assistant", "All steps done! Review everything on the right. Say 'yes' to save, or 'no' to cancel.");
+        } else {
+          sekWizardState.awaitingStepConfirm = true;
+          renderWizardView();
+          appendSekBubble("assistant", `"${step.name}" step done. Review on the right — say 'yes' to continue, 'no' to fix.`);
+        }
+        return;
+      }
+
+      // Ask next field
+      renderWizardView();
+      const f = step.fields[sekWizardState.fieldIndex];
+      appendSekBubble("assistant", f.question);
+    }
+
+    function sekWizardConfirmStep() {
+      sekWizardState.awaitingStepConfirm = false;
+      sekWizardState.stepIndex++;
+      sekWizardState.fieldIndex = 0;
+
+      // Handle Final Review (no fields)
+      if (sekWizardState.stepIndex === WIZARD_STEPS.length - 1) {
+        renderWizardView();
+        appendSekBubble("assistant", "All steps done! Review everything on the right. Say 'yes' to save, or 'no' to cancel.");
+        return;
+      }
+
+      const step = WIZARD_STEPS[sekWizardState.stepIndex];
+      // Handle dependent skip on first field
+      while (sekWizardState.fieldIndex < step.fields.length) {
+        const f = step.fields[sekWizardState.fieldIndex];
+        if (f.dependsOn && !sekWizardState.fields[f.dependsOn]) {
+          sekWizardState.fields[f.name] = null;
+          sekWizardState.fieldIndex++;
+          continue;
+        }
+        break;
+      }
+      renderWizardView();
+      const f = step.fields[sekWizardState.fieldIndex];
+      if (f) appendSekBubble("assistant", `Step ${sekWizardState.stepIndex + 1} of ${WIZARD_STEPS.length}: ${step.name}.\n\n${f.question}`);
+    }
+
+    function sekWizardBack() {
+      if (!sekWizardState) return;
+
+      if (isFinalReviewStep()) {
+        // Go back to last field of Notes step
+        sekWizardState.stepIndex = WIZARD_STEPS.length - 2;
+        sekWizardState.fieldIndex = WIZARD_STEPS[sekWizardState.stepIndex].fields.length - 1;
+        sekWizardState.awaitingStepConfirm = false;
+      } else if (sekWizardState.awaitingStepConfirm) {
+        sekWizardState.awaitingStepConfirm = false;
+        sekWizardState.fieldIndex = WIZARD_STEPS[sekWizardState.stepIndex].fields.length - 1;
+      } else if (sekWizardState.fieldIndex > 0) {
+        sekWizardState.fieldIndex--;
+      } else if (sekWizardState.stepIndex > 0) {
+        sekWizardState.stepIndex--;
+        sekWizardState.fieldIndex = WIZARD_STEPS[sekWizardState.stepIndex].fields.length - 1;
+      } else {
+        appendSekBubble("assistant", "Already on the very first field — say 'cancel' to abort the whole wizard.");
+        return;
+      }
+      renderWizardView();
+      const f = getCurrentWizardField();
+      if (f) appendSekBubble("assistant", `Going back. ${f.question}`);
+    }
+
+    function sekWizardCancel() {
+      sekWizardState = null;
+      sekResult.innerHTML = `
+        <div class="sek-success-view" style="background:#f3f4f6;color:#4b5563;border-color:#e5e7eb;">
+          <div class="icon">✕</div>
+          <h3>Wizard cancelled</h3>
+          <div class="detail">No client was created.</div>
+        </div>`;
+      appendSekBubble("assistant", "Cancelled. No client was created.");
+    }
+
+    async function sekWizardSave() {
+      const f = sekWizardState.fields;
+      const fuIso = f.follow_up_date ? combineDateTime(f.follow_up_date, f.follow_up_time || "09:00") : null;
+      const row = {
+        company_name:    (f.company_name || "").trim(),
+        business_type:    f.business_type || null,
+        client_name:      f.client_name   || null,
+        phone:            f.phone         || null,
+        profile_link:     f.profile_link  || null,
+        post_link:        f.post_link     || null,
+        finished_website: f.finished_website || null,
+        manager:          f.manager       || null,
+        web_status:       f.web_status    || "Not Started",
+        client_status:    f.client_status || "New Lead",
+        motivation:       f.motivation    || "Not Set",
+        follow_up_at:     fuIso,
+        follow_up_type:   f.follow_up_type || "Follow-up",
+        client_notes:     f.initial_client_note ? appendNote([], f.initial_client_note) : [],
+        web_notes:        f.initial_web_note    ? appendNote([], f.initial_web_note)    : [],
+      };
+
+      appendSekBubble("assistant", "Saving...");
+      const { data, error } = await sb.from("clients").insert(row).select();
+      if (error) {
+        appendSekBubble("assistant", `❌ Save failed: ${error.message}. Wizard still active — say 'cancel' or 'back' to fix.`);
+        return;
+      }
+      await load();
+      const newId = data && data[0] && data[0].id;
+      const companyName = row.company_name;
+      sekWizardState = null;
+      renderWriteSuccess("create_client", { success: true, action: "created", client: { id: newId, company_name: companyName } });
+      appendSekBubble("assistant", `🎉 Created "${companyName}". Anything else?`);
+    }
+
+    // ---- DB helper for write tools ----
+    async function sekDbUpdate(clientId, updates) {
+      const c = (allClients || []).find((x) => x.id === clientId);
+      if (c) Object.assign(c, updates);
+      const { error } = await sb.from("clients").update(updates).eq("id", clientId);
+      if (error) return { error: error.message };
+      render();
+      refreshCalendar();
+      return { ok: true };
+    }
 
     function sekToolsDescription() {
       return Object.entries(SEK_TOOLS).map(([name, t]) => {
@@ -2216,10 +2831,15 @@
     }
 
     function sekSystemPrompt() {
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const todayName = new Date().toLocaleDateString(undefined, { weekday: "long" });
       return `You are the Sekretary, an AI assistant inside a small CRM app for a web design agency.
 
+# Today's date
+Today is ${todayName}, ${todayIso}. Use this to compute relative dates like "tomorrow", "next Tuesday", "this Friday".
+
 # CRITICAL RULE
-If the user asks ANYTHING about their clients, businesses, schedule, notes, or pipeline data, you MUST respond with ONLY a JSON tool call — no prose, no explanation, no preamble. Output ONLY the JSON, nothing before it, nothing after it.
+If the user asks ANYTHING about their clients/businesses/schedule/notes/pipeline OR asks you to change/update/schedule/note something, you MUST respond with ONLY a JSON tool call — no prose, no explanation, no preamble. Output ONLY the JSON, nothing before it, nothing after it.
 
 If you find yourself starting with "I'll", "Sure", "Let me", "I found", "Here are" — STOP. Output the tool JSON instead.
 
@@ -2273,6 +2893,52 @@ You: {"tool": "get_schedule", "args": {"when": "overdue"}}
 User: "Pipeline overview"
 You: {"tool": "get_pipeline_summary", "args": {}}
 
+# Write tool examples (changes data)
+
+User: "Mark Acme as Hot"
+You: {"tool": "update_client", "args": {"query": "Acme", "field": "motivation", "value": "Hot"}}
+
+User: "Change Acme's web status to Finished"
+You: {"tool": "update_client", "args": {"query": "Acme", "field": "web_status", "value": "Finished"}}
+
+User: "Assign John to Ivan"
+You: {"tool": "update_client", "args": {"query": "John", "field": "manager", "value": "Ivan"}}
+
+User: "Add a note for Acme: client wants to push back"
+You: {"tool": "add_note", "args": {"query": "Acme", "kind": "client", "text": "client wants to push back"}}
+
+User: "Web note on Putting Green: design needs more green"
+You: {"tool": "add_note", "args": {"query": "Putting Green", "kind": "web", "text": "design needs more green"}}
+
+User: "Schedule Acme for Tuesday 2pm"
+(Compute Tuesday's date from today, e.g. if today is ${todayName} ${todayIso}, find next Tuesday's YYYY-MM-DD.)
+You: {"tool": "schedule_followup", "args": {"query": "Acme", "date": "<computed YYYY-MM-DD>", "time": "14:00", "type": "Appointment"}}
+
+User: "Set up a follow-up for John tomorrow at 10am"
+You: {"tool": "schedule_followup", "args": {"query": "John", "date": "<tomorrow's YYYY-MM-DD>", "time": "10:00", "type": "Follow-up"}}
+
+User: "Cancel Acme's appointment"
+You: {"tool": "cancel_followup", "args": {"query": "Acme"}}
+
+# Create new client — ALWAYS use the wizard
+
+When the user wants to add/create/make a new client, ALWAYS call wizard_start. Do NOT try to capture all the fields yourself — the wizard walks the user through one field at a time in the right panel.
+
+User: "Add a new client"
+You: {"tool": "wizard_start", "args": {}}
+
+User: "Create a new client called Acme Paving"
+You: {"tool": "wizard_start", "args": {}}
+
+User: "I want to add John from Acme Paving with all his details"
+You: {"tool": "wizard_start", "args": {}}
+
+After wizard_start runs, the user will be guided through the wizard step by step. You don't need to do anything else — the wizard handles the rest.
+
+# Confirmation flow
+
+For schedule_followup and cancel_followup, NEVER set "confirmed": true yourself. The frontend handles user confirmation. Just submit the tool call without that flag — the system will show a confirmation panel.
+
 # After the tool runs
 
 I will send back a message starting with "[Tool result]". Then respond in PLAIN ENGLISH (1-2 short sentences). Do NOT output JSON in that follow-up.
@@ -2315,6 +2981,33 @@ ONLY for pure chitchat (greetings, "how are you", "what can you do", general que
       }
       if (tool === "get_pipeline_summary") {
         return `[Tool result] get_pipeline_summary returned: ${JSON.stringify(result)}. Give a 2-3 sentence overview of the pipeline state.`;
+      }
+      // Write tools
+      if (result && result.error) {
+        if (result.error === "no_match")        return `[Tool result] No client matched "${result.query}". Tell the user that and ask them to clarify.`;
+        if (result.error === "multiple_matches") return `[Tool result] Multiple matches for "${result.query}": ${result.matches.map((m) => m.company_name).join(", ")}. Ask the user which one they meant.`;
+        if (result.error === "invalid_field")    return `[Tool result] "${result.field}" isn't a valid field. Valid fields: ${(result.valid || []).join(", ")}. Apologize and ask the user to clarify.`;
+        if (result.error === "invalid_value")    return `[Tool result] "${result.value}" isn't a valid value for ${result.field}. Valid options: ${(result.valid || []).join(", ")}. Apologize and ask the user to pick one.`;
+        if (result.error === "missing_date")     return `[Tool result] No date provided. Ask the user when to schedule it.`;
+        if (result.error === "nothing_scheduled") return `[Tool result] ${result.client} has no schedule to cancel. Tell the user.`;
+        if (result.error === "empty_text")       return `[Tool result] Note text was empty. Ask the user what to add.`;
+        if (result.error === "missing_company_name") return `[Tool result] Cannot create a client without a company name. Ask the user what the company name is.`;
+        if (result.error === "duplicate_phone")  return `[Tool result] Phone "${result.phone}" is already used by "${result.existing_company}". Tell the user this is a duplicate and ask if they want to proceed anyway (with a different phone) or cancel.`;
+        if (result.error === "db_error")         return `[Tool result] Database error: ${result.message}. Apologize.`;
+        return `[Tool result] Error: ${JSON.stringify(result)}. Apologize and explain.`;
+      }
+      if (result && result.needs_confirmation) {
+        if (tool === "schedule_followup") return `[Tool result] About to schedule a ${result.preview.type} for ${result.preview.client} on ${result.preview.friendly_when}. The frontend is showing a confirmation panel. Tell the user briefly to confirm in the right panel.`;
+        if (tool === "cancel_followup")   return `[Tool result] About to cancel ${result.preview.client}'s ${result.preview.current_type} on ${result.preview.current_when}. The frontend is showing a confirmation panel. Tell the user briefly to confirm in the right panel.`;
+        if (tool === "create_client")     return `[Tool result] About to create a new client: "${result.preview.company_name}". The frontend is showing a confirmation panel with all the details. Tell the user briefly to confirm in the right panel.`;
+      }
+      if (result && result.success) {
+        if (tool === "update_client") return `[Tool result] Successfully changed ${result.client.company_name}'s ${result.field} from "${result.old_value || "(none)"}" to "${result.new_value || "(none)"}". Confirm to the user in 1 short sentence.`;
+        if (tool === "add_note")      return `[Tool result] Added a ${result.kind} note for ${result.client.company_name}: "${result.text}". Confirm to the user in 1 short sentence.`;
+        if (tool === "schedule_followup") return `[Tool result] Scheduled a ${result.type} for ${result.client.company_name} at ${formatDateTime(result.when)}. Confirm to the user in 1 short sentence.`;
+        if (tool === "cancel_followup")   return `[Tool result] Cancelled ${result.client.company_name}'s schedule. Confirm to the user in 1 short sentence.`;
+        if (tool === "create_client")     return `[Tool result] Created new client "${result.client.company_name}". Confirm to the user in 1 short sentence.`;
+        if (tool === "wizard_start")      return `[Tool result] Wizard has started in the right panel. Tell the user briefly that the wizard is active.`;
       }
       return `[Tool result] ${tool} returned: ${JSON.stringify(result).slice(0, 400)}. Summarize for the user.`;
     }
@@ -2506,17 +3199,297 @@ ONLY for pure chitchat (greetings, "how are you", "what can you do", general que
         </div>`;
     }
 
+    function renderConfirmation(tool, result) {
+      const p = result.preview;
+      if (tool === "schedule_followup") {
+        sekResult.innerHTML = `
+          <div class="sek-confirm-view">
+            <h3>📅 Confirm scheduling</h3>
+            <div class="sek-confirm-card">
+              <div class="sek-confirm-row"><div class="k">Client</div><div class="v">${esc(p.client)}</div></div>
+              <div class="sek-confirm-row"><div class="k">Type</div><div class="v">${esc(p.type)}</div></div>
+              <div class="sek-confirm-row"><div class="k">When</div><div class="v">${esc(p.friendly_when)}</div></div>
+            </div>
+            <div class="sek-confirm-actions">
+              <button class="ghost" data-confirm-action="cancel">Cancel</button>
+              <button data-confirm-action="confirm">Confirm</button>
+            </div>
+          </div>`;
+      } else if (tool === "cancel_followup") {
+        sekResult.innerHTML = `
+          <div class="sek-confirm-view">
+            <h3>⚠ Confirm cancellation</h3>
+            <div class="sek-confirm-card danger">
+              <div class="sek-confirm-row"><div class="k">Client</div><div class="v">${esc(p.client)}</div></div>
+              <div class="sek-confirm-row"><div class="k">Cancelling</div><div class="v">${esc(p.current_type)} on ${esc(p.current_when)}</div></div>
+            </div>
+            <div class="sek-confirm-actions">
+              <button class="ghost" data-confirm-action="cancel">Keep it</button>
+              <button class="danger" data-confirm-action="confirm">Cancel schedule</button>
+            </div>
+          </div>`;
+      } else if (tool === "create_client") {
+        // Build rows only for fields the user filled in (skip empty / default-only)
+        const rows = [];
+        const push = (k, v) => { if (v != null && v !== "" && v !== "Not Set" && !(typeof v === "object" && Array.isArray(v) && v.length === 0)) rows.push([k, v]); };
+        push("Company",          p.company_name);
+        push("Business type",    p.business_type);
+        push("Client",           p.client_name);
+        push("Phone",            p.phone ? displayPhone(p.phone) : null);
+        push("Profile link",     p.profile_link);
+        push("Post link",        p.post_link);
+        push("Finished website", p.finished_website);
+        push("Manager",          p.manager);
+        if (p.web_status && p.web_status !== "Not Started") push("Web status", p.web_status);
+        if (p.client_status && p.client_status !== "New Lead") push("Client status", p.client_status);
+        if (p.motivation && p.motivation !== "Not Set") push("Motivation", p.motivation);
+        if (p.follow_up_at) push("Follow-up", `${formatDateTime(p.follow_up_at)} (${p.follow_up_type || "Follow-up"})`);
+        if (Array.isArray(p.client_notes) && p.client_notes.length) push("Client note", p.client_notes[0].text);
+        if (Array.isArray(p.web_notes)    && p.web_notes.length)    push("Web note",    p.web_notes[0].text);
+
+        const rowsHtml = rows.map(([k, v]) =>
+          `<div class="sek-confirm-row"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`
+        ).join("");
+
+        sekResult.innerHTML = `
+          <div class="sek-confirm-view">
+            <h3>➕ Confirm new client</h3>
+            <div class="sek-confirm-card">${rowsHtml}</div>
+            <div class="sek-confirm-actions">
+              <button class="ghost" data-confirm-action="cancel">Cancel</button>
+              <button data-confirm-action="confirm">Create client</button>
+            </div>
+          </div>`;
+      }
+      // Wire buttons
+      sekResult.querySelectorAll("[data-confirm-action]").forEach((btn) => {
+        btn.addEventListener("click", () => onConfirmAction(btn.dataset.confirmAction));
+      });
+    }
+
+    function renderWriteSuccess(tool, result) {
+      let icon = "✓", title = "Done";
+      let detail = "";
+      if (tool === "update_client") {
+        icon = "✓"; title = "Updated";
+        detail = `${esc(result.client.company_name)} · ${esc(result.field)}: "${esc(result.old_value || "—")}" → "${esc(result.new_value || "—")}"`;
+      } else if (tool === "add_note") {
+        icon = "📝"; title = "Note added";
+        detail = `${esc(result.client.company_name)} · ${result.kind} thread`;
+      } else if (tool === "schedule_followup") {
+        icon = "📅"; title = "Scheduled";
+        detail = `${esc(result.client.company_name)} · ${esc(result.type)} at ${esc(formatDateTime(result.when))}`;
+      } else if (tool === "cancel_followup") {
+        icon = "✕"; title = "Schedule cancelled";
+        detail = `${esc(result.client.company_name)}`;
+      } else if (tool === "create_client") {
+        icon = "🎉"; title = "Client created";
+        detail = `${esc(result.client.company_name)}`;
+      }
+      sekResult.innerHTML = `
+        <div class="sek-success-view">
+          <div class="icon">${icon}</div>
+          <h3>${esc(title)}</h3>
+          <div class="detail">${detail}</div>
+          <div class="actions">
+            ${result.client && result.client.id ? `<button class="ghost" data-detail-id="${esc(result.client.id)}">Open profile →</button>` : ""}
+          </div>
+        </div>`;
+      sekResult.querySelector("[data-detail-id]")?.addEventListener("click", (e) => {
+        openDetail(e.currentTarget.dataset.detailId, "info");
+      });
+    }
+
+    function renderWriteError(tool, result) {
+      const messages = {
+        no_match:           `No client matched "${result.query}". Try a different name.`,
+        multiple_matches:   `Multiple clients matched "${result.query}": ${(result.matches || []).map((m) => m.company_name).join(", ")}. Be more specific.`,
+        invalid_field:      `Invalid field "${result.field}". Valid: ${(result.valid || []).join(", ")}.`,
+        invalid_value:      `Invalid value "${result.value}" for ${result.field}. Valid: ${(result.valid || []).join(", ")}.`,
+        missing_date:       `No date was provided. When should it be scheduled?`,
+        nothing_scheduled:  `${result.client} doesn't have anything scheduled.`,
+        empty_text:         `The note text was empty.`,
+        db_error:           `Database error: ${result.message}`,
+      };
+      const msg = messages[result.error] || `Error: ${JSON.stringify(result).slice(0, 200)}`;
+      sekResult.innerHTML = `
+        <div class="sek-error-view">
+          <div class="title">Couldn't complete the action</div>
+          <div>${esc(msg)}</div>
+        </div>`;
+    }
+
     function renderToolResult(tool, args, result) {
-      if (tool === "list_clients") {
-        renderClientList(result, describeFilters(args || {}));
-      } else if (tool === "get_client") {
-        renderClientDetailOrList(result);
-      } else if (tool === "get_client_notes") {
-        renderNotesView(result);
-      } else if (tool === "get_schedule") {
-        renderScheduleView(result);
-      } else if (tool === "get_pipeline_summary") {
-        renderSummaryStats(result);
+      // Wizard start — wizard takes over rendering
+      if (tool === "wizard_start") return; // sekWizardStart already rendered
+      // Errors from any tool
+      if (result && result.error) { renderWriteError(tool, result); return; }
+      // Confirmation needed (schedule/cancel followup)
+      if (result && result.needs_confirmation) { renderConfirmation(tool, result); return; }
+      // Read tools
+      if (tool === "list_clients") return renderClientList(result, describeFilters(args || {}));
+      if (tool === "get_client") return renderClientDetailOrList(result);
+      if (tool === "get_client_notes") return renderNotesView(result);
+      if (tool === "get_schedule") return renderScheduleView(result);
+      if (tool === "get_pipeline_summary") return renderSummaryStats(result);
+      // Write tools (success)
+      if (result && result.success) return renderWriteSuccess(tool, result);
+    }
+
+    // ---------- Wizard rendering (split layout) ----------
+    function renderWizardView() {
+      if (!sekWizardState) return;
+      const stepIdx = sekWizardState.stepIndex;
+      const step = WIZARD_STEPS[stepIdx];
+      const totalSteps = WIZARD_STEPS.length;
+      const progress = Math.round(((stepIdx + (sekWizardState.fieldIndex / Math.max(1, step.fields.length))) / totalSteps) * 100);
+
+      // ---- Left half: wizard panel ----
+      let leftHtml = `
+        <div class="sek-wizard-step-num">Step ${stepIdx + 1} of ${totalSteps}</div>
+        <div class="sek-wizard-step-name">${esc(step.name)}</div>
+        <div class="sek-wizard-progress"><div class="sek-wizard-progress-fill" style="width:${progress}%"></div></div>`;
+
+      if (isFinalReviewStep()) {
+        leftHtml += `
+          <div class="sek-wizard-final-confirm">
+            <div class="title">Ready to save</div>
+            <div class="sub">Review everything on the right. Type <strong>yes</strong> to save, or <strong>no</strong> to cancel.</div>
+          </div>`;
+      } else if (sekWizardState.awaitingStepConfirm) {
+        leftHtml += `
+          <div class="sek-wizard-step-confirm">
+            <div class="title">Step done — confirm to continue</div>
+            <div class="sub">Review on the right. Type <strong>yes</strong> to move on, <strong>no</strong> to fix the last answer.</div>
+          </div>`;
+      } else {
+        const f = step.fields[sekWizardState.fieldIndex];
+        if (f) {
+          leftHtml += `
+            <div class="sek-wizard-question-block">
+              <div class="sek-wizard-field-label">${esc(f.label)}${f.required ? " *" : ""}</div>
+              <div class="sek-wizard-question">${esc(f.question)}</div>
+            </div>`;
+        }
+      }
+
+      leftHtml += `
+        <div class="sek-wizard-hints">
+          Type your answer in the chat. Or:
+          <ul style="margin: 4px 0; padding-left: 18px;">
+            <li><code>skip</code> — skip this field (optional only)</li>
+            <li><code>back</code> — go to the previous field</li>
+            <li><code>cancel</code> — abort the wizard</li>
+          </ul>
+        </div>`;
+
+      // ---- Right half: review panel ----
+      const filled = sekWizardState.fields;
+      let currentSection = "";
+      const fieldRow = (label, value) => {
+        if (value && value.toString().trim()) {
+          return `<div class="sek-wizard-review-row"><div class="k">${esc(label)}</div><div class="v">${esc(value)}</div></div>`;
+        }
+        return `<div class="sek-wizard-review-row"><div class="k">${esc(label)}</div><div class="v muted">—</div></div>`;
+      };
+
+      // Current step's filled fields (live)
+      const currentStepFields = step.fields || [];
+      if (!isFinalReviewStep() && currentStepFields.length > 0) {
+        const rows = currentStepFields.map((f, i) => {
+          if (i < sekWizardState.fieldIndex || sekWizardState.awaitingStepConfirm) {
+            return fieldRow(f.label, filled[f.name]);
+          }
+          return `<div class="sek-wizard-review-row"><div class="k">${esc(f.label)}</div><div class="v muted">— pending —</div></div>`;
+        }).join("");
+        currentSection = `
+          <div class="sek-wizard-review-section">
+            <h4>This step</h4>
+            ${rows}
+          </div>`;
+      }
+
+      // Previous steps (collapsible)
+      let prevSection = "";
+      if (stepIdx > 0) {
+        const prevStepsHtml = WIZARD_STEPS.slice(0, stepIdx).map((s, i) => {
+          if (s.fields.length === 0) return "";
+          const rows = s.fields.map((f) => fieldRow(f.label, filled[f.name])).join("");
+          return `
+            <details class="sek-wizard-prev-step" ${i === stepIdx - 1 ? "open" : ""}>
+              <summary>${i + 1}. ${esc(s.name)} ✓</summary>
+              <div class="sek-wizard-prev-step-content">${rows}</div>
+            </details>`;
+        }).join("");
+        prevSection = `
+          <div class="sek-wizard-review-section">
+            <h4>Earlier steps</h4>
+            ${prevStepsHtml}
+          </div>`;
+      }
+
+      // Final review: full client preview
+      let finalSection = "";
+      if (isFinalReviewStep()) {
+        const fuIso = filled.follow_up_date ? combineDateTime(filled.follow_up_date, filled.follow_up_time || "09:00") : null;
+        const allRows = [
+          ["Company",          filled.company_name],
+          ["Business type",    filled.business_type],
+          ["Client",           filled.client_name],
+          ["Phone",            filled.phone],
+          ["Profile link",     filled.profile_link],
+          ["Post link",        filled.post_link],
+          ["Finished website", filled.finished_website],
+          ["Manager",          filled.manager || "Unassigned"],
+          ["Web status",       filled.web_status || "Not Started"],
+          ["Client status",    filled.client_status || "New Lead"],
+          ["Motivation",       filled.motivation || "Not Set"],
+          ["Follow-up",        fuIso ? `${formatDateTime(fuIso)} (${filled.follow_up_type || "Follow-up"})` : null],
+          ["Client note",      filled.initial_client_note],
+          ["Web note",         filled.initial_web_note],
+        ];
+        finalSection = `
+          <div class="sek-wizard-review-section">
+            <h4>New client preview</h4>
+            ${allRows.map(([k, v]) => fieldRow(k, v)).join("")}
+          </div>`;
+      }
+
+      const rightHtml = (finalSection || currentSection || `<div class="sek-wizard-empty-state">Nothing yet — answer the question on the left.</div>`) + prevSection;
+
+      sekResult.innerHTML = `
+        <div class="sek-wizard-layout">
+          <div class="sek-wizard-panel">${leftHtml}</div>
+          <div class="sek-wizard-review-panel">${rightHtml}</div>
+        </div>`;
+    }
+
+    // ---------- Confirmation handling ----------
+    let sekPendingConfirm = null; // { tool, args }
+
+    async function onConfirmAction(action) {
+      if (!sekPendingConfirm) return;
+      const pending = sekPendingConfirm;
+      sekPendingConfirm = null;
+      if (action === "cancel") {
+        sekResult.innerHTML = `
+          <div class="sek-success-view" style="background:#f3f4f6;color:#4b5563;border-color:#e5e7eb;">
+            <div class="icon">✕</div>
+            <h3>Action cancelled</h3>
+          </div>`;
+        appendSekBubble("assistant", "Got it — cancelled.");
+        return;
+      }
+      // Confirm path: re-execute tool with confirmed: true
+      const tool = SEK_TOOLS[pending.tool];
+      if (!tool) return;
+      const result = await tool.execute(pending.args);
+      renderToolResult(pending.tool, pending.args, result);
+      // Tell the user briefly
+      if (result && result.success) {
+        appendSekBubble("assistant", `✓ Done.`);
+      } else if (result && result.error) {
+        appendSekBubble("assistant", `Hmm, that didn't work: ${result.error}.`);
       }
     }
 
@@ -2646,6 +3619,14 @@ ONLY for pure chitchat (greetings, "how are you", "what can you do", general que
       const text = sekInput.value.trim();
       if (!text) return;
 
+      // ---- WIZARD MODE: bypass the AI, route directly to wizard handler ----
+      if (sekWizardState && sekWizardState.active) {
+        appendSekBubble("user", text);
+        sekInput.value = "";
+        await handleWizardInput(text);
+        return;
+      }
+
       appendSekBubble("user", text);
       sekInput.value = "";
       sekConversation.push({ role: "user", content: text });
@@ -2685,9 +3666,14 @@ ONLY for pure chitchat (greetings, "how are you", "what can you do", general que
         }
 
         if (toolCall) {
-          // Execute the tool
+          // Execute the tool (await — some are async)
           const tool = SEK_TOOLS[toolCall.tool];
-          const result = tool.execute(toolCall.args || {});
+          const result = await Promise.resolve(tool.execute(toolCall.args || {}));
+
+          // If confirmation is needed, store pending and render confirm UI
+          if (result && result.needs_confirmation) {
+            sekPendingConfirm = { tool: toolCall.tool, args: result.confirm_args };
+          }
 
           // Render result in right panel (routes to correct view type)
           renderToolResult(toolCall.tool, toolCall.args || {}, result);
