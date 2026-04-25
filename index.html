@@ -549,6 +549,57 @@
     }
     .sek-no-webgpu .title { font-weight: 600; margin-bottom: 8px; font-size: 15px; }
 
+    /* Sekretary result list view */
+    .sek-list-view { max-width: 100%; }
+    .sek-list-view h3 {
+      font-size: 16px; font-weight: 600; color: #111827;
+      margin: 0 0 4px; display: flex; align-items: center; gap: 8px;
+    }
+    .sek-list-view .sek-list-count {
+      font-size: 12px; color: #6b7280; font-weight: 500;
+      background: #f3f4f6; padding: 2px 8px; border-radius: 999px;
+    }
+    .sek-list-view .sek-list-sub {
+      font-size: 13px; color: #6b7280; margin-bottom: 14px;
+    }
+    .sek-list-items {
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .sek-list-item {
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+      padding: 12px 14px; cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .sek-list-item:hover {
+      border-color: #6366f1; background: #f9fafb;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+    .sek-list-item .sek-list-name {
+      font-size: 14px; font-weight: 600; color: #1f2937;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .sek-list-item .sek-list-meta {
+      font-size: 12px; color: #6b7280; margin-top: 4px;
+      display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    }
+    .sek-list-item .sek-list-meta .badge { font-size: 10px; }
+    .sek-list-empty-result {
+      padding: 32px 16px; text-align: center;
+      color: #9ca3af; font-style: italic; font-size: 14px;
+    }
+
+    /* "Searching..." indicator inside a chat bubble */
+    .sek-thinking {
+      display: inline-flex; gap: 3px; align-items: center;
+    }
+    .sek-thinking span {
+      width: 6px; height: 6px; background: #9ca3af; border-radius: 50%;
+      animation: sekDot 1.2s infinite;
+    }
+    .sek-thinking span:nth-child(2) { animation-delay: 0.2s; }
+    .sek-thinking span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes sekDot { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
+
     /* Microphone button */
     .sek-mic-btn {
       background: #fff; color: #6b7280;
@@ -676,7 +727,7 @@
             <div class="icon">🤖</div>
             <div class="lead">Ask me anything on the left.</div>
             <div class="sub">Adaptive result views will render here.</div>
-            <div class="sek-shell-banner">Chunk 2 of 6 — model loaded, no tools yet</div>
+            <div class="sek-shell-banner">Chunk 3 of 6 — list_clients tool active. Try: "show me hot leads"</div>
           </div>
         </div>
       </div>
@@ -1872,7 +1923,7 @@
         // Reset thread message
         sekThread.classList.remove("empty");
         sekThread.innerHTML = "";
-        appendSekBubble("assistant", "Hi! I'm running locally on your device via WebGPU. I don't have access to your CRM data yet — that comes in Chunk 3. For now, ask me anything in plain English.");
+        appendSekBubble("assistant", "Hi! I'm running locally via WebGPU and I can read your client list. Try: \"show me hot leads\", \"list Ivan's clients\", or \"what's in negotiation\".");
       } catch (err) {
         console.error("Sekretary load error:", err);
         setSekStatus("error", "Load failed");
@@ -1903,32 +1954,164 @@
       return bubble; // return for streaming updates
     }
 
-    async function sendSekretary() {
-      if (sekState !== "ready" || !sekPipeline) return;
-      const text = sekInput.value.trim();
-      if (!text) return;
+    // ============================================================
+    // SEKRETARY — Chunk 3: First mini-API (list_clients)
+    // ============================================================
 
-      appendSekBubble("user", text);
-      sekInput.value = "";
-      sekConversation.push({ role: "user", content: text });
+    // Tool catalog — JS-side functions the AI can ask us to run
+    const SEK_TOOLS = {
+      list_clients: {
+        description: "Returns clients matching the filters. ALL filters are optional and combined with AND.",
+        params: {
+          motivation:    "One of: Not Set, Dead, Cold, Warm, Hot, VIP",
+          web_status:    "One of: Not Started, In Progress, Review, Needs Fixing, Finished",
+          client_status: "One of: New Lead, Contacted, Interested, Proposal Sent, Negotiation, Follow Up, Closed Won, Closed Lost, Nurture",
+          business_type: "Free text — exact business type (e.g., 'Pavers', 'Roofing')",
+          manager:       "One of: Ivan, Hector, or 'Unassigned'",
+        },
+        execute: (args) => {
+          const a = args || {};
+          const filtered = (allClients || []).filter((c) => {
+            if (a.motivation    && c.motivation    !== a.motivation) return false;
+            if (a.web_status    && c.web_status    !== a.web_status) return false;
+            if (a.client_status && c.client_status !== a.client_status) return false;
+            if (a.business_type && c.business_type !== a.business_type) return false;
+            if (a.manager) {
+              if (a.manager === "Unassigned" && c.manager) return false;
+              if (a.manager !== "Unassigned" && c.manager !== a.manager) return false;
+            }
+            return true;
+          });
+          return filtered.map((c) => ({
+            id: c.id,
+            company_name: c.company_name,
+            client_name: c.client_name,
+            business_type: c.business_type,
+            phone: c.phone,
+            manager: c.manager,
+            web_status: c.web_status,
+            client_status: c.client_status,
+            motivation: c.motivation,
+            follow_up_at: c.follow_up_at,
+            follow_up_type: c.follow_up_type,
+          }));
+        },
+      },
+    };
 
-      // Create empty assistant bubble that we'll fill as tokens stream
-      const bubbleEl = appendSekBubble("assistant", "…");
-      bubbleEl.textContent = "";
+    function sekToolsDescription() {
+      return Object.entries(SEK_TOOLS).map(([name, t]) => {
+        const params = Object.entries(t.params).map(([p, d]) => `    - ${p}: ${d}`).join("\n");
+        return `- ${name}(filters):\n  ${t.description}\n  Filters object can have any of:\n${params}`;
+      }).join("\n\n");
+    }
 
-      sekSendBtn.disabled = true;
-      sekInput.disabled = true;
+    function sekSystemPrompt() {
+      return `You are the Sekretary, an AI assistant inside a small CRM app for a web design agency.
 
+You have access to ONE tool right now:
+
+${sekToolsDescription()}
+
+# How to use the tool
+
+When the user asks for client data (e.g., "show me hot leads", "list Ivan's clients", "any deals in negotiation"), respond ONLY with a single line of JSON in this exact format and nothing else:
+
+{"tool": "list_clients", "args": { ... filter object ... }}
+
+Examples:
+User: "Show me my hot leads"
+You: {"tool": "list_clients", "args": {"motivation": "Hot"}}
+
+User: "List Ivan's clients in negotiation"
+You: {"tool": "list_clients", "args": {"manager": "Ivan", "client_status": "Negotiation"}}
+
+User: "Show all clients"
+You: {"tool": "list_clients", "args": {}}
+
+# After the tool runs
+
+I will send you back a message starting with "[Tool result]" containing the data. Then respond in PLAIN ENGLISH (1-2 short sentences) summarizing what was found. Do NOT output more JSON in that follow-up reply.
+
+# When NOT to use the tool
+
+If the user is just chatting (greetings, questions about you, general questions), respond normally in plain English. Do not invent tool calls when no data is needed.`;
+    }
+
+    function parseToolCall(text) {
+      if (!text) return null;
+      // Find the first JSON object that has "tool" and "args"
+      const match = text.match(/\{[\s\S]*?"tool"\s*:\s*"[^"]+"[\s\S]*?"args"\s*:\s*\{[\s\S]*?\}\s*\}/);
+      if (!match) return null;
       try {
-        const messages = [
-          { role: "system", content: "You are the Sekretary, an AI assistant for a Mini CRM. Be concise (2-4 sentences typical). You don't have access to CRM data yet — that's coming in a future update. For now, just answer in plain English. If asked about specific clients or data, say you'll be able to access that soon." },
-          ...sekConversation,
-        ];
+        const parsed = JSON.parse(match[0]);
+        if (parsed && typeof parsed.tool === "string" && parsed.args && SEK_TOOLS[parsed.tool]) {
+          return parsed;
+        }
+      } catch {}
+      return null;
+    }
 
-        // Streaming generation
+    function renderClientList(results, callDescription) {
+      if (!results || results.length === 0) {
+        sekResult.innerHTML = `
+          <div class="sek-list-view">
+            <h3>No matches</h3>
+            <div class="sek-list-sub">${esc(callDescription || "Filtered client list")}</div>
+            <div class="sek-list-empty-result">No clients matched those filters.</div>
+          </div>`;
+        return;
+      }
+      const items = results.map((c) => {
+        const motiBadge = c.motivation ? `<span class="badge ${moClass(c.motivation)}">${esc(c.motivation)}</span>` : "";
+        const wsBadge   = c.web_status ? `<span class="badge ${wsClass(c.web_status)}">${esc(c.web_status)}</span>` : "";
+        const csBadge   = c.client_status ? `<span class="badge ${csClass(c.client_status)}">${esc(c.client_status)}</span>` : "";
+        const mgr       = c.manager ? `Manager: ${esc(c.manager)}` : "Unassigned";
+        const biz       = c.business_type ? esc(c.business_type) : "—";
+        const phone     = c.phone ? esc(displayPhone(c.phone)) : "";
+        return `
+          <div class="sek-list-item" data-id="${esc(c.id)}">
+            <div class="sek-list-name">${esc(c.company_name || "(no name)")} ${motiBadge}</div>
+            <div class="sek-list-meta">
+              <span>${biz}</span>
+              ${csBadge}
+              ${wsBadge}
+              <span>· ${mgr}</span>
+              ${phone ? `<span>· ${phone}</span>` : ""}
+            </div>
+          </div>`;
+      }).join("");
+      sekResult.innerHTML = `
+        <div class="sek-list-view">
+          <h3>Results <span class="sek-list-count">${results.length}</span></h3>
+          <div class="sek-list-sub">${esc(callDescription || "Filtered client list")} · click a row to open details</div>
+          <div class="sek-list-items">${items}</div>
+        </div>`;
+      // Wire click → open existing detail modal
+      sekResult.querySelectorAll(".sek-list-item").forEach((el) => {
+        el.addEventListener("click", () => {
+          const id = el.dataset.id;
+          if (id) openDetail(id, "info");
+        });
+      });
+    }
+
+    function describeFilters(args) {
+      const parts = [];
+      if (args.motivation)    parts.push(`motivation=${args.motivation}`);
+      if (args.web_status)    parts.push(`web=${args.web_status}`);
+      if (args.client_status) parts.push(`status=${args.client_status}`);
+      if (args.business_type) parts.push(`type=${args.business_type}`);
+      if (args.manager)       parts.push(`manager=${args.manager}`);
+      return parts.length ? `Filters: ${parts.join(", ")}` : "All clients (no filter)";
+    }
+
+    async function generateOnce(messages, { stream = false, bubbleEl = null } = {}) {
+      const opts = { max_new_tokens: 400, do_sample: false };
+      if (stream && bubbleEl) {
         const { TextStreamer } = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@latest");
         let streamed = "";
-        const streamer = new TextStreamer(sekPipeline.tokenizer, {
+        opts.streamer = new TextStreamer(sekPipeline.tokenizer, {
           skip_prompt: true,
           skip_special_tokens: true,
           callback_function: (chunk) => {
@@ -1937,20 +2120,75 @@
             sekThread.scrollTop = sekThread.scrollHeight;
           },
         });
-
-        const out = await sekPipeline(messages, { max_new_tokens: 400, do_sample: false, streamer });
-
-        // Pull final assistant response from output (last message)
-        let finalText = streamed;
-        if (Array.isArray(out) && out[0]?.generated_text) {
-          const gen = out[0].generated_text;
-          if (Array.isArray(gen)) {
-            const last = gen[gen.length - 1];
-            if (last && last.role === "assistant" && last.content) finalText = last.content;
-          }
+      }
+      const out = await sekPipeline(messages, opts);
+      let finalText = "";
+      if (Array.isArray(out) && out[0]?.generated_text) {
+        const gen = out[0].generated_text;
+        if (Array.isArray(gen)) {
+          const last = gen[gen.length - 1];
+          if (last && last.role === "assistant" && last.content) finalText = last.content;
+        } else if (typeof gen === "string") {
+          finalText = gen;
         }
-        bubbleEl.textContent = finalText.trim() || streamed.trim() || "(no response)";
-        sekConversation.push({ role: "assistant", content: bubbleEl.textContent });
+      }
+      return finalText.trim();
+    }
+
+    async function sendSekretary() {
+      if (sekState !== "ready" || !sekPipeline) return;
+      // Stop the mic if it's still listening so we don't capture stray audio after send
+      stopSekMic();
+      const text = sekInput.value.trim();
+      if (!text) return;
+
+      appendSekBubble("user", text);
+      sekInput.value = "";
+      sekConversation.push({ role: "user", content: text });
+
+      const bubbleEl = appendSekBubble("assistant", "");
+      bubbleEl.innerHTML = `<span class="sek-thinking"><span></span><span></span><span></span></span>`;
+
+      sekSendBtn.disabled = true;
+      sekInput.disabled = true;
+
+      try {
+        const baseMessages = [
+          { role: "system", content: sekSystemPrompt() },
+          ...sekConversation,
+        ];
+
+        // ---- Pass 1: get tool call OR plain reply ----
+        const firstReply = await generateOnce(baseMessages);
+        const toolCall = parseToolCall(firstReply);
+
+        if (toolCall) {
+          // Execute the tool
+          const tool = SEK_TOOLS[toolCall.tool];
+          const result = tool.execute(toolCall.args || {});
+          const filterDesc = describeFilters(toolCall.args || {});
+
+          // Render result in right panel
+          renderClientList(result, filterDesc);
+
+          // ---- Pass 2: feed result back, get natural-language summary ----
+          const augmented = [
+            ...baseMessages,
+            { role: "assistant", content: firstReply },
+            { role: "user", content: `[Tool result] list_clients returned ${result.length} client(s) matching: ${filterDesc}. Summarize this in 1-2 short sentences for the user. Do NOT output JSON.` },
+          ];
+
+          // Stream the summary into the bubble
+          bubbleEl.textContent = "";
+          const summary = await generateOnce(augmented, { stream: true, bubbleEl });
+          const finalSummary = summary || bubbleEl.textContent || `Found ${result.length} client(s).`;
+          bubbleEl.textContent = finalSummary;
+          sekConversation.push({ role: "assistant", content: finalSummary });
+        } else {
+          // No tool call — just a plain text reply
+          bubbleEl.textContent = firstReply || "(no response)";
+          sekConversation.push({ role: "assistant", content: firstReply });
+        }
       } catch (err) {
         console.error("Sekretary generate error:", err);
         bubbleEl.textContent = "Error: " + (err.message || String(err));
@@ -1992,14 +2230,23 @@
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     let sekRecognition = null;
     let sekListening = false;
-    let sekSttBaseline = "";
+    let sekSttBaseline = "";    // text already in input when mic turned on
+    let sekSttAccumulated = ""; // all "final" text captured during this mic session
+    let sekUserStopped = true;  // true = user explicitly stopped (or never started)
+
+    function stopSekMic() {
+      if (sekRecognition && sekListening) {
+        sekUserStopped = true;
+        try { sekRecognition.stop(); } catch {}
+      }
+    }
 
     if (!SpeechRec) {
       // Browser doesn't support speech recognition — hide the mic button
       if (sekMicBtn) sekMicBtn.style.display = "none";
     } else {
       sekRecognition = new SpeechRec();
-      sekRecognition.continuous = false;       // stop after a pause
+      sekRecognition.continuous = true;        // KEEP listening through pauses
       sekRecognition.interimResults = true;    // live updates while speaking
       sekRecognition.lang = "en-US";
 
@@ -2007,29 +2254,40 @@
         sekListening = true;
         sekMicBtn.classList.add("listening");
         sekMicBtn.title = "Listening... click to stop";
-        sekSttBaseline = sekInput.value.trim();
       };
       sekRecognition.onresult = (e) => {
+        let newFinal = "";
         let interim = "";
-        let finalChunk = "";
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const t = e.results[i][0].transcript;
-          if (e.results[i].isFinal) finalChunk += t;
+          if (e.results[i].isFinal) newFinal += t;
           else interim += t;
         }
-        const sep = sekSttBaseline ? sekSttBaseline + " " : "";
-        sekInput.value = (sep + finalChunk + interim).replace(/\s+/g, " ").trim();
+        if (newFinal) {
+          sekSttAccumulated = (sekSttAccumulated + " " + newFinal).trim();
+        }
+        const parts = [sekSttBaseline, sekSttAccumulated, interim].filter(Boolean);
+        sekInput.value = parts.join(" ").replace(/\s+/g, " ").trim();
       };
       sekRecognition.onerror = (e) => {
         console.warn("STT error:", e.error);
-        sekListening = false;
-        sekMicBtn.classList.remove("listening");
-        sekMicBtn.title = "Click to talk";
         if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+          sekUserStopped = true;
           alert("Microphone permission denied. Allow microphone access in your browser settings to use voice input.");
         }
+        // For "no-speech" errors etc., the onend handler will auto-restart if !sekUserStopped
       };
       sekRecognition.onend = () => {
+        // If the user didn't explicitly stop, auto-restart (continuous mode "ends" on long pauses or hiccups)
+        if (!sekUserStopped) {
+          try {
+            sekRecognition.start();
+            return; // still listening — don't change UI
+          } catch (err) {
+            // Fall through if restart fails
+            console.warn("STT restart failed:", err);
+          }
+        }
         sekListening = false;
         sekMicBtn.classList.remove("listening");
         sekMicBtn.title = "Click to talk";
@@ -2038,8 +2296,14 @@
 
       sekMicBtn.addEventListener("click", () => {
         if (sekListening) {
-          sekRecognition.stop();
+          // User explicitly stopping
+          sekUserStopped = true;
+          try { sekRecognition.stop(); } catch {}
         } else {
+          // User starting fresh
+          sekUserStopped = false;
+          sekSttBaseline = sekInput.value.trim();
+          sekSttAccumulated = "";
           try { sekRecognition.start(); } catch (err) { console.warn(err); }
         }
       });
