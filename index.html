@@ -548,6 +548,25 @@
       text-align: center; font-size: 14px;
     }
     .sek-no-webgpu .title { font-weight: 600; margin-bottom: 8px; font-size: 15px; }
+
+    /* Microphone button */
+    .sek-mic-btn {
+      background: #fff; color: #6b7280;
+      border: 1px solid #d1d5db; border-radius: 50%;
+      width: 36px; height: 36px; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 15px; cursor: pointer; flex-shrink: 0;
+      transition: all 120ms ease;
+    }
+    .sek-mic-btn:hover { background: #f3f4f6; color: #1f2937; border-color: #9ca3af; }
+    .sek-mic-btn.listening {
+      background: #fee2e2; border-color: #dc2626; color: #dc2626;
+      animation: micPulse 1.2s infinite;
+    }
+    @keyframes micPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45); }
+      50%      { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+    }
   </style>
 </head>
 <body>
@@ -646,6 +665,7 @@
             Subsequent visits will be instant.
           </div>
           <div id="sekInputBar" class="sek-input-bar disabled">
+            <button id="sekMicBtn" class="sek-mic-btn" title="Click to talk" aria-label="Microphone">🎤</button>
             <textarea id="sekInput" placeholder="Loading model..."></textarea>
             <button id="sekSendBtn">Send</button>
           </div>
@@ -1964,6 +1984,64 @@
     if (sekTabBtn) {
       sekTabBtn.addEventListener("click", () => {
         if (sekState === "idle") ensureSekModelLoaded();
+      });
+    }
+
+    // ---------- Speech-to-Text (browser Web Speech API) ----------
+    const sekMicBtn = document.getElementById("sekMicBtn");
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let sekRecognition = null;
+    let sekListening = false;
+    let sekSttBaseline = "";
+
+    if (!SpeechRec) {
+      // Browser doesn't support speech recognition — hide the mic button
+      if (sekMicBtn) sekMicBtn.style.display = "none";
+    } else {
+      sekRecognition = new SpeechRec();
+      sekRecognition.continuous = false;       // stop after a pause
+      sekRecognition.interimResults = true;    // live updates while speaking
+      sekRecognition.lang = "en-US";
+
+      sekRecognition.onstart = () => {
+        sekListening = true;
+        sekMicBtn.classList.add("listening");
+        sekMicBtn.title = "Listening... click to stop";
+        sekSttBaseline = sekInput.value.trim();
+      };
+      sekRecognition.onresult = (e) => {
+        let interim = "";
+        let finalChunk = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const t = e.results[i][0].transcript;
+          if (e.results[i].isFinal) finalChunk += t;
+          else interim += t;
+        }
+        const sep = sekSttBaseline ? sekSttBaseline + " " : "";
+        sekInput.value = (sep + finalChunk + interim).replace(/\s+/g, " ").trim();
+      };
+      sekRecognition.onerror = (e) => {
+        console.warn("STT error:", e.error);
+        sekListening = false;
+        sekMicBtn.classList.remove("listening");
+        sekMicBtn.title = "Click to talk";
+        if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+          alert("Microphone permission denied. Allow microphone access in your browser settings to use voice input.");
+        }
+      };
+      sekRecognition.onend = () => {
+        sekListening = false;
+        sekMicBtn.classList.remove("listening");
+        sekMicBtn.title = "Click to talk";
+        sekInput.focus();
+      };
+
+      sekMicBtn.addEventListener("click", () => {
+        if (sekListening) {
+          sekRecognition.stop();
+        } else {
+          try { sekRecognition.start(); } catch (err) { console.warn(err); }
+        }
       });
     }
 
