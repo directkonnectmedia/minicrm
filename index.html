@@ -500,6 +500,54 @@
       padding: 6px 10px; margin-top: 8px; font-size: 11px;
       display: inline-block;
     }
+
+    /* Sekretary status indicator inside the chat header */
+    .sek-status-row {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 4px; font-size: 11px; color: #6b7280;
+    }
+    .sek-status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #9ca3af; flex-shrink: 0;
+    }
+    .sek-status-dot.loading { background: #f59e0b; animation: sekPulse 1.2s infinite; }
+    .sek-status-dot.ready   { background: #10b981; }
+    .sek-status-dot.error   { background: #dc2626; }
+    @keyframes sekPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    /* Loading progress bar */
+    .sek-progress {
+      margin: 8px 0 0;
+      height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden;
+      display: none;
+    }
+    .sek-progress.show { display: block; }
+    .sek-progress-fill {
+      height: 100%; width: 0%; background: #6366f1;
+      transition: width 200ms ease;
+    }
+    .sek-progress-detail { font-size: 10px; color: #9ca3af; margin-top: 3px; }
+
+    /* Disabled input bar while not ready */
+    .sek-input-bar.disabled textarea, .sek-input-bar.disabled button { opacity: 0.5; pointer-events: none; }
+
+    /* Right-panel "model loading" placeholder */
+    .sek-loading-card {
+      max-width: 420px; margin: 0 auto; padding: 24px;
+      background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;
+      text-align: center;
+    }
+    .sek-loading-card .lead { font-size: 15px; color: #1f2937; font-weight: 500; }
+    .sek-loading-card .sub { font-size: 13px; color: #6b7280; margin-top: 4px; }
+    .sek-loading-card .progress-text { font-size: 11px; color: #9ca3af; margin-top: 12px; }
+
+    /* When WebGPU isn't supported */
+    .sek-no-webgpu {
+      max-width: 480px; margin: 32px auto; padding: 20px;
+      background: #fef3c7; color: #92400e; border: 1px solid #fde68a; border-radius: 10px;
+      text-align: center; font-size: 14px;
+    }
+    .sek-no-webgpu .title { font-weight: 600; margin-bottom: 8px; font-size: 15px; }
   </style>
 </head>
 <body>
@@ -585,24 +633,30 @@
         <div class="sek-chat">
           <div class="sek-header">
             <div class="sek-title">🤖 Sekretary</div>
-            <div class="sek-status">UI shell — no AI loaded yet (Chunk 1)</div>
+            <div class="sek-status-row">
+              <div class="sek-status-dot" id="sekStatusDot"></div>
+              <div id="sekStatusText">Idle — open this tab to load the model</div>
+            </div>
+            <div id="sekProgress" class="sek-progress"><div class="sek-progress-fill" id="sekProgressFill"></div></div>
+            <div id="sekProgressDetail" class="sek-progress-detail"></div>
           </div>
           <div id="sekThread" class="sek-thread empty">
-            Type something below to test the chat layout.<br>
-            (Replies are echoes for now — AI hookup comes in Chunk 2.)
+            Open this tab to load Gemma 4 E2B in your browser.<br>
+            First load downloads ~1.5 GB (one time per device).<br>
+            Subsequent visits will be instant.
           </div>
-          <div class="sek-input-bar">
-            <textarea id="sekInput" placeholder="Ask anything... (Enter to send, Shift+Enter for newline)"></textarea>
+          <div id="sekInputBar" class="sek-input-bar disabled">
+            <textarea id="sekInput" placeholder="Loading model..."></textarea>
             <button id="sekSendBtn">Send</button>
           </div>
         </div>
         <!-- Right 70% — adaptive result panel (placeholder for now) -->
         <div class="sek-result" id="sekResult">
-          <div class="sek-result-empty">
+          <div class="sek-result-empty" id="sekResultEmpty">
             <div class="icon">🤖</div>
             <div class="lead">Ask me anything on the left.</div>
             <div class="sub">Adaptive result views will render here.</div>
-            <div class="sek-shell-banner">Chunk 1 of 6 — UI shell only</div>
+            <div class="sek-shell-banner">Chunk 2 of 6 — model loaded, no tools yet</div>
           </div>
         </div>
       </div>
@@ -1683,13 +1737,133 @@
       }
     });
 
-    // ---------- Sekretary (Chunk 1: UI shell, echo behavior only) ----------
-    const sekThread = document.getElementById("sekThread");
-    const sekInput = document.getElementById("sekInput");
-    const sekSendBtn = document.getElementById("sekSendBtn");
+    // ============================================================
+    // SEKRETARY — Chunk 2: WebGPU detection + Gemma 4 E2B loading
+    // ============================================================
+    const sekThread        = document.getElementById("sekThread");
+    const sekInput         = document.getElementById("sekInput");
+    const sekSendBtn       = document.getElementById("sekSendBtn");
+    const sekInputBar      = document.getElementById("sekInputBar");
+    const sekStatusDot     = document.getElementById("sekStatusDot");
+    const sekStatusText    = document.getElementById("sekStatusText");
+    const sekProgress      = document.getElementById("sekProgress");
+    const sekProgressFill  = document.getElementById("sekProgressFill");
+    const sekProgressDetail= document.getElementById("sekProgressDetail");
+    const sekTabBtn        = document.querySelector('.tab[data-view="sekretary"]');
+    const sekResult        = document.getElementById("sekResult");
+
+    const SEK_MODEL_ID = "onnx-community/gemma-4-E2B-it-ONNX";
+    let sekState = "idle";   // idle | loading | ready | error | unsupported
+    let sekPipeline = null;
+    let sekConversation = []; // chat history for the model
 
     function sekTime() {
       return new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    }
+
+    function setSekStatus(state, text) {
+      sekState = state;
+      sekStatusDot.className = "sek-status-dot" + (state === "loading" ? " loading" : state === "ready" ? " ready" : state === "error" ? " error" : "");
+      sekStatusText.textContent = text;
+      const ready = state === "ready";
+      sekInputBar.classList.toggle("disabled", !ready);
+      sekInput.placeholder = ready ? "Ask anything... (Enter to send, Shift+Enter for newline)" : text;
+    }
+
+    async function checkWebGPU() {
+      if (!navigator.gpu) return false;
+      try {
+        const adapter = await navigator.gpu.requestAdapter();
+        return !!adapter;
+      } catch { return false; }
+    }
+
+    function showNoWebGPU() {
+      // Hide tab button
+      if (sekTabBtn) sekTabBtn.style.display = "none";
+      // If somehow visible, show explanation in the right panel
+      sekResult.innerHTML = `
+        <div class="sek-no-webgpu">
+          <div class="title">⚠️ Sekretary not available</div>
+          <div>Your browser doesn't support WebGPU, which is required to run Gemma 4 E2B on-device.</div>
+          <div style="margin-top: 8px; font-size: 13px;">Try Chrome 113+ or Edge 113+ on a desktop. Your CRM (List + Calendar tabs) still works fully.</div>
+        </div>`;
+    }
+
+    let sekModelLoadStarted = false;
+    async function ensureSekModelLoaded() {
+      if (sekState === "ready" || sekState === "loading") return;
+      if (sekModelLoadStarted) return;
+      sekModelLoadStarted = true;
+
+      setSekStatus("loading", "Loading model...");
+      sekProgress.classList.add("show");
+      sekProgressFill.style.width = "0%";
+      sekProgressDetail.textContent = "Initializing Transformers.js...";
+
+      // Show right-panel loading card
+      sekResult.innerHTML = `
+        <div class="sek-loading-card">
+          <div class="lead">Loading Gemma 4 E2B</div>
+          <div class="sub">First load downloads ~1.5 GB and caches on this device.<br>Future visits will be instant.</div>
+          <div class="progress-text" id="sekRightProgress">Initializing...</div>
+        </div>`;
+      const rightProgress = document.getElementById("sekRightProgress");
+
+      try {
+        const { pipeline } = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@latest");
+
+        sekPipeline = await pipeline("text-generation", SEK_MODEL_ID, {
+          device: "webgpu",
+          dtype: "q4f16",
+          progress_callback: (p) => {
+            if (p.status === "progress" && p.file) {
+              const pct = Math.round((p.loaded / p.total) * 100);
+              sekProgressFill.style.width = pct + "%";
+              const fileShort = p.file.split("/").pop();
+              const mb = (p.loaded / 1024 / 1024).toFixed(0);
+              const total = (p.total / 1024 / 1024).toFixed(0);
+              const msg = `${fileShort}: ${mb}/${total} MB (${pct}%)`;
+              sekProgressDetail.textContent = msg;
+              if (rightProgress) rightProgress.textContent = msg;
+            } else if (p.status === "ready") {
+              sekProgressDetail.textContent = "Model ready";
+            } else if (p.status === "initiate" || p.status === "download") {
+              const fileShort = (p.file || "").split("/").pop();
+              const msg = `Fetching ${fileShort || "files"}...`;
+              sekProgressDetail.textContent = msg;
+              if (rightProgress) rightProgress.textContent = msg;
+            }
+          },
+        });
+
+        setSekStatus("ready", "Ready");
+        sekProgress.classList.remove("show");
+        sekProgressDetail.textContent = "";
+
+        // Reset right panel to idle prompt
+        sekResult.innerHTML = `
+          <div class="sek-result-empty">
+            <div class="icon">🤖</div>
+            <div class="lead">Ask me anything on the left.</div>
+            <div class="sub">No tool calls yet — just plain text replies for now (Chunk 2).</div>
+          </div>`;
+
+        // Reset thread message
+        sekThread.classList.remove("empty");
+        sekThread.innerHTML = "";
+        appendSekBubble("assistant", "Hi! I'm running locally on your device via WebGPU. I don't have access to your CRM data yet — that comes in Chunk 3. For now, ask me anything in plain English.");
+      } catch (err) {
+        console.error("Sekretary load error:", err);
+        setSekStatus("error", "Load failed");
+        sekProgressDetail.textContent = String(err.message || err).slice(0, 200);
+        sekResult.innerHTML = `
+          <div class="sek-no-webgpu">
+            <div class="title">⚠️ Couldn't load the model</div>
+            <div style="font-size: 13px;">${esc(String(err.message || err))}</div>
+            <div style="margin-top: 8px; font-size: 12px; color: #92400e;">Check your network, refresh the page, or try a different browser.</div>
+          </div>`;
+      }
     }
 
     function appendSekBubble(role, text) {
@@ -1706,19 +1880,65 @@
       wrap.appendChild(time);
       sekThread.appendChild(wrap);
       sekThread.scrollTop = sekThread.scrollHeight;
+      return bubble; // return for streaming updates
     }
 
-    function sendSekretary() {
+    async function sendSekretary() {
+      if (sekState !== "ready" || !sekPipeline) return;
       const text = sekInput.value.trim();
       if (!text) return;
+
       appendSekBubble("user", text);
       sekInput.value = "";
-      // Echo placeholder — no AI yet
-      setTimeout(() => {
-        appendSekBubble("assistant",
-          `(echo) Heard: "${text}"\n\nNo AI loaded yet — this is the UI shell. Chunk 2 will load Gemma 4 E2B and start replying for real.`
-        );
-      }, 250);
+      sekConversation.push({ role: "user", content: text });
+
+      // Create empty assistant bubble that we'll fill as tokens stream
+      const bubbleEl = appendSekBubble("assistant", "…");
+      bubbleEl.textContent = "";
+
+      sekSendBtn.disabled = true;
+      sekInput.disabled = true;
+
+      try {
+        const messages = [
+          { role: "system", content: "You are the Sekretary, an AI assistant for a Mini CRM. Be concise (2-4 sentences typical). You don't have access to CRM data yet — that's coming in a future update. For now, just answer in plain English. If asked about specific clients or data, say you'll be able to access that soon." },
+          ...sekConversation,
+        ];
+
+        // Streaming generation
+        const { TextStreamer } = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@latest");
+        let streamed = "";
+        const streamer = new TextStreamer(sekPipeline.tokenizer, {
+          skip_prompt: true,
+          skip_special_tokens: true,
+          callback_function: (chunk) => {
+            streamed += chunk;
+            bubbleEl.textContent = streamed;
+            sekThread.scrollTop = sekThread.scrollHeight;
+          },
+        });
+
+        const out = await sekPipeline(messages, { max_new_tokens: 400, do_sample: false, streamer });
+
+        // Pull final assistant response from output (last message)
+        let finalText = streamed;
+        if (Array.isArray(out) && out[0]?.generated_text) {
+          const gen = out[0].generated_text;
+          if (Array.isArray(gen)) {
+            const last = gen[gen.length - 1];
+            if (last && last.role === "assistant" && last.content) finalText = last.content;
+          }
+        }
+        bubbleEl.textContent = finalText.trim() || streamed.trim() || "(no response)";
+        sekConversation.push({ role: "assistant", content: bubbleEl.textContent });
+      } catch (err) {
+        console.error("Sekretary generate error:", err);
+        bubbleEl.textContent = "Error: " + (err.message || String(err));
+      } finally {
+        sekSendBtn.disabled = false;
+        sekInput.disabled = false;
+        sekInput.focus();
+      }
     }
 
     sekSendBtn.addEventListener("click", sendSekretary);
@@ -1728,6 +1948,24 @@
         sendSekretary();
       }
     });
+
+    // Run WebGPU detection + lazy model load on tab switch
+    (async () => {
+      const supported = await checkWebGPU();
+      if (!supported) {
+        showNoWebGPU();
+        setSekStatus("unsupported", "WebGPU not supported");
+        return;
+      }
+      setSekStatus("idle", "Click the Sekretary tab to load the model");
+    })();
+
+    // Hook into the existing tab switcher to lazy-load when Sekretary tab is opened
+    if (sekTabBtn) {
+      sekTabBtn.addEventListener("click", () => {
+        if (sekState === "idle") ensureSekModelLoaded();
+      });
+    }
 
     load();
   </script>
