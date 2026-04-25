@@ -417,6 +417,449 @@
     .review-row .k { color: #6b7280; font-weight: 500; }
     .review-row .v { color: #1f2937; word-break: break-word; }
     .review-row .v.muted { color: #9ca3af; font-style: italic; }
+
+    /* === SEKRETARY (Chunk 1: UI shell only, no AI yet) === */
+    .sekretary-card { padding: 0; overflow: hidden; }
+    .sekretary-layout {
+      display: grid;
+      grid-template-columns: 32% 68%;
+      height: calc(100vh - 230px);
+      min-height: 500px;
+    }
+    @media (max-width: 720px) {
+      .sekretary-layout { grid-template-columns: 1fr; height: auto; }
+    }
+    .sek-chat {
+      display: flex; flex-direction: column;
+      border-right: 1px solid #e5e7eb;
+      background: #f9fafb;
+      overflow: hidden;
+    }
+    .sek-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e5e7eb;
+      background: #fff;
+    }
+    .sek-title { font-size: 15px; font-weight: 600; color: #111827; }
+    .sek-status { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+    .sek-thread {
+      flex: 1; overflow-y: auto; padding: 14px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .sek-thread.empty {
+      align-items: center; justify-content: center;
+      color: #9ca3af; font-size: 13px; font-style: italic; text-align: center;
+    }
+    .sek-bubble-wrap { display: flex; flex-direction: column; max-width: 90%; gap: 1px; }
+    .sek-bubble-wrap.user { align-self: flex-end; align-items: flex-end; }
+    .sek-bubble-wrap.assistant { align-self: flex-start; align-items: flex-start; }
+    .sek-bubble {
+      padding: 8px 12px; border-radius: 16px;
+      font-size: 13px; word-break: break-word; white-space: pre-wrap;
+      line-height: 1.4;
+    }
+    .sek-bubble.user {
+      background: #6366f1; color: white;
+      border-bottom-right-radius: 4px;
+    }
+    .sek-bubble.assistant {
+      background: #fff; color: #1f2937;
+      border: 1px solid #e5e7eb;
+      border-bottom-left-radius: 4px;
+    }
+    .sek-bubble-time { font-size: 10px; color: #9ca3af; padding: 0 8px; }
+    .sek-input-bar {
+      border-top: 1px solid #e5e7eb;
+      padding: 10px; background: #fff;
+      display: flex; gap: 6px; align-items: flex-end;
+    }
+    .sek-input-bar textarea {
+      flex: 1; padding: 8px 14px;
+      border: 1px solid #d1d5db; border-radius: 18px;
+      font-size: 13px; font-family: inherit; resize: none;
+      min-height: 36px; max-height: 100px;
+    }
+    .sek-input-bar textarea:focus { outline: none; border-color: #6366f1; }
+    .sek-input-bar button { padding: 8px 16px; font-size: 13px; border-radius: 18px; }
+    .sek-result {
+      overflow-y: auto;
+      padding: 24px;
+      background: #fff;
+    }
+    .sek-result-empty {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100%; min-height: 400px; text-align: center; color: #9ca3af;
+    }
+    .sek-result-empty .icon { font-size: 56px; opacity: 0.25; }
+    .sek-result-empty .lead { margin-top: 16px; font-size: 15px; color: #6b7280; }
+    .sek-result-empty .sub { margin-top: 6px; font-size: 13px; color: #9ca3af; }
+    .sek-shell-banner {
+      background: #fef3c7; color: #92400e;
+      border: 1px solid #fde68a; border-radius: 6px;
+      padding: 6px 10px; margin-top: 8px; font-size: 11px;
+      display: inline-block;
+    }
+
+    /* Sekretary status indicator inside the chat header */
+    .sek-status-row {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 4px; font-size: 11px; color: #6b7280;
+    }
+    .sek-status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #9ca3af; flex-shrink: 0;
+    }
+    .sek-status-dot.loading { background: #f59e0b; animation: sekPulse 1.2s infinite; }
+    .sek-status-dot.ready   { background: #10b981; }
+    .sek-status-dot.error   { background: #dc2626; }
+    @keyframes sekPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    /* Loading progress bar */
+    .sek-progress {
+      margin: 8px 0 0;
+      height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden;
+      display: none;
+    }
+    .sek-progress.show { display: block; }
+    .sek-progress-fill {
+      height: 100%; width: 0%; background: #6366f1;
+      transition: width 200ms ease;
+    }
+    .sek-progress-detail { font-size: 10px; color: #9ca3af; margin-top: 3px; }
+
+    /* Disabled input bar while not ready */
+    .sek-input-bar.disabled textarea, .sek-input-bar.disabled button { opacity: 0.5; pointer-events: none; }
+
+    /* Right-panel "model loading" placeholder */
+    .sek-loading-card {
+      max-width: 420px; margin: 0 auto; padding: 24px;
+      background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;
+      text-align: center;
+    }
+    .sek-loading-card .lead { font-size: 15px; color: #1f2937; font-weight: 500; }
+    .sek-loading-card .sub { font-size: 13px; color: #6b7280; margin-top: 4px; }
+    .sek-loading-card .progress-text { font-size: 11px; color: #9ca3af; margin-top: 12px; }
+
+    /* When WebGPU isn't supported */
+    .sek-no-webgpu {
+      max-width: 480px; margin: 32px auto; padding: 20px;
+      background: #fef3c7; color: #92400e; border: 1px solid #fde68a; border-radius: 10px;
+      text-align: center; font-size: 14px;
+    }
+    .sek-no-webgpu .title { font-weight: 600; margin-bottom: 8px; font-size: 15px; }
+
+    /* Sekretary result list view */
+    .sek-list-view { max-width: 100%; }
+    .sek-list-view h3 {
+      font-size: 16px; font-weight: 600; color: #111827;
+      margin: 0 0 4px; display: flex; align-items: center; gap: 8px;
+    }
+    .sek-list-view .sek-list-count {
+      font-size: 12px; color: #6b7280; font-weight: 500;
+      background: #f3f4f6; padding: 2px 8px; border-radius: 999px;
+    }
+    .sek-list-view .sek-list-sub {
+      font-size: 13px; color: #6b7280; margin-bottom: 14px;
+    }
+    .sek-list-items {
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .sek-list-item {
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+      padding: 12px 14px; cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .sek-list-item:hover {
+      border-color: #6366f1; background: #f9fafb;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+    .sek-list-item .sek-list-name {
+      font-size: 14px; font-weight: 600; color: #1f2937;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .sek-list-item .sek-list-meta {
+      font-size: 12px; color: #6b7280; margin-top: 4px;
+      display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    }
+    .sek-list-item .sek-list-meta .badge { font-size: 10px; }
+    .sek-list-empty-result {
+      padding: 32px 16px; text-align: center;
+      color: #9ca3af; font-style: italic; font-size: 14px;
+    }
+
+    /* Client detail view (single client deep dive) */
+    .sek-detail-view { max-width: 100%; }
+    .sek-detail-view h3 {
+      font-size: 18px; font-weight: 600; color: #111827;
+      margin: 0 0 4px;
+    }
+    .sek-detail-view .sek-detail-meta {
+      font-size: 13px; color: #6b7280; margin-bottom: 16px;
+    }
+    .sek-detail-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px;
+      background: #f9fafb; border: 1px solid #e5e7eb;
+      border-radius: 8px; padding: 14px;
+    }
+    .sek-detail-grid .sek-detail-cell {
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .sek-detail-grid .sek-detail-cell.full { grid-column: 1 / -1; }
+    .sek-detail-grid .sek-detail-cell .k {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+      color: #6b7280; font-weight: 600;
+    }
+    .sek-detail-grid .sek-detail-cell .v {
+      font-size: 14px; color: #1f2937; word-break: break-word;
+    }
+    .sek-detail-grid .sek-detail-cell .v.muted { color: #9ca3af; font-style: italic; }
+    .sek-detail-actions { margin-top: 12px; display: flex; gap: 8px; }
+    .sek-disambig {
+      background: #fef3c7; border: 1px solid #fde68a;
+      color: #92400e; padding: 10px 12px; border-radius: 8px;
+      margin-bottom: 12px; font-size: 13px;
+    }
+
+    /* Notes thread view */
+    .sek-notes-view { max-width: 100%; }
+    .sek-notes-view h3 {
+      font-size: 16px; font-weight: 600; margin: 0 0 4px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .sek-notes-view .sek-list-sub { font-size: 13px; color: #6b7280; margin-bottom: 12px; }
+    .sek-notes-result-thread {
+      background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;
+      padding: 12px; display: flex; flex-direction: column; gap: 8px;
+      max-height: 480px; overflow-y: auto;
+    }
+    .sek-result-bubble {
+      padding: 10px 12px; border-radius: 12px;
+      font-size: 13px; word-break: break-word; white-space: pre-wrap;
+      line-height: 1.4; max-width: 90%;
+    }
+    .sek-result-bubble.client { background: #dbeafe; color: #1e40af; align-self: flex-start; }
+    .sek-result-bubble.web    { background: #d1fae5; color: #065f46; align-self: flex-start; }
+    .sek-result-bubble-time { font-size: 11px; color: #9ca3af; margin-top: 3px; }
+
+    /* Schedule view */
+    .sek-schedule-view h3 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+    .sek-schedule-view .sek-list-sub { font-size: 13px; color: #6b7280; margin-bottom: 12px; }
+    .sek-schedule-items { display: flex; flex-direction: column; gap: 8px; }
+    .sek-schedule-item {
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+      padding: 12px 14px; display: grid;
+      grid-template-columns: auto 1fr auto; gap: 12px;
+      align-items: center; cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .sek-schedule-item:hover { border-color: #6366f1; background: #f9fafb; }
+    .sek-schedule-item .sched-time {
+      font-size: 13px; font-weight: 600; color: #1f2937; white-space: nowrap;
+    }
+    .sek-schedule-item .sched-time .day { font-size: 11px; color: #6b7280; font-weight: 500; }
+    .sek-schedule-item.overdue .sched-time { color: #991b1b; }
+    .sek-schedule-item .sched-name { font-size: 14px; font-weight: 500; color: #1f2937; }
+    .sek-schedule-item .sched-meta { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .sek-schedule-item .sched-type { font-size: 11px; }
+
+    /* Summary stats view */
+    .sek-stats-view h3 { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
+    .sek-stat-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 10px; margin-bottom: 18px;
+    }
+    .sek-stat {
+      background: #f9fafb; border: 1px solid #e5e7eb;
+      border-radius: 8px; padding: 14px; text-align: center;
+    }
+    .sek-stat .num { font-size: 24px; font-weight: 700; color: #111827; line-height: 1; }
+    .sek-stat .label {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+      color: #6b7280; margin-top: 4px;
+    }
+    .sek-stat.alert .num { color: #dc2626; }
+    .sek-stats-section { margin-bottom: 16px; }
+    .sek-stats-section h4 {
+      font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em;
+      color: #6b7280; font-weight: 600; margin: 0 0 8px;
+    }
+    .sek-stats-bars { display: flex; flex-direction: column; gap: 4px; }
+    .sek-stats-bar {
+      display: grid; grid-template-columns: 120px 1fr 30px; gap: 10px;
+      align-items: center; font-size: 13px;
+    }
+    .sek-stats-bar .lbl { color: #374151; }
+    .sek-stats-bar .track {
+      background: #f3f4f6; border-radius: 4px; height: 8px; overflow: hidden;
+    }
+    .sek-stats-bar .fill {
+      background: #6366f1; height: 100%; border-radius: 4px;
+      transition: width 200ms ease;
+    }
+    .sek-stats-bar .cnt { color: #6b7280; text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* New-client wizard (split layout in right panel) */
+    .sek-wizard-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      margin: -24px;
+      min-height: calc(100vh - 320px);
+    }
+    @media (max-width: 1100px) {
+      .sek-wizard-layout { grid-template-columns: 1fr; }
+    }
+    .sek-wizard-panel { padding: 22px; border-right: 1px solid #e5e7eb; background: #fff; }
+    .sek-wizard-review-panel { padding: 22px; background: #f9fafb; overflow-y: auto; }
+    .sek-wizard-step-num {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+      color: #6366f1; font-weight: 600;
+    }
+    .sek-wizard-step-name { font-size: 20px; font-weight: 700; color: #111827; margin-top: 2px; }
+    .sek-wizard-progress {
+      height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden;
+      margin: 12px 0 20px;
+    }
+    .sek-wizard-progress-fill {
+      height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6);
+      transition: width 250ms ease;
+    }
+    .sek-wizard-question-block {
+      background: #eef2ff; border: 1px solid #c7d2fe;
+      border-radius: 10px; padding: 16px; margin-bottom: 16px;
+    }
+    .sek-wizard-field-label {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+      color: #4f46e5; font-weight: 600; margin-bottom: 6px;
+    }
+    .sek-wizard-question { font-size: 16px; color: #1e293b; line-height: 1.4; }
+    .sek-wizard-step-confirm {
+      background: #fef3c7; border: 1px solid #fde68a;
+      border-radius: 10px; padding: 16px; margin-bottom: 16px;
+      color: #92400e;
+    }
+    .sek-wizard-step-confirm .title { font-weight: 600; margin-bottom: 4px; font-size: 15px; }
+    .sek-wizard-step-confirm .sub { font-size: 13px; }
+    .sek-wizard-final-confirm {
+      background: #d1fae5; border: 1px solid #6ee7b7;
+      border-radius: 10px; padding: 16px; margin-bottom: 16px;
+      color: #065f46;
+    }
+    .sek-wizard-final-confirm .title { font-weight: 600; margin-bottom: 4px; font-size: 15px; }
+    .sek-wizard-final-confirm .sub { font-size: 13px; }
+    .sek-wizard-hints {
+      font-size: 12px; color: #6b7280; line-height: 1.6;
+      background: #f9fafb; border-radius: 8px; padding: 10px 12px;
+    }
+    .sek-wizard-hints code {
+      background: #fff; border: 1px solid #e5e7eb;
+      padding: 1px 5px; border-radius: 4px;
+      font-size: 11px; color: #1f2937;
+    }
+    .sek-wizard-review-panel h4 {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+      color: #6b7280; font-weight: 600; margin: 0 0 8px;
+    }
+    .sek-wizard-review-section { margin-bottom: 18px; }
+    .sek-wizard-review-row {
+      display: grid; grid-template-columns: 110px 1fr;
+      gap: 8px; padding: 6px 0; font-size: 13px;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .sek-wizard-review-row:last-child { border-bottom: none; }
+    .sek-wizard-review-row .k { color: #6b7280; font-weight: 500; }
+    .sek-wizard-review-row .v { color: #1f2937; word-break: break-word; }
+    .sek-wizard-review-row .v.muted { color: #9ca3af; font-style: italic; }
+    .sek-wizard-prev-step {
+      background: #fff; border: 1px solid #e5e7eb;
+      border-radius: 8px; padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+    .sek-wizard-prev-step summary {
+      cursor: pointer; font-size: 13px; font-weight: 500; color: #374151;
+      list-style: none;
+    }
+    .sek-wizard-prev-step summary::before {
+      content: "▸ "; color: #9ca3af; display: inline-block;
+      transition: transform 150ms;
+    }
+    .sek-wizard-prev-step[open] summary::before { content: "▾ "; }
+    .sek-wizard-prev-step-content { margin-top: 8px; padding-top: 8px; border-top: 1px solid #f3f4f6; }
+    .sek-wizard-empty-state { color: #9ca3af; font-style: italic; font-size: 13px; padding: 8px 0; }
+
+    /* Write-action confirmation / result views */
+    .sek-confirm-view { max-width: 100%; }
+    .sek-confirm-view h3 {
+      font-size: 17px; font-weight: 600; color: #111827;
+      margin: 0 0 12px;
+    }
+    .sek-confirm-card {
+      background: #fef3c7; border: 1px solid #fde68a;
+      border-radius: 10px; padding: 16px; margin-bottom: 12px;
+    }
+    .sek-confirm-card.danger { background: #fee2e2; border-color: #fecaca; }
+    .sek-confirm-row {
+      display: grid; grid-template-columns: 110px 1fr; gap: 10px;
+      padding: 6px 0; font-size: 14px;
+    }
+    .sek-confirm-row .k {
+      color: #92400e; font-weight: 600; font-size: 12px;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      padding-top: 2px;
+    }
+    .sek-confirm-card.danger .sek-confirm-row .k { color: #991b1b; }
+    .sek-confirm-row .v { color: #1f2937; word-break: break-word; }
+    .sek-confirm-actions {
+      display: flex; gap: 10px; justify-content: flex-end;
+      margin-top: 4px;
+    }
+    .sek-success-view {
+      max-width: 480px; margin: 16px auto; padding: 20px;
+      background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7;
+      border-radius: 10px; text-align: center;
+    }
+    .sek-success-view .icon { font-size: 36px; }
+    .sek-success-view h3 { font-size: 16px; font-weight: 600; margin: 8px 0 4px; }
+    .sek-success-view .detail { font-size: 14px; color: #047857; }
+    .sek-success-view .actions { margin-top: 12px; display: flex; gap: 8px; justify-content: center; }
+    .sek-error-view {
+      max-width: 480px; margin: 16px auto; padding: 16px;
+      background: #fef3c7; color: #92400e; border: 1px solid #fde68a;
+      border-radius: 10px; text-align: center; font-size: 14px;
+    }
+    .sek-error-view .title { font-weight: 600; margin-bottom: 6px; }
+
+    /* "Searching..." indicator inside a chat bubble */
+    .sek-thinking {
+      display: inline-flex; gap: 3px; align-items: center;
+    }
+    .sek-thinking span {
+      width: 6px; height: 6px; background: #9ca3af; border-radius: 50%;
+      animation: sekDot 1.2s infinite;
+    }
+    .sek-thinking span:nth-child(2) { animation-delay: 0.2s; }
+    .sek-thinking span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes sekDot { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+    /* Microphone button */
+    .sek-mic-btn {
+      background: #fff; color: #6b7280;
+      border: 1px solid #d1d5db; border-radius: 50%;
+      width: 36px; height: 36px; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 15px; cursor: pointer; flex-shrink: 0;
+      transition: all 120ms ease;
+    }
+    .sek-mic-btn:hover { background: #f3f4f6; color: #1f2937; border-color: #9ca3af; }
+    .sek-mic-btn.listening {
+      background: #fee2e2; border-color: #dc2626; color: #dc2626;
+      animation: micPulse 1.2s infinite;
+    }
+    @keyframes micPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45); }
+      50%      { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+    }
   </style>
 </head>
 <body>
@@ -460,6 +903,7 @@
   <div class="tabs">
     <button class="tab active" data-view="list">📋 List</button>
     <button class="tab" data-view="calendar">📅 Calendar</button>
+    <button class="tab" data-view="sekretary">🤖 Sekretary</button>
   </div>
 
   <div id="filterChips" class="filter-chips"></div>
@@ -491,6 +935,44 @@
   <div class="tab-content" data-view="calendar">
     <div class="card">
       <div id="calendar"></div>
+    </div>
+  </div>
+
+  <div class="tab-content" data-view="sekretary">
+    <div class="card sekretary-card">
+      <div class="sekretary-layout">
+        <!-- Left 30% — chat panel -->
+        <div class="sek-chat">
+          <div class="sek-header">
+            <div class="sek-title">🤖 Sekretary</div>
+            <div class="sek-status-row">
+              <div class="sek-status-dot" id="sekStatusDot"></div>
+              <div id="sekStatusText">Idle — open this tab to load the model</div>
+            </div>
+            <div id="sekProgress" class="sek-progress"><div class="sek-progress-fill" id="sekProgressFill"></div></div>
+            <div id="sekProgressDetail" class="sek-progress-detail"></div>
+          </div>
+          <div id="sekThread" class="sek-thread empty">
+            Open this tab to load Gemma 4 E2B in your browser.<br>
+            First load downloads ~1.5 GB (one time per device).<br>
+            Subsequent visits will be instant.
+          </div>
+          <div id="sekInputBar" class="sek-input-bar disabled">
+            <button id="sekMicBtn" class="sek-mic-btn" title="Click to talk" aria-label="Microphone">🎤</button>
+            <textarea id="sekInput" placeholder="Loading model..."></textarea>
+            <button id="sekSendBtn">Send</button>
+          </div>
+        </div>
+        <!-- Right 70% — adaptive result panel (placeholder for now) -->
+        <div class="sek-result" id="sekResult">
+          <div class="sek-result-empty" id="sekResultEmpty">
+            <div class="icon">🤖</div>
+            <div class="lead">Ask me anything on the left.</div>
+            <div class="sub">Adaptive result views will render here.</div>
+            <div class="sek-shell-banner">All chunks complete. Try: "Add a new client" (launches wizard), "Mark Acme as Hot", "Schedule Acme Tuesday 2pm", "Show me hot leads"</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1567,6 +2049,1772 @@
         e.preventDefault(); goNext();
       }
     });
+
+    // ============================================================
+    // SEKRETARY — Chunk 2: WebGPU detection + Gemma 4 E2B loading
+    // ============================================================
+    const sekThread        = document.getElementById("sekThread");
+    const sekInput         = document.getElementById("sekInput");
+    const sekSendBtn       = document.getElementById("sekSendBtn");
+    const sekInputBar      = document.getElementById("sekInputBar");
+    const sekStatusDot     = document.getElementById("sekStatusDot");
+    const sekStatusText    = document.getElementById("sekStatusText");
+    const sekProgress      = document.getElementById("sekProgress");
+    const sekProgressFill  = document.getElementById("sekProgressFill");
+    const sekProgressDetail= document.getElementById("sekProgressDetail");
+    const sekTabBtn        = document.querySelector('.tab[data-view="sekretary"]');
+    const sekResult        = document.getElementById("sekResult");
+
+    const SEK_MODEL_ID = "onnx-community/gemma-4-E2B-it-ONNX";
+    let sekState = "idle";   // idle | loading | ready | error | unsupported
+    let sekPipeline = null;
+    let sekConversation = []; // chat history for the model
+
+    function sekTime() {
+      return new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    }
+
+    function setSekStatus(state, text) {
+      sekState = state;
+      sekStatusDot.className = "sek-status-dot" + (state === "loading" ? " loading" : state === "ready" ? " ready" : state === "error" ? " error" : "");
+      sekStatusText.textContent = text;
+      const ready = state === "ready";
+      sekInputBar.classList.toggle("disabled", !ready);
+      sekInput.placeholder = ready ? "Ask anything... (Enter to send, Shift+Enter for newline)" : text;
+    }
+
+    async function checkWebGPU() {
+      if (!navigator.gpu) return false;
+      try {
+        const adapter = await navigator.gpu.requestAdapter();
+        return !!adapter;
+      } catch { return false; }
+    }
+
+    function showNoWebGPU() {
+      // Hide tab button
+      if (sekTabBtn) sekTabBtn.style.display = "none";
+      // If somehow visible, show explanation in the right panel
+      sekResult.innerHTML = `
+        <div class="sek-no-webgpu">
+          <div class="title">⚠️ Sekretary not available</div>
+          <div>Your browser doesn't support WebGPU, which is required to run Gemma 4 E2B on-device.</div>
+          <div style="margin-top: 8px; font-size: 13px;">Try Chrome 113+ or Edge 113+ on a desktop. Your CRM (List + Calendar tabs) still works fully.</div>
+        </div>`;
+    }
+
+    let sekModelLoadStarted = false;
+    async function ensureSekModelLoaded() {
+      if (sekState === "ready" || sekState === "loading") return;
+      if (sekModelLoadStarted) return;
+      sekModelLoadStarted = true;
+
+      setSekStatus("loading", "Loading model...");
+      sekProgress.classList.add("show");
+      sekProgressFill.style.width = "0%";
+      sekProgressDetail.textContent = "Initializing Transformers.js...";
+
+      // Show right-panel loading card
+      sekResult.innerHTML = `
+        <div class="sek-loading-card">
+          <div class="lead">Loading Gemma 4 E2B</div>
+          <div class="sub">First load downloads ~1.5 GB and caches on this device.<br>Future visits will be instant.</div>
+          <div class="progress-text" id="sekRightProgress">Initializing...</div>
+        </div>`;
+      const rightProgress = document.getElementById("sekRightProgress");
+
+      try {
+        const { pipeline } = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@latest");
+
+        sekPipeline = await pipeline("text-generation", SEK_MODEL_ID, {
+          device: "webgpu",
+          dtype: "q4f16",
+          progress_callback: (p) => {
+            if (p.status === "progress" && p.file) {
+              const pct = Math.round((p.loaded / p.total) * 100);
+              sekProgressFill.style.width = pct + "%";
+              const fileShort = p.file.split("/").pop();
+              const mb = (p.loaded / 1024 / 1024).toFixed(0);
+              const total = (p.total / 1024 / 1024).toFixed(0);
+              const msg = `${fileShort}: ${mb}/${total} MB (${pct}%)`;
+              sekProgressDetail.textContent = msg;
+              if (rightProgress) rightProgress.textContent = msg;
+            } else if (p.status === "ready") {
+              sekProgressDetail.textContent = "Model ready";
+            } else if (p.status === "initiate" || p.status === "download") {
+              const fileShort = (p.file || "").split("/").pop();
+              const msg = `Fetching ${fileShort || "files"}...`;
+              sekProgressDetail.textContent = msg;
+              if (rightProgress) rightProgress.textContent = msg;
+            }
+          },
+        });
+
+        setSekStatus("ready", "Ready");
+        sekProgress.classList.remove("show");
+        sekProgressDetail.textContent = "";
+
+        // Reset right panel to idle prompt
+        sekResult.innerHTML = `
+          <div class="sek-result-empty">
+            <div class="icon">🤖</div>
+            <div class="lead">Ask me anything on the left.</div>
+            <div class="sub">No tool calls yet — just plain text replies for now (Chunk 2).</div>
+          </div>`;
+
+        // Reset thread message
+        sekThread.classList.remove("empty");
+        sekThread.innerHTML = "";
+        appendSekBubble("assistant", "Hi! I can read, change, and create clients in your CRM. Try things like:\n\n📖 Read:\n• \"Show me hot leads\"\n• \"Tell me about [client]\"\n• \"What's on my calendar today?\"\n\n✏️ Write:\n• \"Mark Acme as Hot\"\n• \"Add note for John: Wants to push deadline\"\n• \"Schedule Acme for Tuesday 2pm\"\n• \"Cancel Acme's appointment\"\n\n➕ Create new client:\n• \"Add a new client\" — launches a guided step-by-step wizard");
+      } catch (err) {
+        console.error("Sekretary load error:", err);
+        setSekStatus("error", "Load failed");
+        sekProgressDetail.textContent = String(err.message || err).slice(0, 200);
+        sekResult.innerHTML = `
+          <div class="sek-no-webgpu">
+            <div class="title">⚠️ Couldn't load the model</div>
+            <div style="font-size: 13px;">${esc(String(err.message || err))}</div>
+            <div style="margin-top: 8px; font-size: 12px; color: #92400e;">Check your network, refresh the page, or try a different browser.</div>
+          </div>`;
+      }
+    }
+
+    function appendSekBubble(role, text) {
+      sekThread.classList.remove("empty");
+      const wrap = document.createElement("div");
+      wrap.className = `sek-bubble-wrap ${role}`;
+      const bubble = document.createElement("div");
+      bubble.className = `sek-bubble ${role}`;
+      bubble.textContent = text;
+      const time = document.createElement("div");
+      time.className = "sek-bubble-time";
+      time.textContent = sekTime();
+      wrap.appendChild(bubble);
+      wrap.appendChild(time);
+      sekThread.appendChild(wrap);
+      sekThread.scrollTop = sekThread.scrollHeight;
+      return bubble; // return for streaming updates
+    }
+
+    // ============================================================
+    // SEKRETARY — Chunk 3: First mini-API (list_clients)
+    // ============================================================
+
+    // Helper: fuzzy substring match across company_name + client_name
+    function sekFuzzyMatch(query) {
+      const q = (query || "").toLowerCase().trim();
+      if (!q) return [];
+      return (allClients || []).filter((c) => {
+        return ((c.company_name || "").toLowerCase().includes(q)) ||
+               ((c.client_name  || "").toLowerCase().includes(q));
+      });
+    }
+    function sekClientSummary(c) {
+      return {
+        id: c.id, company_name: c.company_name, client_name: c.client_name,
+        business_type: c.business_type, phone: c.phone, manager: c.manager,
+        web_status: c.web_status, client_status: c.client_status, motivation: c.motivation,
+        follow_up_at: c.follow_up_at, follow_up_type: c.follow_up_type,
+        profile_link: c.profile_link, post_link: c.post_link, finished_website: c.finished_website,
+      };
+    }
+
+    // Tool catalog — JS-side functions the AI can ask us to run
+    const SEK_TOOLS = {
+      list_clients: {
+        description: "List clients matching filters. Use for 'show me X clients' / 'who has Y status' / 'still need to do' queries. ALL filters are case-insensitive; business_type also supports substring match.",
+        params: {
+          motivation:    "One of: Not Set, Dead, Cold, Warm, Hot, VIP",
+          web_status:    "One of: Not Started, In Progress, Review, Needs Fixing, Finished",
+          web_status_not:"EXCLUDE clients with this web_status. Use 'Finished' to find work that still needs to be done.",
+          client_status: "One of: New Lead, Contacted, Interested, Proposal Sent, Negotiation, Follow Up, Closed Won, Closed Lost, Nurture",
+          business_type: "Free text — partial OK (e.g., 'concrete' matches 'Concrete')",
+          manager:       "One of: Ivan, Hector, or 'Unassigned'",
+        },
+        execute: (args) => {
+          const a = args || {};
+          const norm = (v) => (v || "").toString().toLowerCase().trim();
+          const eq   = (x, y) => norm(x) === norm(y);
+          const filtered = (allClients || []).filter((c) => {
+            if (a.motivation    && !eq(c.motivation,    a.motivation))    return false;
+            if (a.web_status    && !eq(c.web_status,    a.web_status))    return false;
+            if (a.web_status_not && eq(c.web_status,    a.web_status_not)) return false;
+            if (a.client_status && !eq(c.client_status, a.client_status)) return false;
+            if (a.business_type) {
+              if (!norm(c.business_type).includes(norm(a.business_type))) return false;
+            }
+            if (a.manager) {
+              if (norm(a.manager) === "unassigned") { if (c.manager) return false; }
+              else if (!eq(c.manager, a.manager)) return false;
+            }
+            return true;
+          });
+          return filtered.map(sekClientSummary);
+        },
+      },
+      get_client: {
+        description: "Get full details for ONE specific client by company name or contact name (fuzzy substring match). Use for 'tell me about [name]' queries.",
+        params: { query: "Company name or client name (substring, case-insensitive)" },
+        execute: (args) => {
+          const matches = sekFuzzyMatch(args.query);
+          return { query: args.query, matches: matches.map(sekClientSummary) };
+        },
+      },
+      get_client_notes: {
+        description: "Get the notes thread for a specific client. kind is 'client' (relationship notes) or 'web' (website build notes).",
+        params: {
+          query: "Company name or client name (substring match)",
+          kind:  "Either 'client' or 'web'",
+        },
+        execute: (args) => {
+          const kind = (args.kind === "web") ? "web" : "client";
+          const matches = sekFuzzyMatch(args.query);
+          if (matches.length === 0) return { error: "no_match", query: args.query };
+          if (matches.length > 1) {
+            return {
+              error: "multiple_matches",
+              query: args.query,
+              matches: matches.map((c) => ({ id: c.id, company_name: c.company_name })),
+            };
+          }
+          const c = matches[0];
+          const notes = kind === "web" ? (c.web_notes || []) : (c.client_notes || []);
+          return {
+            client: { id: c.id, company_name: c.company_name },
+            kind,
+            notes,
+          };
+        },
+      },
+      get_schedule: {
+        description: "Get scheduled follow-ups and appointments. Filter by time window.",
+        params: {
+          when: "One of: 'today', 'this_week', 'this_month', 'overdue', 'all'",
+        },
+        execute: (args) => {
+          const when = args.when || "all";
+          const now = new Date();
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const tomorrow = new Date(today.getTime() + 24*60*60*1000);
+          const weekEnd = new Date(today.getTime() + 7*24*60*60*1000);
+          const monthEnd = new Date(today.getTime() + 30*24*60*60*1000);
+          const scheduled = (allClients || []).filter((c) => c.follow_up_at);
+          const filtered = scheduled.filter((c) => {
+            const at = new Date(c.follow_up_at);
+            if (when === "today")      return at >= today && at < tomorrow;
+            if (when === "this_week")  return at >= today && at < weekEnd;
+            if (when === "this_month") return at >= today && at < monthEnd;
+            if (when === "overdue")    return at < today;
+            return true;
+          });
+          filtered.sort((a, b) => new Date(a.follow_up_at) - new Date(b.follow_up_at));
+          return { when, items: filtered.map(sekClientSummary) };
+        },
+      },
+      get_pipeline_summary: {
+        description: "Get an overview of the pipeline: counts by motivation, web/client status, manager, and overdue. Use for 'how am I doing', 'pipeline overview' queries.",
+        params: {},
+        execute: () => {
+          const clients = allClients || [];
+          const total = clients.length;
+          const counts = (key) => {
+            const map = {};
+            for (const c of clients) {
+              const v = c[key] || "(none)";
+              map[v] = (map[v] || 0) + 1;
+            }
+            return map;
+          };
+          const todayStart = new Date(new Date().toDateString()).getTime();
+          const overdue = clients.filter((c) => c.follow_up_at && new Date(c.follow_up_at).getTime() < todayStart).length;
+          return {
+            total,
+            overdue_count: overdue,
+            by_motivation:    counts("motivation"),
+            by_web_status:    counts("web_status"),
+            by_client_status: counts("client_status"),
+            by_manager:       counts("manager"),
+          };
+        },
+      },
+
+      // ---------- WRITE TOOLS (Chunk 6) ----------
+
+      update_client: {
+        description: "Update ONE field on a single client. Use for 'mark X as Y' / 'change X's status to Z'. Field must be one of: motivation, web_status, client_status, manager.",
+        params: {
+          query: "Company name or client name (fuzzy match)",
+          field: "One of: motivation, web_status, client_status, manager",
+          value: "New value — must be valid for the chosen field. For manager, use 'Ivan', 'Hector', or 'Unassigned'.",
+        },
+        tier: "green",
+        execute: async (args) => {
+          const matches = sekFuzzyMatch(args.query);
+          if (matches.length === 0) return { error: "no_match", query: args.query };
+          if (matches.length > 1) return { error: "multiple_matches", query: args.query, matches: matches.map((c) => ({ id: c.id, company_name: c.company_name })) };
+          const c = matches[0];
+          const validFields = {
+            motivation:    MOTIVATIONS,
+            web_status:    WEB_STATUSES,
+            client_status: CLIENT_STATUSES,
+            manager:       ["Ivan", "Hector", "Unassigned"],
+          };
+          if (!validFields[args.field]) return { error: "invalid_field", field: args.field, valid: Object.keys(validFields) };
+          let value = args.value;
+          if (args.field === "manager" && (value === "Unassigned" || value === "")) value = null;
+          if (value !== null && !validFields[args.field].includes(value)) {
+            return { error: "invalid_value", field: args.field, value: args.value, valid: validFields[args.field] };
+          }
+          const oldValue = c[args.field];
+          const update = { [args.field]: value };
+          const dbResult = await sekDbUpdate(c.id, update);
+          if (dbResult.error) return { error: "db_error", message: dbResult.error };
+          return { success: true, action: "updated", client: { id: c.id, company_name: c.company_name }, field: args.field, old_value: oldValue, new_value: value };
+        },
+      },
+
+      add_note: {
+        description: "Append a new note to a client's thread. kind is 'client' (relationship notes) or 'web' (build notes).",
+        params: {
+          query: "Company name or client name (fuzzy match)",
+          kind:  "Either 'client' or 'web'",
+          text:  "The note text",
+        },
+        tier: "green",
+        execute: async (args) => {
+          const matches = sekFuzzyMatch(args.query);
+          if (matches.length === 0) return { error: "no_match", query: args.query };
+          if (matches.length > 1) return { error: "multiple_matches", query: args.query, matches: matches.map((c) => ({ id: c.id, company_name: c.company_name })) };
+          const c = matches[0];
+          if (!args.text || !args.text.trim()) return { error: "empty_text" };
+          const kind = (args.kind === "web") ? "web" : "client";
+          const field = kind === "web" ? "web_notes" : "client_notes";
+          const newNotes = appendNote(c[field] || [], args.text);
+          const dbResult = await sekDbUpdate(c.id, { [field]: newNotes });
+          if (dbResult.error) return { error: "db_error", message: dbResult.error };
+          return { success: true, action: "noted", client: { id: c.id, company_name: c.company_name }, kind, text: args.text };
+        },
+      },
+
+      schedule_followup: {
+        description: "Schedule a follow-up or appointment for a client. Requires user confirmation before saving.",
+        params: {
+          query: "Company name or client name (fuzzy match)",
+          date:  "Date in YYYY-MM-DD format. Compute relative dates from today's date in the system prompt.",
+          time:  "Time in HH:MM (24-hour). Defaults to 09:00 if omitted.",
+          type:  "Either 'Follow-up' (casual check-in) or 'Appointment' (firm meeting). Default 'Follow-up'.",
+          confirmed: "Set to true ONLY if the user has explicitly confirmed via the right-panel button. Otherwise omit.",
+        },
+        tier: "yellow",
+        execute: async (args) => {
+          const matches = sekFuzzyMatch(args.query);
+          if (matches.length === 0) return { error: "no_match", query: args.query };
+          if (matches.length > 1) return { error: "multiple_matches", query: args.query, matches: matches.map((c) => ({ id: c.id, company_name: c.company_name })) };
+          const c = matches[0];
+          if (!args.date) return { error: "missing_date" };
+          const time = args.time || "09:00";
+          const type = args.type === "Appointment" ? "Appointment" : "Follow-up";
+          const iso = combineDateTime(args.date, time);
+
+          if (!args.confirmed) {
+            return {
+              needs_confirmation: true,
+              tier: "yellow",
+              tool: "schedule_followup",
+              preview: {
+                client: c.company_name,
+                client_id: c.id,
+                date: args.date,
+                time,
+                type,
+                friendly_when: formatDateTime(iso),
+              },
+              confirm_args: { ...args, confirmed: true },
+            };
+          }
+          const dbResult = await sekDbUpdate(c.id, { follow_up_at: iso, follow_up_type: type });
+          if (dbResult.error) return { error: "db_error", message: dbResult.error };
+          return { success: true, action: "scheduled", client: { id: c.id, company_name: c.company_name }, when: iso, type };
+        },
+      },
+
+      cancel_followup: {
+        description: "Cancel/clear a scheduled follow-up or appointment. Requires user confirmation.",
+        params: {
+          query: "Company name or client name (fuzzy match)",
+          confirmed: "Set to true ONLY if the user has explicitly confirmed via the right-panel button.",
+        },
+        tier: "yellow",
+        execute: async (args) => {
+          const matches = sekFuzzyMatch(args.query);
+          if (matches.length === 0) return { error: "no_match", query: args.query };
+          if (matches.length > 1) return { error: "multiple_matches", query: args.query, matches: matches.map((c) => ({ id: c.id, company_name: c.company_name })) };
+          const c = matches[0];
+          if (!c.follow_up_at) return { error: "nothing_scheduled", client: c.company_name };
+          if (!args.confirmed) {
+            return {
+              needs_confirmation: true,
+              tier: "yellow",
+              tool: "cancel_followup",
+              preview: {
+                client: c.company_name,
+                client_id: c.id,
+                current_when: formatDateTime(c.follow_up_at),
+                current_type: c.follow_up_type || "Follow-up",
+              },
+              confirm_args: { ...args, confirmed: true },
+            };
+          }
+          const dbResult = await sekDbUpdate(c.id, { follow_up_at: null });
+          if (dbResult.error) return { error: "db_error", message: dbResult.error };
+          return { success: true, action: "cancelled", client: { id: c.id, company_name: c.company_name } };
+        },
+      },
+
+      wizard_start: {
+        description: "Start the new-client creation wizard. Use this whenever the user wants to add, create, or make a new client. The wizard walks them through each field step by step in the right panel.",
+        params: {},
+        tier: "wizard",
+        execute: () => {
+          sekWizardStart();
+          return { success: true, action: "wizard_started" };
+        },
+      },
+    };
+
+    // ============================================================
+    // NEW-CLIENT WIZARD (Chunk 7)
+    // ============================================================
+    let sekWizardState = null;
+
+    const WIZARD_STEPS = [
+      {
+        name: "Company Info",
+        fields: [
+          { name: "company_name",  label: "Company name",   question: "What's the company name?",                   required: true },
+          { name: "business_type", label: "Business type",  question: "What's the business type? (e.g., Pavers, Roofing, Landscaping — or say 'skip')" },
+        ],
+      },
+      {
+        name: "Contact",
+        fields: [
+          { name: "client_name", label: "Client name", question: "Who's the contact person? (or 'skip')" },
+          { name: "phone",       label: "Phone",       question: "What's the phone number? (or 'skip')",
+            validate: (v) => {
+              if (!v) return null;
+              const p = normPhone(v);
+              if (!p) return null;
+              const existing = (allClients || []).find((c) => normPhone(c.phone) === p);
+              if (existing) return `That phone is already used by "${existing.company_name}". Enter a different number, or say 'skip'.`;
+              return null;
+            },
+            transform: (v) => formatPhone(v) || v,
+          },
+        ],
+      },
+      {
+        name: "Links",
+        fields: [
+          { name: "profile_link",     label: "Profile link",     question: "Profile / social media link? (or 'skip')" },
+          { name: "post_link",        label: "Post link",        question: "Specific post link? (or 'skip')" },
+          { name: "finished_website", label: "Finished website", question: "Finished website URL? (or 'skip')" },
+        ],
+      },
+      {
+        name: "Assignment",
+        fields: [
+          { name: "manager",       label: "Manager",       question: "Manager — Ivan, Hector, or 'skip' for unassigned?", choices: ["Ivan", "Hector"] },
+          { name: "web_status",    label: "Web status",    question: "Web status? (Not Started, In Progress, Review, Needs Fixing, Finished — or 'skip' for Not Started)", choices: WEB_STATUSES },
+          { name: "client_status", label: "Client status", question: "Client status? (New Lead, Contacted, Interested, Proposal Sent, Negotiation, Follow Up, Closed Won, Closed Lost, Nurture — or 'skip' for New Lead)", choices: CLIENT_STATUSES },
+          { name: "motivation",    label: "Motivation",    question: "Motivation? (Not Set, Dead, Cold, Warm, Hot, VIP — or 'skip' for Not Set)", choices: MOTIVATIONS },
+        ],
+      },
+      {
+        name: "Schedule",
+        fields: [
+          { name: "follow_up_date", label: "Date",  question: "Want to schedule a follow-up? Give a date (YYYY-MM-DD) or 'skip' for none.",
+            validate: (v) => {
+              if (!v) return null;
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return "Please use YYYY-MM-DD format (e.g., 2026-04-28), or 'skip'.";
+              return null;
+            },
+          },
+          { name: "follow_up_time", label: "Time",  question: "What time? (HH:MM in 24-hour, e.g., '14:00' for 2pm — or 'skip' for 09:00)", dependsOn: "follow_up_date",
+            validate: (v) => {
+              if (!v) return null;
+              if (!/^\d{1,2}:\d{2}$/.test(v)) return "Please use HH:MM 24-hour format (e.g., 14:00), or 'skip'.";
+              return null;
+            },
+          },
+          { name: "follow_up_type", label: "Type",  question: "Follow-up or Appointment?", dependsOn: "follow_up_date", choices: FOLLOW_UP_TYPES },
+        ],
+      },
+      {
+        name: "Notes",
+        fields: [
+          { name: "initial_client_note", label: "Client note", question: "Initial client note? (or 'skip')" },
+          { name: "initial_web_note",    label: "Web note",    question: "Initial web/build note? (or 'skip')" },
+        ],
+      },
+      {
+        name: "Final Review",
+        fields: [], // special — full review, just yes/no
+      },
+    ];
+
+    function sekWizardStart() {
+      sekWizardState = {
+        active: true,
+        stepIndex: 0,
+        fieldIndex: 0,
+        fields: {},
+        awaitingStepConfirm: false,
+      };
+      renderWizardView();
+      const step = WIZARD_STEPS[0];
+      const f = step.fields[0];
+      appendSekBubble("assistant", `Let's create a new client step by step. Step 1 of ${WIZARD_STEPS.length}: ${step.name}.\n\n${f.question}`);
+    }
+
+    function getCurrentWizardField() {
+      if (!sekWizardState) return null;
+      const step = WIZARD_STEPS[sekWizardState.stepIndex];
+      if (!step || !step.fields) return null;
+      return step.fields[sekWizardState.fieldIndex] || null;
+    }
+
+    function isFinalReviewStep() {
+      return sekWizardState && sekWizardState.stepIndex === WIZARD_STEPS.length - 1;
+    }
+
+    async function handleWizardInput(text) {
+      const lower = (text || "").toLowerCase().trim();
+
+      if (/^(cancel|stop|abort|quit|exit|nevermind)\b/.test(lower)) {
+        sekWizardCancel();
+        return;
+      }
+      if (/^(back|go back|previous)\b/.test(lower)) {
+        sekWizardBack();
+        return;
+      }
+
+      // Final review: yes/no only
+      if (isFinalReviewStep()) {
+        if (/^(yes|y|yeah|yep|confirm|save|create|ok|okay|sure|do it|go|done)\b/.test(lower)) {
+          await sekWizardSave();
+        } else if (/^(no|n|nope|cancel)\b/.test(lower)) {
+          sekWizardCancel();
+        } else {
+          appendSekBubble("assistant", "Yes to save the client, or no to cancel.");
+        }
+        return;
+      }
+
+      // Step confirm phase: yes/no only
+      if (sekWizardState.awaitingStepConfirm) {
+        if (/^(yes|y|yeah|yep|confirm|ok|okay|sure|good|next|continue)\b/.test(lower)) {
+          sekWizardConfirmStep();
+        } else if (/^(no|n|nope|change|fix|edit|wait)\b/.test(lower)) {
+          // Re-ask the last field of this step so they can fix it
+          sekWizardState.awaitingStepConfirm = false;
+          sekWizardState.fieldIndex = WIZARD_STEPS[sekWizardState.stepIndex].fields.length - 1;
+          renderWizardView();
+          const f = getCurrentWizardField();
+          if (f) appendSekBubble("assistant", `OK, let's fix that. ${f.question}`);
+        } else {
+          appendSekBubble("assistant", "Yes to confirm and continue, or no to fix something.");
+        }
+        return;
+      }
+
+      // Field input phase
+      const field = getCurrentWizardField();
+      if (!field) return; // shouldn't happen
+
+      // Skip command (only allowed for non-required fields)
+      if (/^skip\b/.test(lower)) {
+        if (field.required) {
+          appendSekBubble("assistant", `${field.label} is required — please provide a value.`);
+          return;
+        }
+        sekWizardState.fields[field.name] = null;
+        sekWizardAdvance();
+        return;
+      }
+
+      // Validate enum choice
+      let value = text.trim();
+      if (field.choices) {
+        const matched = field.choices.find((c) => c.toLowerCase() === value.toLowerCase());
+        if (!matched) {
+          appendSekBubble("assistant", `Please pick one of: ${field.choices.join(", ")}. Or say 'skip'.`);
+          return;
+        }
+        value = matched;
+      }
+
+      // Required check
+      if (field.required && !value) {
+        appendSekBubble("assistant", `${field.label} is required.`);
+        return;
+      }
+
+      // Custom validate
+      if (field.validate) {
+        const err = field.validate(value, sekWizardState.fields);
+        if (err) {
+          appendSekBubble("assistant", err);
+          return;
+        }
+      }
+
+      // Optional transform (e.g. format phone)
+      if (field.transform) value = field.transform(value);
+
+      sekWizardState.fields[field.name] = value;
+      sekWizardAdvance();
+    }
+
+    function sekWizardAdvance() {
+      sekWizardState.fieldIndex++;
+      const step = WIZARD_STEPS[sekWizardState.stepIndex];
+
+      // Skip dependent fields whose dependency is empty
+      while (sekWizardState.fieldIndex < step.fields.length) {
+        const f = step.fields[sekWizardState.fieldIndex];
+        if (f.dependsOn && !sekWizardState.fields[f.dependsOn]) {
+          sekWizardState.fields[f.name] = null;
+          sekWizardState.fieldIndex++;
+          continue;
+        }
+        break;
+      }
+
+      if (sekWizardState.fieldIndex >= step.fields.length) {
+        // Step done
+        if (sekWizardState.stepIndex === WIZARD_STEPS.length - 2) {
+          // Just finished Notes — go straight to Final Review
+          sekWizardState.stepIndex++;
+          sekWizardState.fieldIndex = 0;
+          renderWizardView();
+          appendSekBubble("assistant", "All steps done! Review everything on the right. Say 'yes' to save, or 'no' to cancel.");
+        } else {
+          sekWizardState.awaitingStepConfirm = true;
+          renderWizardView();
+          appendSekBubble("assistant", `"${step.name}" step done. Review on the right — say 'yes' to continue, 'no' to fix.`);
+        }
+        return;
+      }
+
+      // Ask next field
+      renderWizardView();
+      const f = step.fields[sekWizardState.fieldIndex];
+      appendSekBubble("assistant", f.question);
+    }
+
+    function sekWizardConfirmStep() {
+      sekWizardState.awaitingStepConfirm = false;
+      sekWizardState.stepIndex++;
+      sekWizardState.fieldIndex = 0;
+
+      // Handle Final Review (no fields)
+      if (sekWizardState.stepIndex === WIZARD_STEPS.length - 1) {
+        renderWizardView();
+        appendSekBubble("assistant", "All steps done! Review everything on the right. Say 'yes' to save, or 'no' to cancel.");
+        return;
+      }
+
+      const step = WIZARD_STEPS[sekWizardState.stepIndex];
+      // Handle dependent skip on first field
+      while (sekWizardState.fieldIndex < step.fields.length) {
+        const f = step.fields[sekWizardState.fieldIndex];
+        if (f.dependsOn && !sekWizardState.fields[f.dependsOn]) {
+          sekWizardState.fields[f.name] = null;
+          sekWizardState.fieldIndex++;
+          continue;
+        }
+        break;
+      }
+      renderWizardView();
+      const f = step.fields[sekWizardState.fieldIndex];
+      if (f) appendSekBubble("assistant", `Step ${sekWizardState.stepIndex + 1} of ${WIZARD_STEPS.length}: ${step.name}.\n\n${f.question}`);
+    }
+
+    function sekWizardBack() {
+      if (!sekWizardState) return;
+
+      if (isFinalReviewStep()) {
+        // Go back to last field of Notes step
+        sekWizardState.stepIndex = WIZARD_STEPS.length - 2;
+        sekWizardState.fieldIndex = WIZARD_STEPS[sekWizardState.stepIndex].fields.length - 1;
+        sekWizardState.awaitingStepConfirm = false;
+      } else if (sekWizardState.awaitingStepConfirm) {
+        sekWizardState.awaitingStepConfirm = false;
+        sekWizardState.fieldIndex = WIZARD_STEPS[sekWizardState.stepIndex].fields.length - 1;
+      } else if (sekWizardState.fieldIndex > 0) {
+        sekWizardState.fieldIndex--;
+      } else if (sekWizardState.stepIndex > 0) {
+        sekWizardState.stepIndex--;
+        sekWizardState.fieldIndex = WIZARD_STEPS[sekWizardState.stepIndex].fields.length - 1;
+      } else {
+        appendSekBubble("assistant", "Already on the very first field — say 'cancel' to abort the whole wizard.");
+        return;
+      }
+      renderWizardView();
+      const f = getCurrentWizardField();
+      if (f) appendSekBubble("assistant", `Going back. ${f.question}`);
+    }
+
+    function sekWizardCancel() {
+      sekWizardState = null;
+      sekResult.innerHTML = `
+        <div class="sek-success-view" style="background:#f3f4f6;color:#4b5563;border-color:#e5e7eb;">
+          <div class="icon">✕</div>
+          <h3>Wizard cancelled</h3>
+          <div class="detail">No client was created.</div>
+        </div>`;
+      appendSekBubble("assistant", "Cancelled. No client was created.");
+    }
+
+    async function sekWizardSave() {
+      const f = sekWizardState.fields;
+      const fuIso = f.follow_up_date ? combineDateTime(f.follow_up_date, f.follow_up_time || "09:00") : null;
+      const row = {
+        company_name:    (f.company_name || "").trim(),
+        business_type:    f.business_type || null,
+        client_name:      f.client_name   || null,
+        phone:            f.phone         || null,
+        profile_link:     f.profile_link  || null,
+        post_link:        f.post_link     || null,
+        finished_website: f.finished_website || null,
+        manager:          f.manager       || null,
+        web_status:       f.web_status    || "Not Started",
+        client_status:    f.client_status || "New Lead",
+        motivation:       f.motivation    || "Not Set",
+        follow_up_at:     fuIso,
+        follow_up_type:   f.follow_up_type || "Follow-up",
+        client_notes:     f.initial_client_note ? appendNote([], f.initial_client_note) : [],
+        web_notes:        f.initial_web_note    ? appendNote([], f.initial_web_note)    : [],
+      };
+
+      appendSekBubble("assistant", "Saving...");
+      const { data, error } = await sb.from("clients").insert(row).select();
+      if (error) {
+        appendSekBubble("assistant", `❌ Save failed: ${error.message}. Wizard still active — say 'cancel' or 'back' to fix.`);
+        return;
+      }
+      await load();
+      const newId = data && data[0] && data[0].id;
+      const companyName = row.company_name;
+      sekWizardState = null;
+      renderWriteSuccess("create_client", { success: true, action: "created", client: { id: newId, company_name: companyName } });
+      appendSekBubble("assistant", `🎉 Created "${companyName}". Anything else?`);
+    }
+
+    // ---- DB helper for write tools ----
+    async function sekDbUpdate(clientId, updates) {
+      const c = (allClients || []).find((x) => x.id === clientId);
+      if (c) Object.assign(c, updates);
+      const { error } = await sb.from("clients").update(updates).eq("id", clientId);
+      if (error) return { error: error.message };
+      render();
+      refreshCalendar();
+      return { ok: true };
+    }
+
+    function sekToolsDescription() {
+      return Object.entries(SEK_TOOLS).map(([name, t]) => {
+        const params = Object.entries(t.params).map(([p, d]) => `    - ${p}: ${d}`).join("\n");
+        return `- ${name}(filters):\n  ${t.description}\n  Filters object can have any of:\n${params}`;
+      }).join("\n\n");
+    }
+
+    function sekSystemPrompt() {
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const todayName = new Date().toLocaleDateString(undefined, { weekday: "long" });
+      return `You are the Sekretary, an AI assistant inside a small CRM app for a web design agency.
+
+# Today's date
+Today is ${todayName}, ${todayIso}. Use this to compute relative dates like "tomorrow", "next Tuesday", "this Friday".
+
+# CRITICAL RULE
+If the user asks ANYTHING about their clients/businesses/schedule/notes/pipeline OR asks you to change/update/schedule/note something, you MUST respond with ONLY a JSON tool call — no prose, no explanation, no preamble. Output ONLY the JSON, nothing before it, nothing after it.
+
+If you find yourself starting with "I'll", "Sure", "Let me", "I found", "Here are" — STOP. Output the tool JSON instead.
+
+# Available tools
+
+${sekToolsDescription()}
+
+# JSON format
+
+{"tool": "tool_name", "args": { ... }}
+
+# Trigger words that REQUIRE a tool call
+
+show, list, find, get, who, what, which, how many, tell me about, give me, search, display
++ any business type (landscaping, concrete, roofing, etc.)
++ any status word (hot, warm, finished, in progress, etc.)
++ any time word (today, this week, overdue, scheduled)
+
+# Examples
+
+User: "Show me hot leads"
+You: {"tool": "list_clients", "args": {"motivation": "Hot"}}
+
+User: "Show me all the landscaping businesses"
+You: {"tool": "list_clients", "args": {"business_type": "Landscaping"}}
+
+User: "List Ivan's clients in negotiation"
+You: {"tool": "list_clients", "args": {"manager": "Ivan", "client_status": "Negotiation"}}
+
+User: "Concrete clients I still need to finish"
+You: {"tool": "list_clients", "args": {"business_type": "Concrete", "web_status_not": "Finished"}}
+
+User: "What's pending on the dev side?"
+You: {"tool": "list_clients", "args": {"web_status_not": "Finished"}}
+
+User: "Tell me about Acme Paving"
+You: {"tool": "get_client", "args": {"query": "Acme Paving"}}
+
+User: "What are John's web notes?"
+You: {"tool": "get_client_notes", "args": {"query": "John", "kind": "web"}}
+
+User: "Show me Acme's client notes"
+You: {"tool": "get_client_notes", "args": {"query": "Acme", "kind": "client"}}
+
+User: "What's on my calendar today?"
+You: {"tool": "get_schedule", "args": {"when": "today"}}
+
+User: "Anything overdue?"
+You: {"tool": "get_schedule", "args": {"when": "overdue"}}
+
+User: "Pipeline overview"
+You: {"tool": "get_pipeline_summary", "args": {}}
+
+# Write tool examples (changes data)
+
+User: "Mark Acme as Hot"
+You: {"tool": "update_client", "args": {"query": "Acme", "field": "motivation", "value": "Hot"}}
+
+User: "Change Acme's web status to Finished"
+You: {"tool": "update_client", "args": {"query": "Acme", "field": "web_status", "value": "Finished"}}
+
+User: "Assign John to Ivan"
+You: {"tool": "update_client", "args": {"query": "John", "field": "manager", "value": "Ivan"}}
+
+User: "Add a note for Acme: client wants to push back"
+You: {"tool": "add_note", "args": {"query": "Acme", "kind": "client", "text": "client wants to push back"}}
+
+User: "Web note on Putting Green: design needs more green"
+You: {"tool": "add_note", "args": {"query": "Putting Green", "kind": "web", "text": "design needs more green"}}
+
+User: "Schedule Acme for Tuesday 2pm"
+(Compute Tuesday's date from today, e.g. if today is ${todayName} ${todayIso}, find next Tuesday's YYYY-MM-DD.)
+You: {"tool": "schedule_followup", "args": {"query": "Acme", "date": "<computed YYYY-MM-DD>", "time": "14:00", "type": "Appointment"}}
+
+User: "Set up a follow-up for John tomorrow at 10am"
+You: {"tool": "schedule_followup", "args": {"query": "John", "date": "<tomorrow's YYYY-MM-DD>", "time": "10:00", "type": "Follow-up"}}
+
+User: "Cancel Acme's appointment"
+You: {"tool": "cancel_followup", "args": {"query": "Acme"}}
+
+# Create new client — ALWAYS use the wizard
+
+When the user wants to add/create/make a new client, ALWAYS call wizard_start. Do NOT try to capture all the fields yourself — the wizard walks the user through one field at a time in the right panel.
+
+User: "Add a new client"
+You: {"tool": "wizard_start", "args": {}}
+
+User: "Create a new client called Acme Paving"
+You: {"tool": "wizard_start", "args": {}}
+
+User: "I want to add John from Acme Paving with all his details"
+You: {"tool": "wizard_start", "args": {}}
+
+After wizard_start runs, the user will be guided through the wizard step by step. You don't need to do anything else — the wizard handles the rest.
+
+# Confirmation flow
+
+For schedule_followup and cancel_followup, NEVER set "confirmed": true yourself. The frontend handles user confirmation. Just submit the tool call without that flag — the system will show a confirmation panel.
+
+# After the tool runs
+
+I will send back a message starting with "[Tool result]". Then respond in PLAIN ENGLISH (1-2 short sentences). Do NOT output JSON in that follow-up.
+
+# When NOT to use a tool
+
+ONLY for pure chitchat (greetings, "how are you", "what can you do", general questions about yourself). For ANY question about CRM data, use a tool.`;
+    }
+
+    function buildToolResultMessage(tool, args, result) {
+      if (tool === "list_clients") {
+        const filterDesc = describeFilters(args || {});
+        return `[Tool result] list_clients returned ${result.length} client(s) matching: ${filterDesc}. Summarize this in 1-2 short sentences for the user. Do NOT output JSON.`;
+      }
+      if (tool === "get_client") {
+        if (!result.matches || result.matches.length === 0) {
+          return `[Tool result] get_client found no client matching "${args.query}". Tell the user no match was found and ask if they want to try a different name.`;
+        }
+        if (result.matches.length === 1) {
+          const c = result.matches[0];
+          return `[Tool result] get_client found "${c.company_name}" — ${c.business_type || "no type"}, manager ${c.manager || "unassigned"}, motivation ${c.motivation}, web status ${c.web_status}, client status ${c.client_status}. Give the user a 1-2 sentence summary of this client.`;
+        }
+        const names = result.matches.map((c) => c.company_name).join(", ");
+        return `[Tool result] get_client found ${result.matches.length} matches for "${args.query}": ${names}. Ask the user which one they meant.`;
+      }
+      if (tool === "get_client_notes") {
+        if (result.error === "no_match") {
+          return `[Tool result] get_client_notes found no client matching "${args.query}". Tell the user no match was found.`;
+        }
+        if (result.error === "multiple_matches") {
+          const names = result.matches.map((c) => c.company_name).join(", ");
+          return `[Tool result] get_client_notes found multiple matches for "${args.query}": ${names}. Ask the user which one they meant.`;
+        }
+        const count = (result.notes || []).length;
+        return `[Tool result] get_client_notes returned ${count} ${result.kind} note(s) for ${result.client.company_name}. Summarize in 1-2 sentences (or note if empty).`;
+      }
+      if (tool === "get_schedule") {
+        const count = (result.items || []).length;
+        return `[Tool result] get_schedule returned ${count} scheduled event(s) for "${result.when}". Summarize in 1 short sentence.`;
+      }
+      if (tool === "get_pipeline_summary") {
+        return `[Tool result] get_pipeline_summary returned: ${JSON.stringify(result)}. Give a 2-3 sentence overview of the pipeline state.`;
+      }
+      // Write tools
+      if (result && result.error) {
+        if (result.error === "no_match")        return `[Tool result] No client matched "${result.query}". Tell the user that and ask them to clarify.`;
+        if (result.error === "multiple_matches") return `[Tool result] Multiple matches for "${result.query}": ${result.matches.map((m) => m.company_name).join(", ")}. Ask the user which one they meant.`;
+        if (result.error === "invalid_field")    return `[Tool result] "${result.field}" isn't a valid field. Valid fields: ${(result.valid || []).join(", ")}. Apologize and ask the user to clarify.`;
+        if (result.error === "invalid_value")    return `[Tool result] "${result.value}" isn't a valid value for ${result.field}. Valid options: ${(result.valid || []).join(", ")}. Apologize and ask the user to pick one.`;
+        if (result.error === "missing_date")     return `[Tool result] No date provided. Ask the user when to schedule it.`;
+        if (result.error === "nothing_scheduled") return `[Tool result] ${result.client} has no schedule to cancel. Tell the user.`;
+        if (result.error === "empty_text")       return `[Tool result] Note text was empty. Ask the user what to add.`;
+        if (result.error === "missing_company_name") return `[Tool result] Cannot create a client without a company name. Ask the user what the company name is.`;
+        if (result.error === "duplicate_phone")  return `[Tool result] Phone "${result.phone}" is already used by "${result.existing_company}". Tell the user this is a duplicate and ask if they want to proceed anyway (with a different phone) or cancel.`;
+        if (result.error === "db_error")         return `[Tool result] Database error: ${result.message}. Apologize.`;
+        return `[Tool result] Error: ${JSON.stringify(result)}. Apologize and explain.`;
+      }
+      if (result && result.needs_confirmation) {
+        if (tool === "schedule_followup") return `[Tool result] About to schedule a ${result.preview.type} for ${result.preview.client} on ${result.preview.friendly_when}. The frontend is showing a confirmation panel. Tell the user briefly to confirm in the right panel.`;
+        if (tool === "cancel_followup")   return `[Tool result] About to cancel ${result.preview.client}'s ${result.preview.current_type} on ${result.preview.current_when}. The frontend is showing a confirmation panel. Tell the user briefly to confirm in the right panel.`;
+        if (tool === "create_client")     return `[Tool result] About to create a new client: "${result.preview.company_name}". The frontend is showing a confirmation panel with all the details. Tell the user briefly to confirm in the right panel.`;
+      }
+      if (result && result.success) {
+        if (tool === "update_client") return `[Tool result] Successfully changed ${result.client.company_name}'s ${result.field} from "${result.old_value || "(none)"}" to "${result.new_value || "(none)"}". Confirm to the user in 1 short sentence.`;
+        if (tool === "add_note")      return `[Tool result] Added a ${result.kind} note for ${result.client.company_name}: "${result.text}". Confirm to the user in 1 short sentence.`;
+        if (tool === "schedule_followup") return `[Tool result] Scheduled a ${result.type} for ${result.client.company_name} at ${formatDateTime(result.when)}. Confirm to the user in 1 short sentence.`;
+        if (tool === "cancel_followup")   return `[Tool result] Cancelled ${result.client.company_name}'s schedule. Confirm to the user in 1 short sentence.`;
+        if (tool === "create_client")     return `[Tool result] Created new client "${result.client.company_name}". Confirm to the user in 1 short sentence.`;
+        if (tool === "wizard_start")      return `[Tool result] Wizard has started in the right panel. Tell the user briefly that the wizard is active.`;
+      }
+      return `[Tool result] ${tool} returned: ${JSON.stringify(result).slice(0, 400)}. Summarize for the user.`;
+    }
+
+    // ---------- Right-panel renderers (one per view type) ----------
+    function renderClientDetail(c) {
+      const fmtBadge = (v, klass) => v ? `<span class="badge ${klass}">${esc(v)}</span>` : '<span class="muted">—</span>';
+      const linkOrDash = (u) => u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>` : '<span class="muted">—</span>';
+      const phone = c.phone ? esc(displayPhone(c.phone)) : '<span class="muted">—</span>';
+      const fup = c.follow_up_at ? `${esc(formatDateTime(c.follow_up_at))} (${esc(c.follow_up_type || "Follow-up")})` : '<span class="muted">—</span>';
+      sekResult.innerHTML = `
+        <div class="sek-detail-view">
+          <h3>${esc(c.company_name || "(no name)")}</h3>
+          <div class="sek-detail-meta">${esc(c.business_type || "—")}${c.client_name ? " · Contact: " + esc(c.client_name) : ""}</div>
+          <div class="sek-detail-grid">
+            <div class="sek-detail-cell"><div class="k">Phone</div><div class="v">${phone}</div></div>
+            <div class="sek-detail-cell"><div class="k">Manager</div><div class="v">${esc(c.manager || "Unassigned")}</div></div>
+            <div class="sek-detail-cell"><div class="k">Web Status</div><div class="v">${fmtBadge(c.web_status, wsClass(c.web_status))}</div></div>
+            <div class="sek-detail-cell"><div class="k">Client Status</div><div class="v">${fmtBadge(c.client_status, csClass(c.client_status))}</div></div>
+            <div class="sek-detail-cell"><div class="k">Motivation</div><div class="v">${fmtBadge(c.motivation, moClass(c.motivation))}</div></div>
+            <div class="sek-detail-cell"><div class="k">Follow-up</div><div class="v">${fup}</div></div>
+            <div class="sek-detail-cell full"><div class="k">Profile Link</div><div class="v">${linkOrDash(c.profile_link)}</div></div>
+            <div class="sek-detail-cell full"><div class="k">Finished Website</div><div class="v">${linkOrDash(c.finished_website)}</div></div>
+          </div>
+          <div class="sek-detail-actions">
+            <button class="primary-lg" data-detail-id="${esc(c.id)}">Open full profile →</button>
+          </div>
+        </div>`;
+      sekResult.querySelector("[data-detail-id]")?.addEventListener("click", (e) => {
+        const id = e.currentTarget.dataset.detailId;
+        if (id) openDetail(id, "info");
+      });
+    }
+
+    function renderClientDetailOrList(result) {
+      if (!result.matches || result.matches.length === 0) {
+        sekResult.innerHTML = `
+          <div class="sek-list-view">
+            <h3>No matches</h3>
+            <div class="sek-list-sub">Couldn't find a client matching "${esc(result.query)}".</div>
+          </div>`;
+        return;
+      }
+      if (result.matches.length === 1) {
+        renderClientDetail(result.matches[0]);
+        return;
+      }
+      // Multiple matches — show list with disambiguation note
+      const items = result.matches.map((c) => {
+        const moti = c.motivation ? `<span class="badge ${moClass(c.motivation)}">${esc(c.motivation)}</span>` : "";
+        return `
+          <div class="sek-list-item" data-id="${esc(c.id)}">
+            <div class="sek-list-name">${esc(c.company_name || "(no name)")} ${moti}</div>
+            <div class="sek-list-meta">
+              <span>${esc(c.business_type || "—")}</span>
+              <span>· Manager: ${esc(c.manager || "Unassigned")}</span>
+              ${c.client_name ? `<span>· Contact: ${esc(c.client_name)}</span>` : ""}
+            </div>
+          </div>`;
+      }).join("");
+      sekResult.innerHTML = `
+        <div class="sek-list-view">
+          <div class="sek-disambig">Multiple matches for "${esc(result.query)}" — click one to open it.</div>
+          <h3>Matches <span class="sek-list-count">${result.matches.length}</span></h3>
+          <div class="sek-list-items">${items}</div>
+        </div>`;
+      sekResult.querySelectorAll(".sek-list-item").forEach((el) => {
+        el.addEventListener("click", () => openDetail(el.dataset.id, "info"));
+      });
+    }
+
+    function renderNotesView(result) {
+      if (result.error === "no_match") {
+        sekResult.innerHTML = `<div class="sek-list-view"><h3>No match</h3><div class="sek-list-sub">No client found for "${esc(result.query)}".</div></div>`;
+        return;
+      }
+      if (result.error === "multiple_matches") {
+        const items = result.matches.map((c) => `
+          <div class="sek-list-item" data-id="${esc(c.id)}">
+            <div class="sek-list-name">${esc(c.company_name)}</div>
+          </div>`).join("");
+        sekResult.innerHTML = `
+          <div class="sek-list-view">
+            <div class="sek-disambig">Multiple matches for "${esc(result.query)}" — click one to open it.</div>
+            <h3>Matches <span class="sek-list-count">${result.matches.length}</span></h3>
+            <div class="sek-list-items">${items}</div>
+          </div>`;
+        sekResult.querySelectorAll(".sek-list-item").forEach((el) => {
+          el.addEventListener("click", () => openDetail(el.dataset.id, "info"));
+        });
+        return;
+      }
+      const notes = result.notes || [];
+      const bubbleClass = result.kind === "web" ? "web" : "client";
+      const heading = result.kind === "web" ? "Web Notes" : "Client Notes";
+      const body = notes.length === 0
+        ? `<div class="sek-list-empty-result">No ${result.kind} notes yet.</div>`
+        : `<div class="sek-notes-result-thread">
+            ${notes.map((n) => `
+              <div>
+                <div class="sek-result-bubble ${bubbleClass}">${esc(n.text)}</div>
+                <div class="sek-result-bubble-time">${esc(formatDateTime(n.at))}</div>
+              </div>`).join("")}
+          </div>`;
+      sekResult.innerHTML = `
+        <div class="sek-notes-view">
+          <h3>${heading} <span class="sek-list-count">${notes.length}</span></h3>
+          <div class="sek-list-sub">${esc(result.client.company_name)} · click below to open the full profile</div>
+          ${body}
+          <div class="sek-detail-actions" style="margin-top:12px;">
+            <button class="ghost" data-detail-id="${esc(result.client.id)}">Open profile →</button>
+          </div>
+        </div>`;
+      sekResult.querySelector("[data-detail-id]")?.addEventListener("click", (e) => {
+        openDetail(e.currentTarget.dataset.detailId, "info");
+      });
+    }
+
+    function renderScheduleView(result) {
+      const items = result.items || [];
+      const titleMap = {
+        today: "Today's Schedule",
+        this_week: "This Week",
+        this_month: "This Month",
+        overdue: "Overdue",
+        all: "All Scheduled",
+      };
+      const title = titleMap[result.when] || "Schedule";
+      if (items.length === 0) {
+        sekResult.innerHTML = `
+          <div class="sek-schedule-view">
+            <h3>${esc(title)}</h3>
+            <div class="sek-list-empty-result">Nothing scheduled.</div>
+          </div>`;
+        return;
+      }
+      const itemsHtml = items.map((c) => {
+        const at = new Date(c.follow_up_at);
+        const day = at.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+        const time = at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+        const overdueClass = at < new Date(new Date().toDateString()) ? " overdue" : "";
+        const typeTag = `<span class="fup-type-tag ${fupTypeClass(c.follow_up_type)} sched-type">${esc(c.follow_up_type || "Follow-up")}</span>`;
+        return `
+          <div class="sek-schedule-item${overdueClass}" data-id="${esc(c.id)}">
+            <div class="sched-time">${esc(time)}<div class="day">${esc(day)}</div></div>
+            <div>
+              <div class="sched-name">${esc(c.company_name || "(no name)")}</div>
+              <div class="sched-meta">${esc(c.business_type || "—")}${c.manager ? " · " + esc(c.manager) : ""}${c.client_status ? " · " + esc(c.client_status) : ""}</div>
+            </div>
+            <div>${typeTag}</div>
+          </div>`;
+      }).join("");
+      sekResult.innerHTML = `
+        <div class="sek-schedule-view">
+          <h3>${esc(title)} <span class="sek-list-count">${items.length}</span></h3>
+          <div class="sek-list-sub">Click any row to open the client</div>
+          <div class="sek-schedule-items">${itemsHtml}</div>
+        </div>`;
+      sekResult.querySelectorAll(".sek-schedule-item").forEach((el) => {
+        el.addEventListener("click", () => openDetail(el.dataset.id, "client_status"));
+      });
+    }
+
+    function renderSummaryStats(result) {
+      function bars(map) {
+        const total = Object.values(map).reduce((a, b) => a + b, 0);
+        const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
+        return entries.map(([k, v]) => {
+          const pct = total > 0 ? Math.round((v / total) * 100) : 0;
+          return `
+            <div class="sek-stats-bar">
+              <div class="lbl">${esc(k)}</div>
+              <div class="track"><div class="fill" style="width:${pct}%;"></div></div>
+              <div class="cnt">${v}</div>
+            </div>`;
+        }).join("");
+      }
+      sekResult.innerHTML = `
+        <div class="sek-stats-view">
+          <h3>Pipeline Overview</h3>
+          <div class="sek-stat-grid">
+            <div class="sek-stat"><div class="num">${result.total}</div><div class="label">Total</div></div>
+            <div class="sek-stat ${result.overdue_count > 0 ? "alert" : ""}"><div class="num">${result.overdue_count}</div><div class="label">Overdue</div></div>
+          </div>
+          <div class="sek-stats-section"><h4>By Motivation</h4><div class="sek-stats-bars">${bars(result.by_motivation)}</div></div>
+          <div class="sek-stats-section"><h4>By Web Status</h4><div class="sek-stats-bars">${bars(result.by_web_status)}</div></div>
+          <div class="sek-stats-section"><h4>By Client Status</h4><div class="sek-stats-bars">${bars(result.by_client_status)}</div></div>
+          <div class="sek-stats-section"><h4>By Manager</h4><div class="sek-stats-bars">${bars(result.by_manager)}</div></div>
+        </div>`;
+    }
+
+    function renderConfirmation(tool, result) {
+      const p = result.preview;
+      if (tool === "schedule_followup") {
+        sekResult.innerHTML = `
+          <div class="sek-confirm-view">
+            <h3>📅 Confirm scheduling</h3>
+            <div class="sek-confirm-card">
+              <div class="sek-confirm-row"><div class="k">Client</div><div class="v">${esc(p.client)}</div></div>
+              <div class="sek-confirm-row"><div class="k">Type</div><div class="v">${esc(p.type)}</div></div>
+              <div class="sek-confirm-row"><div class="k">When</div><div class="v">${esc(p.friendly_when)}</div></div>
+            </div>
+            <div class="sek-confirm-actions">
+              <button class="ghost" data-confirm-action="cancel">Cancel</button>
+              <button data-confirm-action="confirm">Confirm</button>
+            </div>
+          </div>`;
+      } else if (tool === "cancel_followup") {
+        sekResult.innerHTML = `
+          <div class="sek-confirm-view">
+            <h3>⚠ Confirm cancellation</h3>
+            <div class="sek-confirm-card danger">
+              <div class="sek-confirm-row"><div class="k">Client</div><div class="v">${esc(p.client)}</div></div>
+              <div class="sek-confirm-row"><div class="k">Cancelling</div><div class="v">${esc(p.current_type)} on ${esc(p.current_when)}</div></div>
+            </div>
+            <div class="sek-confirm-actions">
+              <button class="ghost" data-confirm-action="cancel">Keep it</button>
+              <button class="danger" data-confirm-action="confirm">Cancel schedule</button>
+            </div>
+          </div>`;
+      } else if (tool === "create_client") {
+        // Build rows only for fields the user filled in (skip empty / default-only)
+        const rows = [];
+        const push = (k, v) => { if (v != null && v !== "" && v !== "Not Set" && !(typeof v === "object" && Array.isArray(v) && v.length === 0)) rows.push([k, v]); };
+        push("Company",          p.company_name);
+        push("Business type",    p.business_type);
+        push("Client",           p.client_name);
+        push("Phone",            p.phone ? displayPhone(p.phone) : null);
+        push("Profile link",     p.profile_link);
+        push("Post link",        p.post_link);
+        push("Finished website", p.finished_website);
+        push("Manager",          p.manager);
+        if (p.web_status && p.web_status !== "Not Started") push("Web status", p.web_status);
+        if (p.client_status && p.client_status !== "New Lead") push("Client status", p.client_status);
+        if (p.motivation && p.motivation !== "Not Set") push("Motivation", p.motivation);
+        if (p.follow_up_at) push("Follow-up", `${formatDateTime(p.follow_up_at)} (${p.follow_up_type || "Follow-up"})`);
+        if (Array.isArray(p.client_notes) && p.client_notes.length) push("Client note", p.client_notes[0].text);
+        if (Array.isArray(p.web_notes)    && p.web_notes.length)    push("Web note",    p.web_notes[0].text);
+
+        const rowsHtml = rows.map(([k, v]) =>
+          `<div class="sek-confirm-row"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`
+        ).join("");
+
+        sekResult.innerHTML = `
+          <div class="sek-confirm-view">
+            <h3>➕ Confirm new client</h3>
+            <div class="sek-confirm-card">${rowsHtml}</div>
+            <div class="sek-confirm-actions">
+              <button class="ghost" data-confirm-action="cancel">Cancel</button>
+              <button data-confirm-action="confirm">Create client</button>
+            </div>
+          </div>`;
+      }
+      // Wire buttons
+      sekResult.querySelectorAll("[data-confirm-action]").forEach((btn) => {
+        btn.addEventListener("click", () => onConfirmAction(btn.dataset.confirmAction));
+      });
+    }
+
+    function renderWriteSuccess(tool, result) {
+      let icon = "✓", title = "Done";
+      let detail = "";
+      if (tool === "update_client") {
+        icon = "✓"; title = "Updated";
+        detail = `${esc(result.client.company_name)} · ${esc(result.field)}: "${esc(result.old_value || "—")}" → "${esc(result.new_value || "—")}"`;
+      } else if (tool === "add_note") {
+        icon = "📝"; title = "Note added";
+        detail = `${esc(result.client.company_name)} · ${result.kind} thread`;
+      } else if (tool === "schedule_followup") {
+        icon = "📅"; title = "Scheduled";
+        detail = `${esc(result.client.company_name)} · ${esc(result.type)} at ${esc(formatDateTime(result.when))}`;
+      } else if (tool === "cancel_followup") {
+        icon = "✕"; title = "Schedule cancelled";
+        detail = `${esc(result.client.company_name)}`;
+      } else if (tool === "create_client") {
+        icon = "🎉"; title = "Client created";
+        detail = `${esc(result.client.company_name)}`;
+      }
+      sekResult.innerHTML = `
+        <div class="sek-success-view">
+          <div class="icon">${icon}</div>
+          <h3>${esc(title)}</h3>
+          <div class="detail">${detail}</div>
+          <div class="actions">
+            ${result.client && result.client.id ? `<button class="ghost" data-detail-id="${esc(result.client.id)}">Open profile →</button>` : ""}
+          </div>
+        </div>`;
+      sekResult.querySelector("[data-detail-id]")?.addEventListener("click", (e) => {
+        openDetail(e.currentTarget.dataset.detailId, "info");
+      });
+    }
+
+    function renderWriteError(tool, result) {
+      const messages = {
+        no_match:           `No client matched "${result.query}". Try a different name.`,
+        multiple_matches:   `Multiple clients matched "${result.query}": ${(result.matches || []).map((m) => m.company_name).join(", ")}. Be more specific.`,
+        invalid_field:      `Invalid field "${result.field}". Valid: ${(result.valid || []).join(", ")}.`,
+        invalid_value:      `Invalid value "${result.value}" for ${result.field}. Valid: ${(result.valid || []).join(", ")}.`,
+        missing_date:       `No date was provided. When should it be scheduled?`,
+        nothing_scheduled:  `${result.client} doesn't have anything scheduled.`,
+        empty_text:         `The note text was empty.`,
+        db_error:           `Database error: ${result.message}`,
+      };
+      const msg = messages[result.error] || `Error: ${JSON.stringify(result).slice(0, 200)}`;
+      sekResult.innerHTML = `
+        <div class="sek-error-view">
+          <div class="title">Couldn't complete the action</div>
+          <div>${esc(msg)}</div>
+        </div>`;
+    }
+
+    function renderToolResult(tool, args, result) {
+      // Wizard start — wizard takes over rendering
+      if (tool === "wizard_start") return; // sekWizardStart already rendered
+      // Errors from any tool
+      if (result && result.error) { renderWriteError(tool, result); return; }
+      // Confirmation needed (schedule/cancel followup)
+      if (result && result.needs_confirmation) { renderConfirmation(tool, result); return; }
+      // Read tools
+      if (tool === "list_clients") return renderClientList(result, describeFilters(args || {}));
+      if (tool === "get_client") return renderClientDetailOrList(result);
+      if (tool === "get_client_notes") return renderNotesView(result);
+      if (tool === "get_schedule") return renderScheduleView(result);
+      if (tool === "get_pipeline_summary") return renderSummaryStats(result);
+      // Write tools (success)
+      if (result && result.success) return renderWriteSuccess(tool, result);
+    }
+
+    // ---------- Wizard rendering (split layout) ----------
+    function renderWizardView() {
+      if (!sekWizardState) return;
+      const stepIdx = sekWizardState.stepIndex;
+      const step = WIZARD_STEPS[stepIdx];
+      const totalSteps = WIZARD_STEPS.length;
+      const progress = Math.round(((stepIdx + (sekWizardState.fieldIndex / Math.max(1, step.fields.length))) / totalSteps) * 100);
+
+      // ---- Left half: wizard panel ----
+      let leftHtml = `
+        <div class="sek-wizard-step-num">Step ${stepIdx + 1} of ${totalSteps}</div>
+        <div class="sek-wizard-step-name">${esc(step.name)}</div>
+        <div class="sek-wizard-progress"><div class="sek-wizard-progress-fill" style="width:${progress}%"></div></div>`;
+
+      if (isFinalReviewStep()) {
+        leftHtml += `
+          <div class="sek-wizard-final-confirm">
+            <div class="title">Ready to save</div>
+            <div class="sub">Review everything on the right. Type <strong>yes</strong> to save, or <strong>no</strong> to cancel.</div>
+          </div>`;
+      } else if (sekWizardState.awaitingStepConfirm) {
+        leftHtml += `
+          <div class="sek-wizard-step-confirm">
+            <div class="title">Step done — confirm to continue</div>
+            <div class="sub">Review on the right. Type <strong>yes</strong> to move on, <strong>no</strong> to fix the last answer.</div>
+          </div>`;
+      } else {
+        const f = step.fields[sekWizardState.fieldIndex];
+        if (f) {
+          leftHtml += `
+            <div class="sek-wizard-question-block">
+              <div class="sek-wizard-field-label">${esc(f.label)}${f.required ? " *" : ""}</div>
+              <div class="sek-wizard-question">${esc(f.question)}</div>
+            </div>`;
+        }
+      }
+
+      leftHtml += `
+        <div class="sek-wizard-hints">
+          Type your answer in the chat. Or:
+          <ul style="margin: 4px 0; padding-left: 18px;">
+            <li><code>skip</code> — skip this field (optional only)</li>
+            <li><code>back</code> — go to the previous field</li>
+            <li><code>cancel</code> — abort the wizard</li>
+          </ul>
+        </div>`;
+
+      // ---- Right half: review panel ----
+      const filled = sekWizardState.fields;
+      let currentSection = "";
+      const fieldRow = (label, value) => {
+        if (value && value.toString().trim()) {
+          return `<div class="sek-wizard-review-row"><div class="k">${esc(label)}</div><div class="v">${esc(value)}</div></div>`;
+        }
+        return `<div class="sek-wizard-review-row"><div class="k">${esc(label)}</div><div class="v muted">—</div></div>`;
+      };
+
+      // Current step's filled fields (live)
+      const currentStepFields = step.fields || [];
+      if (!isFinalReviewStep() && currentStepFields.length > 0) {
+        const rows = currentStepFields.map((f, i) => {
+          if (i < sekWizardState.fieldIndex || sekWizardState.awaitingStepConfirm) {
+            return fieldRow(f.label, filled[f.name]);
+          }
+          return `<div class="sek-wizard-review-row"><div class="k">${esc(f.label)}</div><div class="v muted">— pending —</div></div>`;
+        }).join("");
+        currentSection = `
+          <div class="sek-wizard-review-section">
+            <h4>This step</h4>
+            ${rows}
+          </div>`;
+      }
+
+      // Previous steps (collapsible)
+      let prevSection = "";
+      if (stepIdx > 0) {
+        const prevStepsHtml = WIZARD_STEPS.slice(0, stepIdx).map((s, i) => {
+          if (s.fields.length === 0) return "";
+          const rows = s.fields.map((f) => fieldRow(f.label, filled[f.name])).join("");
+          return `
+            <details class="sek-wizard-prev-step" ${i === stepIdx - 1 ? "open" : ""}>
+              <summary>${i + 1}. ${esc(s.name)} ✓</summary>
+              <div class="sek-wizard-prev-step-content">${rows}</div>
+            </details>`;
+        }).join("");
+        prevSection = `
+          <div class="sek-wizard-review-section">
+            <h4>Earlier steps</h4>
+            ${prevStepsHtml}
+          </div>`;
+      }
+
+      // Final review: full client preview
+      let finalSection = "";
+      if (isFinalReviewStep()) {
+        const fuIso = filled.follow_up_date ? combineDateTime(filled.follow_up_date, filled.follow_up_time || "09:00") : null;
+        const allRows = [
+          ["Company",          filled.company_name],
+          ["Business type",    filled.business_type],
+          ["Client",           filled.client_name],
+          ["Phone",            filled.phone],
+          ["Profile link",     filled.profile_link],
+          ["Post link",        filled.post_link],
+          ["Finished website", filled.finished_website],
+          ["Manager",          filled.manager || "Unassigned"],
+          ["Web status",       filled.web_status || "Not Started"],
+          ["Client status",    filled.client_status || "New Lead"],
+          ["Motivation",       filled.motivation || "Not Set"],
+          ["Follow-up",        fuIso ? `${formatDateTime(fuIso)} (${filled.follow_up_type || "Follow-up"})` : null],
+          ["Client note",      filled.initial_client_note],
+          ["Web note",         filled.initial_web_note],
+        ];
+        finalSection = `
+          <div class="sek-wizard-review-section">
+            <h4>New client preview</h4>
+            ${allRows.map(([k, v]) => fieldRow(k, v)).join("")}
+          </div>`;
+      }
+
+      const rightHtml = (finalSection || currentSection || `<div class="sek-wizard-empty-state">Nothing yet — answer the question on the left.</div>`) + prevSection;
+
+      sekResult.innerHTML = `
+        <div class="sek-wizard-layout">
+          <div class="sek-wizard-panel">${leftHtml}</div>
+          <div class="sek-wizard-review-panel">${rightHtml}</div>
+        </div>`;
+    }
+
+    // ---------- Confirmation handling ----------
+    let sekPendingConfirm = null; // { tool, args }
+
+    async function onConfirmAction(action) {
+      if (!sekPendingConfirm) return;
+      const pending = sekPendingConfirm;
+      sekPendingConfirm = null;
+      if (action === "cancel") {
+        sekResult.innerHTML = `
+          <div class="sek-success-view" style="background:#f3f4f6;color:#4b5563;border-color:#e5e7eb;">
+            <div class="icon">✕</div>
+            <h3>Action cancelled</h3>
+          </div>`;
+        appendSekBubble("assistant", "Got it — cancelled.");
+        return;
+      }
+      // Confirm path: re-execute tool with confirmed: true
+      const tool = SEK_TOOLS[pending.tool];
+      if (!tool) return;
+      const result = await tool.execute(pending.args);
+      renderToolResult(pending.tool, pending.args, result);
+      // Tell the user briefly
+      if (result && result.success) {
+        appendSekBubble("assistant", `✓ Done.`);
+      } else if (result && result.error) {
+        appendSekBubble("assistant", `Hmm, that didn't work: ${result.error}.`);
+      }
+    }
+
+    function parseToolCall(text) {
+      if (!text) return null;
+      // Try to find any JSON-shaped block in the text and pull tool + args from common variations
+      const candidates = [];
+      // Pattern A: {...} containing both "tool" and "args"
+      const a = text.match(/\{[\s\S]*?"tool"\s*:[\s\S]*?\}/g);
+      if (a) candidates.push(...a);
+      // Pattern B: {...} containing "name" or "function" + "arguments"/"parameters"
+      const b = text.match(/\{[\s\S]*?"(?:name|function)"\s*:[\s\S]*?\}/g);
+      if (b) candidates.push(...b);
+      // Pattern C: any top-level {...} block
+      const c = text.match(/\{[\s\S]*\}/);
+      if (c) candidates.push(c[0]);
+
+      for (const raw of candidates) {
+        // Find the matching closing brace by counting depth
+        let depth = 0, end = -1;
+        for (let i = 0; i < raw.length; i++) {
+          if (raw[i] === "{") depth++;
+          else if (raw[i] === "}") { depth--; if (depth === 0) { end = i; break; } }
+        }
+        const slice = end > 0 ? raw.slice(0, end + 1) : raw;
+        try {
+          const obj = JSON.parse(slice);
+          // Normalize possible field names
+          const tool = obj.tool || obj.name || obj.function || obj.function_name;
+          const args = obj.args || obj.arguments || obj.parameters || obj.filters || {};
+          if (typeof tool === "string" && SEK_TOOLS[tool]) {
+            return { tool, args: args && typeof args === "object" ? args : {} };
+          }
+        } catch {}
+      }
+      return null;
+    }
+
+    function renderClientList(results, callDescription) {
+      if (!results || results.length === 0) {
+        sekResult.innerHTML = `
+          <div class="sek-list-view">
+            <h3>No matches</h3>
+            <div class="sek-list-sub">${esc(callDescription || "Filtered client list")}</div>
+            <div class="sek-list-empty-result">No clients matched those filters.</div>
+          </div>`;
+        return;
+      }
+      const items = results.map((c) => {
+        const motiBadge = c.motivation ? `<span class="badge ${moClass(c.motivation)}">${esc(c.motivation)}</span>` : "";
+        const wsBadge   = c.web_status ? `<span class="badge ${wsClass(c.web_status)}">${esc(c.web_status)}</span>` : "";
+        const csBadge   = c.client_status ? `<span class="badge ${csClass(c.client_status)}">${esc(c.client_status)}</span>` : "";
+        const mgr       = c.manager ? `Manager: ${esc(c.manager)}` : "Unassigned";
+        const biz       = c.business_type ? esc(c.business_type) : "—";
+        const phone     = c.phone ? esc(displayPhone(c.phone)) : "";
+        return `
+          <div class="sek-list-item" data-id="${esc(c.id)}">
+            <div class="sek-list-name">${esc(c.company_name || "(no name)")} ${motiBadge}</div>
+            <div class="sek-list-meta">
+              <span>${biz}</span>
+              ${csBadge}
+              ${wsBadge}
+              <span>· ${mgr}</span>
+              ${phone ? `<span>· ${phone}</span>` : ""}
+            </div>
+          </div>`;
+      }).join("");
+      sekResult.innerHTML = `
+        <div class="sek-list-view">
+          <h3>Results <span class="sek-list-count">${results.length}</span></h3>
+          <div class="sek-list-sub">${esc(callDescription || "Filtered client list")} · click a row to open details</div>
+          <div class="sek-list-items">${items}</div>
+        </div>`;
+      // Wire click → open existing detail modal
+      sekResult.querySelectorAll(".sek-list-item").forEach((el) => {
+        el.addEventListener("click", () => {
+          const id = el.dataset.id;
+          if (id) openDetail(id, "info");
+        });
+      });
+    }
+
+    function describeFilters(args) {
+      const parts = [];
+      if (args.motivation)     parts.push(`motivation=${args.motivation}`);
+      if (args.web_status)     parts.push(`web=${args.web_status}`);
+      if (args.web_status_not) parts.push(`web≠${args.web_status_not}`);
+      if (args.client_status)  parts.push(`status=${args.client_status}`);
+      if (args.business_type)  parts.push(`type∋"${args.business_type}"`);
+      if (args.manager)        parts.push(`manager=${args.manager}`);
+      return parts.length ? `Filters: ${parts.join(", ")}` : "All clients (no filter)";
+    }
+
+    async function generateOnce(messages, { stream = false, bubbleEl = null } = {}) {
+      const opts = { max_new_tokens: 400, do_sample: false };
+      if (stream && bubbleEl) {
+        const { TextStreamer } = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@latest");
+        let streamed = "";
+        opts.streamer = new TextStreamer(sekPipeline.tokenizer, {
+          skip_prompt: true,
+          skip_special_tokens: true,
+          callback_function: (chunk) => {
+            streamed += chunk;
+            bubbleEl.textContent = streamed;
+            sekThread.scrollTop = sekThread.scrollHeight;
+          },
+        });
+      }
+      const out = await sekPipeline(messages, opts);
+      let finalText = "";
+      if (Array.isArray(out) && out[0]?.generated_text) {
+        const gen = out[0].generated_text;
+        if (Array.isArray(gen)) {
+          const last = gen[gen.length - 1];
+          if (last && last.role === "assistant" && last.content) finalText = last.content;
+        } else if (typeof gen === "string") {
+          finalText = gen;
+        }
+      }
+      return finalText.trim();
+    }
+
+    async function sendSekretary() {
+      if (sekState !== "ready" || !sekPipeline) return;
+      // Stop the mic if it's still listening so we don't capture stray audio after send
+      stopSekMic();
+      const text = sekInput.value.trim();
+      if (!text) return;
+
+      // ---- WIZARD MODE: bypass the AI, route directly to wizard handler ----
+      if (sekWizardState && sekWizardState.active) {
+        appendSekBubble("user", text);
+        sekInput.value = "";
+        await handleWizardInput(text);
+        return;
+      }
+
+      appendSekBubble("user", text);
+      sekInput.value = "";
+      sekConversation.push({ role: "user", content: text });
+
+      const bubbleEl = appendSekBubble("assistant", "");
+      bubbleEl.innerHTML = `<span class="sek-thinking"><span></span><span></span><span></span></span>`;
+
+      sekSendBtn.disabled = true;
+      sekInput.disabled = true;
+
+      try {
+        const baseMessages = [
+          { role: "system", content: sekSystemPrompt() },
+          ...sekConversation,
+        ];
+
+        // ---- Pass 1: get tool call OR plain reply ----
+        const firstReply = await generateOnce(baseMessages);
+        console.log("[Sekretary] First reply:", firstReply);
+        let toolCall = parseToolCall(firstReply);
+        console.log("[Sekretary] Parsed tool call:", toolCall);
+
+        // Heuristic: if user's message looks like a data query but AI didn't call a tool, retry once
+        // with a stricter prompt and NO chat history (chat history pulls small models into "prose mode")
+        const dataQueryHints = /\b(show|list|find|get|tell|give|search|display|who|what|which|where|when|how many|pending|overdue|today|week|landscap|concrete|roof|paver|client)/i;
+        if (!toolCall && dataQueryHints.test(text)) {
+          console.warn("[Sekretary] No tool call on first pass for data-shaped query — retrying with stricter prompt");
+          const strictMessages = [
+            { role: "system", content: sekSystemPrompt() + "\n\n# RETRY MODE\nThe previous attempt did not call a tool. The user is asking about CRM data. Respond with ONLY the JSON tool call. No prose. No 'I'll find that for you' preamble. ONLY: {\"tool\": \"...\", \"args\": {...}}" },
+            { role: "user", content: text },
+          ];
+          const retryReply = await generateOnce(strictMessages);
+          console.log("[Sekretary] Retry reply:", retryReply);
+          const retryCall = parseToolCall(retryReply);
+          console.log("[Sekretary] Retry parsed tool call:", retryCall);
+          if (retryCall) toolCall = retryCall;
+        }
+
+        if (toolCall) {
+          // Execute the tool (await — some are async)
+          const tool = SEK_TOOLS[toolCall.tool];
+          const result = await Promise.resolve(tool.execute(toolCall.args || {}));
+
+          // If confirmation is needed, store pending and render confirm UI
+          if (result && result.needs_confirmation) {
+            sekPendingConfirm = { tool: toolCall.tool, args: result.confirm_args };
+          }
+
+          // Render result in right panel (routes to correct view type)
+          renderToolResult(toolCall.tool, toolCall.args || {}, result);
+
+          // ---- Pass 2: feed result back, get natural-language summary ----
+          const augmented = [
+            ...baseMessages,
+            { role: "assistant", content: firstReply },
+            { role: "user", content: buildToolResultMessage(toolCall.tool, toolCall.args || {}, result) },
+          ];
+
+          // Stream the summary into the bubble
+          bubbleEl.textContent = "";
+          const summary = await generateOnce(augmented, { stream: true, bubbleEl });
+          const finalSummary = summary || bubbleEl.textContent || "(done)";
+          bubbleEl.textContent = finalSummary;
+          sekConversation.push({ role: "assistant", content: finalSummary });
+        } else {
+          // No tool call — just a plain text reply
+          bubbleEl.textContent = firstReply || "(no response)";
+          sekConversation.push({ role: "assistant", content: firstReply });
+        }
+      } catch (err) {
+        console.error("Sekretary generate error:", err);
+        bubbleEl.textContent = "Error: " + (err.message || String(err));
+      } finally {
+        sekSendBtn.disabled = false;
+        sekInput.disabled = false;
+        sekInput.focus();
+      }
+    }
+
+    sekSendBtn.addEventListener("click", sendSekretary);
+    sekInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendSekretary();
+      }
+    });
+
+    // Run WebGPU detection + lazy model load on tab switch
+    (async () => {
+      const supported = await checkWebGPU();
+      if (!supported) {
+        showNoWebGPU();
+        setSekStatus("unsupported", "WebGPU not supported");
+        return;
+      }
+      setSekStatus("idle", "Click the Sekretary tab to load the model");
+    })();
+
+    // Hook into the existing tab switcher to lazy-load when Sekretary tab is opened
+    if (sekTabBtn) {
+      sekTabBtn.addEventListener("click", () => {
+        if (sekState === "idle") ensureSekModelLoaded();
+      });
+    }
+
+    // ---------- Speech-to-Text (browser Web Speech API) ----------
+    const sekMicBtn = document.getElementById("sekMicBtn");
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let sekRecognition = null;
+    let sekListening = false;
+    let sekSttBaseline = "";    // text already in input when mic turned on
+    let sekSttAccumulated = ""; // all "final" text captured during this mic session
+    let sekUserStopped = true;  // true = user explicitly stopped (or never started)
+
+    function stopSekMic() {
+      if (sekRecognition && sekListening) {
+        sekUserStopped = true;
+        try { sekRecognition.stop(); } catch {}
+      }
+    }
+
+    if (!SpeechRec) {
+      // Browser doesn't support speech recognition — hide the mic button
+      if (sekMicBtn) sekMicBtn.style.display = "none";
+    } else {
+      sekRecognition = new SpeechRec();
+      sekRecognition.continuous = true;        // KEEP listening through pauses
+      sekRecognition.interimResults = true;    // live updates while speaking
+      sekRecognition.lang = "en-US";
+
+      sekRecognition.onstart = () => {
+        sekListening = true;
+        sekMicBtn.classList.add("listening");
+        sekMicBtn.title = "Listening... click to stop";
+      };
+      sekRecognition.onresult = (e) => {
+        let newFinal = "";
+        let interim = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const t = e.results[i][0].transcript;
+          if (e.results[i].isFinal) newFinal += t;
+          else interim += t;
+        }
+        if (newFinal) {
+          sekSttAccumulated = (sekSttAccumulated + " " + newFinal).trim();
+        }
+        const parts = [sekSttBaseline, sekSttAccumulated, interim].filter(Boolean);
+        sekInput.value = parts.join(" ").replace(/\s+/g, " ").trim();
+      };
+      sekRecognition.onerror = (e) => {
+        console.warn("STT error:", e.error);
+        if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+          sekUserStopped = true;
+          alert("Microphone permission denied. Allow microphone access in your browser settings to use voice input.");
+        }
+        // For "no-speech" errors etc., the onend handler will auto-restart if !sekUserStopped
+      };
+      sekRecognition.onend = () => {
+        // If the user didn't explicitly stop, auto-restart (continuous mode "ends" on long pauses or hiccups)
+        if (!sekUserStopped) {
+          try {
+            sekRecognition.start();
+            return; // still listening — don't change UI
+          } catch (err) {
+            // Fall through if restart fails
+            console.warn("STT restart failed:", err);
+          }
+        }
+        sekListening = false;
+        sekMicBtn.classList.remove("listening");
+        sekMicBtn.title = "Click to talk";
+        sekInput.focus();
+      };
+
+      sekMicBtn.addEventListener("click", () => {
+        if (sekListening) {
+          // User explicitly stopping
+          sekUserStopped = true;
+          try { sekRecognition.stop(); } catch {}
+        } else {
+          // User starting fresh
+          sekUserStopped = false;
+          sekSttBaseline = sekInput.value.trim();
+          sekSttAccumulated = "";
+          try { sekRecognition.start(); } catch (err) { console.warn(err); }
+        }
+      });
+    }
 
     load();
   </script>
