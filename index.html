@@ -588,6 +588,117 @@
       color: #9ca3af; font-style: italic; font-size: 14px;
     }
 
+    /* Client detail view (single client deep dive) */
+    .sek-detail-view { max-width: 100%; }
+    .sek-detail-view h3 {
+      font-size: 18px; font-weight: 600; color: #111827;
+      margin: 0 0 4px;
+    }
+    .sek-detail-view .sek-detail-meta {
+      font-size: 13px; color: #6b7280; margin-bottom: 16px;
+    }
+    .sek-detail-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px;
+      background: #f9fafb; border: 1px solid #e5e7eb;
+      border-radius: 8px; padding: 14px;
+    }
+    .sek-detail-grid .sek-detail-cell {
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .sek-detail-grid .sek-detail-cell.full { grid-column: 1 / -1; }
+    .sek-detail-grid .sek-detail-cell .k {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+      color: #6b7280; font-weight: 600;
+    }
+    .sek-detail-grid .sek-detail-cell .v {
+      font-size: 14px; color: #1f2937; word-break: break-word;
+    }
+    .sek-detail-grid .sek-detail-cell .v.muted { color: #9ca3af; font-style: italic; }
+    .sek-detail-actions { margin-top: 12px; display: flex; gap: 8px; }
+    .sek-disambig {
+      background: #fef3c7; border: 1px solid #fde68a;
+      color: #92400e; padding: 10px 12px; border-radius: 8px;
+      margin-bottom: 12px; font-size: 13px;
+    }
+
+    /* Notes thread view */
+    .sek-notes-view { max-width: 100%; }
+    .sek-notes-view h3 {
+      font-size: 16px; font-weight: 600; margin: 0 0 4px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .sek-notes-view .sek-list-sub { font-size: 13px; color: #6b7280; margin-bottom: 12px; }
+    .sek-notes-result-thread {
+      background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;
+      padding: 12px; display: flex; flex-direction: column; gap: 8px;
+      max-height: 480px; overflow-y: auto;
+    }
+    .sek-result-bubble {
+      padding: 10px 12px; border-radius: 12px;
+      font-size: 13px; word-break: break-word; white-space: pre-wrap;
+      line-height: 1.4; max-width: 90%;
+    }
+    .sek-result-bubble.client { background: #dbeafe; color: #1e40af; align-self: flex-start; }
+    .sek-result-bubble.web    { background: #d1fae5; color: #065f46; align-self: flex-start; }
+    .sek-result-bubble-time { font-size: 11px; color: #9ca3af; margin-top: 3px; }
+
+    /* Schedule view */
+    .sek-schedule-view h3 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+    .sek-schedule-view .sek-list-sub { font-size: 13px; color: #6b7280; margin-bottom: 12px; }
+    .sek-schedule-items { display: flex; flex-direction: column; gap: 8px; }
+    .sek-schedule-item {
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+      padding: 12px 14px; display: grid;
+      grid-template-columns: auto 1fr auto; gap: 12px;
+      align-items: center; cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .sek-schedule-item:hover { border-color: #6366f1; background: #f9fafb; }
+    .sek-schedule-item .sched-time {
+      font-size: 13px; font-weight: 600; color: #1f2937; white-space: nowrap;
+    }
+    .sek-schedule-item .sched-time .day { font-size: 11px; color: #6b7280; font-weight: 500; }
+    .sek-schedule-item.overdue .sched-time { color: #991b1b; }
+    .sek-schedule-item .sched-name { font-size: 14px; font-weight: 500; color: #1f2937; }
+    .sek-schedule-item .sched-meta { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .sek-schedule-item .sched-type { font-size: 11px; }
+
+    /* Summary stats view */
+    .sek-stats-view h3 { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
+    .sek-stat-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 10px; margin-bottom: 18px;
+    }
+    .sek-stat {
+      background: #f9fafb; border: 1px solid #e5e7eb;
+      border-radius: 8px; padding: 14px; text-align: center;
+    }
+    .sek-stat .num { font-size: 24px; font-weight: 700; color: #111827; line-height: 1; }
+    .sek-stat .label {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+      color: #6b7280; margin-top: 4px;
+    }
+    .sek-stat.alert .num { color: #dc2626; }
+    .sek-stats-section { margin-bottom: 16px; }
+    .sek-stats-section h4 {
+      font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em;
+      color: #6b7280; font-weight: 600; margin: 0 0 8px;
+    }
+    .sek-stats-bars { display: flex; flex-direction: column; gap: 4px; }
+    .sek-stats-bar {
+      display: grid; grid-template-columns: 120px 1fr 30px; gap: 10px;
+      align-items: center; font-size: 13px;
+    }
+    .sek-stats-bar .lbl { color: #374151; }
+    .sek-stats-bar .track {
+      background: #f3f4f6; border-radius: 4px; height: 8px; overflow: hidden;
+    }
+    .sek-stats-bar .fill {
+      background: #6366f1; height: 100%; border-radius: 4px;
+      transition: width 200ms ease;
+    }
+    .sek-stats-bar .cnt { color: #6b7280; text-align: right; font-variant-numeric: tabular-nums; }
+
     /* "Searching..." indicator inside a chat bubble */
     .sek-thinking {
       display: inline-flex; gap: 3px; align-items: center;
@@ -727,7 +838,7 @@
             <div class="icon">🤖</div>
             <div class="lead">Ask me anything on the left.</div>
             <div class="sub">Adaptive result views will render here.</div>
-            <div class="sek-shell-banner">Chunk 3 of 6 — list_clients tool active. Try: "show me hot leads"</div>
+            <div class="sek-shell-banner">Chunk 5 of 6 — read tools active. Try: "show hot leads", "tell me about [name]", "today's schedule", "pipeline overview"</div>
           </div>
         </div>
       </div>
@@ -1923,7 +2034,7 @@
         // Reset thread message
         sekThread.classList.remove("empty");
         sekThread.innerHTML = "";
-        appendSekBubble("assistant", "Hi! I'm running locally via WebGPU and I can read your client list. Try: \"show me hot leads\", \"list Ivan's clients\", or \"what's in negotiation\".");
+        appendSekBubble("assistant", "Hi! I'm running locally via WebGPU. I can read your CRM. Try things like:\n\n• \"Show me hot leads\"\n• \"Tell me about [client name]\"\n• \"What are John's web notes?\"\n• \"What's on my calendar today?\"\n• \"Pipeline overview\"");
       } catch (err) {
         console.error("Sekretary load error:", err);
         setSekStatus("error", "Load failed");
@@ -1958,43 +2069,141 @@
     // SEKRETARY — Chunk 3: First mini-API (list_clients)
     // ============================================================
 
+    // Helper: fuzzy substring match across company_name + client_name
+    function sekFuzzyMatch(query) {
+      const q = (query || "").toLowerCase().trim();
+      if (!q) return [];
+      return (allClients || []).filter((c) => {
+        return ((c.company_name || "").toLowerCase().includes(q)) ||
+               ((c.client_name  || "").toLowerCase().includes(q));
+      });
+    }
+    function sekClientSummary(c) {
+      return {
+        id: c.id, company_name: c.company_name, client_name: c.client_name,
+        business_type: c.business_type, phone: c.phone, manager: c.manager,
+        web_status: c.web_status, client_status: c.client_status, motivation: c.motivation,
+        follow_up_at: c.follow_up_at, follow_up_type: c.follow_up_type,
+        profile_link: c.profile_link, post_link: c.post_link, finished_website: c.finished_website,
+      };
+    }
+
     // Tool catalog — JS-side functions the AI can ask us to run
     const SEK_TOOLS = {
       list_clients: {
-        description: "Returns clients matching the filters. ALL filters are optional and combined with AND.",
+        description: "List clients matching filters. Use for 'show me X clients' / 'who has Y status' / 'still need to do' queries. ALL filters are case-insensitive; business_type also supports substring match.",
         params: {
           motivation:    "One of: Not Set, Dead, Cold, Warm, Hot, VIP",
           web_status:    "One of: Not Started, In Progress, Review, Needs Fixing, Finished",
+          web_status_not:"EXCLUDE clients with this web_status. Use 'Finished' to find work that still needs to be done.",
           client_status: "One of: New Lead, Contacted, Interested, Proposal Sent, Negotiation, Follow Up, Closed Won, Closed Lost, Nurture",
-          business_type: "Free text — exact business type (e.g., 'Pavers', 'Roofing')",
+          business_type: "Free text — partial OK (e.g., 'concrete' matches 'Concrete')",
           manager:       "One of: Ivan, Hector, or 'Unassigned'",
         },
         execute: (args) => {
           const a = args || {};
+          const norm = (v) => (v || "").toString().toLowerCase().trim();
+          const eq   = (x, y) => norm(x) === norm(y);
           const filtered = (allClients || []).filter((c) => {
-            if (a.motivation    && c.motivation    !== a.motivation) return false;
-            if (a.web_status    && c.web_status    !== a.web_status) return false;
-            if (a.client_status && c.client_status !== a.client_status) return false;
-            if (a.business_type && c.business_type !== a.business_type) return false;
+            if (a.motivation    && !eq(c.motivation,    a.motivation))    return false;
+            if (a.web_status    && !eq(c.web_status,    a.web_status))    return false;
+            if (a.web_status_not && eq(c.web_status,    a.web_status_not)) return false;
+            if (a.client_status && !eq(c.client_status, a.client_status)) return false;
+            if (a.business_type) {
+              if (!norm(c.business_type).includes(norm(a.business_type))) return false;
+            }
             if (a.manager) {
-              if (a.manager === "Unassigned" && c.manager) return false;
-              if (a.manager !== "Unassigned" && c.manager !== a.manager) return false;
+              if (norm(a.manager) === "unassigned") { if (c.manager) return false; }
+              else if (!eq(c.manager, a.manager)) return false;
             }
             return true;
           });
-          return filtered.map((c) => ({
-            id: c.id,
-            company_name: c.company_name,
-            client_name: c.client_name,
-            business_type: c.business_type,
-            phone: c.phone,
-            manager: c.manager,
-            web_status: c.web_status,
-            client_status: c.client_status,
-            motivation: c.motivation,
-            follow_up_at: c.follow_up_at,
-            follow_up_type: c.follow_up_type,
-          }));
+          return filtered.map(sekClientSummary);
+        },
+      },
+      get_client: {
+        description: "Get full details for ONE specific client by company name or contact name (fuzzy substring match). Use for 'tell me about [name]' queries.",
+        params: { query: "Company name or client name (substring, case-insensitive)" },
+        execute: (args) => {
+          const matches = sekFuzzyMatch(args.query);
+          return { query: args.query, matches: matches.map(sekClientSummary) };
+        },
+      },
+      get_client_notes: {
+        description: "Get the notes thread for a specific client. kind is 'client' (relationship notes) or 'web' (website build notes).",
+        params: {
+          query: "Company name or client name (substring match)",
+          kind:  "Either 'client' or 'web'",
+        },
+        execute: (args) => {
+          const kind = (args.kind === "web") ? "web" : "client";
+          const matches = sekFuzzyMatch(args.query);
+          if (matches.length === 0) return { error: "no_match", query: args.query };
+          if (matches.length > 1) {
+            return {
+              error: "multiple_matches",
+              query: args.query,
+              matches: matches.map((c) => ({ id: c.id, company_name: c.company_name })),
+            };
+          }
+          const c = matches[0];
+          const notes = kind === "web" ? (c.web_notes || []) : (c.client_notes || []);
+          return {
+            client: { id: c.id, company_name: c.company_name },
+            kind,
+            notes,
+          };
+        },
+      },
+      get_schedule: {
+        description: "Get scheduled follow-ups and appointments. Filter by time window.",
+        params: {
+          when: "One of: 'today', 'this_week', 'this_month', 'overdue', 'all'",
+        },
+        execute: (args) => {
+          const when = args.when || "all";
+          const now = new Date();
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const tomorrow = new Date(today.getTime() + 24*60*60*1000);
+          const weekEnd = new Date(today.getTime() + 7*24*60*60*1000);
+          const monthEnd = new Date(today.getTime() + 30*24*60*60*1000);
+          const scheduled = (allClients || []).filter((c) => c.follow_up_at);
+          const filtered = scheduled.filter((c) => {
+            const at = new Date(c.follow_up_at);
+            if (when === "today")      return at >= today && at < tomorrow;
+            if (when === "this_week")  return at >= today && at < weekEnd;
+            if (when === "this_month") return at >= today && at < monthEnd;
+            if (when === "overdue")    return at < today;
+            return true;
+          });
+          filtered.sort((a, b) => new Date(a.follow_up_at) - new Date(b.follow_up_at));
+          return { when, items: filtered.map(sekClientSummary) };
+        },
+      },
+      get_pipeline_summary: {
+        description: "Get an overview of the pipeline: counts by motivation, web/client status, manager, and overdue. Use for 'how am I doing', 'pipeline overview' queries.",
+        params: {},
+        execute: () => {
+          const clients = allClients || [];
+          const total = clients.length;
+          const counts = (key) => {
+            const map = {};
+            for (const c of clients) {
+              const v = c[key] || "(none)";
+              map[v] = (map[v] || 0) + 1;
+            }
+            return map;
+          };
+          const todayStart = new Date(new Date().toDateString()).getTime();
+          const overdue = clients.filter((c) => c.follow_up_at && new Date(c.follow_up_at).getTime() < todayStart).length;
+          return {
+            total,
+            overdue_count: overdue,
+            by_motivation:    counts("motivation"),
+            by_web_status:    counts("web_status"),
+            by_client_status: counts("client_status"),
+            by_manager:       counts("manager"),
+          };
         },
       },
     };
@@ -2009,46 +2218,340 @@
     function sekSystemPrompt() {
       return `You are the Sekretary, an AI assistant inside a small CRM app for a web design agency.
 
-You have access to ONE tool right now:
+# CRITICAL RULE
+If the user asks ANYTHING about their clients, businesses, schedule, notes, or pipeline data, you MUST respond with ONLY a JSON tool call — no prose, no explanation, no preamble. Output ONLY the JSON, nothing before it, nothing after it.
+
+If you find yourself starting with "I'll", "Sure", "Let me", "I found", "Here are" — STOP. Output the tool JSON instead.
+
+# Available tools
 
 ${sekToolsDescription()}
 
-# How to use the tool
+# JSON format
 
-When the user asks for client data (e.g., "show me hot leads", "list Ivan's clients", "any deals in negotiation"), respond ONLY with a single line of JSON in this exact format and nothing else:
+{"tool": "tool_name", "args": { ... }}
 
-{"tool": "list_clients", "args": { ... filter object ... }}
+# Trigger words that REQUIRE a tool call
 
-Examples:
-User: "Show me my hot leads"
+show, list, find, get, who, what, which, how many, tell me about, give me, search, display
++ any business type (landscaping, concrete, roofing, etc.)
++ any status word (hot, warm, finished, in progress, etc.)
++ any time word (today, this week, overdue, scheduled)
+
+# Examples
+
+User: "Show me hot leads"
 You: {"tool": "list_clients", "args": {"motivation": "Hot"}}
+
+User: "Show me all the landscaping businesses"
+You: {"tool": "list_clients", "args": {"business_type": "Landscaping"}}
 
 User: "List Ivan's clients in negotiation"
 You: {"tool": "list_clients", "args": {"manager": "Ivan", "client_status": "Negotiation"}}
 
-User: "Show all clients"
-You: {"tool": "list_clients", "args": {}}
+User: "Concrete clients I still need to finish"
+You: {"tool": "list_clients", "args": {"business_type": "Concrete", "web_status_not": "Finished"}}
+
+User: "What's pending on the dev side?"
+You: {"tool": "list_clients", "args": {"web_status_not": "Finished"}}
+
+User: "Tell me about Acme Paving"
+You: {"tool": "get_client", "args": {"query": "Acme Paving"}}
+
+User: "What are John's web notes?"
+You: {"tool": "get_client_notes", "args": {"query": "John", "kind": "web"}}
+
+User: "Show me Acme's client notes"
+You: {"tool": "get_client_notes", "args": {"query": "Acme", "kind": "client"}}
+
+User: "What's on my calendar today?"
+You: {"tool": "get_schedule", "args": {"when": "today"}}
+
+User: "Anything overdue?"
+You: {"tool": "get_schedule", "args": {"when": "overdue"}}
+
+User: "Pipeline overview"
+You: {"tool": "get_pipeline_summary", "args": {}}
 
 # After the tool runs
 
-I will send you back a message starting with "[Tool result]" containing the data. Then respond in PLAIN ENGLISH (1-2 short sentences) summarizing what was found. Do NOT output more JSON in that follow-up reply.
+I will send back a message starting with "[Tool result]". Then respond in PLAIN ENGLISH (1-2 short sentences). Do NOT output JSON in that follow-up.
 
-# When NOT to use the tool
+# When NOT to use a tool
 
-If the user is just chatting (greetings, questions about you, general questions), respond normally in plain English. Do not invent tool calls when no data is needed.`;
+ONLY for pure chitchat (greetings, "how are you", "what can you do", general questions about yourself). For ANY question about CRM data, use a tool.`;
+    }
+
+    function buildToolResultMessage(tool, args, result) {
+      if (tool === "list_clients") {
+        const filterDesc = describeFilters(args || {});
+        return `[Tool result] list_clients returned ${result.length} client(s) matching: ${filterDesc}. Summarize this in 1-2 short sentences for the user. Do NOT output JSON.`;
+      }
+      if (tool === "get_client") {
+        if (!result.matches || result.matches.length === 0) {
+          return `[Tool result] get_client found no client matching "${args.query}". Tell the user no match was found and ask if they want to try a different name.`;
+        }
+        if (result.matches.length === 1) {
+          const c = result.matches[0];
+          return `[Tool result] get_client found "${c.company_name}" — ${c.business_type || "no type"}, manager ${c.manager || "unassigned"}, motivation ${c.motivation}, web status ${c.web_status}, client status ${c.client_status}. Give the user a 1-2 sentence summary of this client.`;
+        }
+        const names = result.matches.map((c) => c.company_name).join(", ");
+        return `[Tool result] get_client found ${result.matches.length} matches for "${args.query}": ${names}. Ask the user which one they meant.`;
+      }
+      if (tool === "get_client_notes") {
+        if (result.error === "no_match") {
+          return `[Tool result] get_client_notes found no client matching "${args.query}". Tell the user no match was found.`;
+        }
+        if (result.error === "multiple_matches") {
+          const names = result.matches.map((c) => c.company_name).join(", ");
+          return `[Tool result] get_client_notes found multiple matches for "${args.query}": ${names}. Ask the user which one they meant.`;
+        }
+        const count = (result.notes || []).length;
+        return `[Tool result] get_client_notes returned ${count} ${result.kind} note(s) for ${result.client.company_name}. Summarize in 1-2 sentences (or note if empty).`;
+      }
+      if (tool === "get_schedule") {
+        const count = (result.items || []).length;
+        return `[Tool result] get_schedule returned ${count} scheduled event(s) for "${result.when}". Summarize in 1 short sentence.`;
+      }
+      if (tool === "get_pipeline_summary") {
+        return `[Tool result] get_pipeline_summary returned: ${JSON.stringify(result)}. Give a 2-3 sentence overview of the pipeline state.`;
+      }
+      return `[Tool result] ${tool} returned: ${JSON.stringify(result).slice(0, 400)}. Summarize for the user.`;
+    }
+
+    // ---------- Right-panel renderers (one per view type) ----------
+    function renderClientDetail(c) {
+      const fmtBadge = (v, klass) => v ? `<span class="badge ${klass}">${esc(v)}</span>` : '<span class="muted">—</span>';
+      const linkOrDash = (u) => u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>` : '<span class="muted">—</span>';
+      const phone = c.phone ? esc(displayPhone(c.phone)) : '<span class="muted">—</span>';
+      const fup = c.follow_up_at ? `${esc(formatDateTime(c.follow_up_at))} (${esc(c.follow_up_type || "Follow-up")})` : '<span class="muted">—</span>';
+      sekResult.innerHTML = `
+        <div class="sek-detail-view">
+          <h3>${esc(c.company_name || "(no name)")}</h3>
+          <div class="sek-detail-meta">${esc(c.business_type || "—")}${c.client_name ? " · Contact: " + esc(c.client_name) : ""}</div>
+          <div class="sek-detail-grid">
+            <div class="sek-detail-cell"><div class="k">Phone</div><div class="v">${phone}</div></div>
+            <div class="sek-detail-cell"><div class="k">Manager</div><div class="v">${esc(c.manager || "Unassigned")}</div></div>
+            <div class="sek-detail-cell"><div class="k">Web Status</div><div class="v">${fmtBadge(c.web_status, wsClass(c.web_status))}</div></div>
+            <div class="sek-detail-cell"><div class="k">Client Status</div><div class="v">${fmtBadge(c.client_status, csClass(c.client_status))}</div></div>
+            <div class="sek-detail-cell"><div class="k">Motivation</div><div class="v">${fmtBadge(c.motivation, moClass(c.motivation))}</div></div>
+            <div class="sek-detail-cell"><div class="k">Follow-up</div><div class="v">${fup}</div></div>
+            <div class="sek-detail-cell full"><div class="k">Profile Link</div><div class="v">${linkOrDash(c.profile_link)}</div></div>
+            <div class="sek-detail-cell full"><div class="k">Finished Website</div><div class="v">${linkOrDash(c.finished_website)}</div></div>
+          </div>
+          <div class="sek-detail-actions">
+            <button class="primary-lg" data-detail-id="${esc(c.id)}">Open full profile →</button>
+          </div>
+        </div>`;
+      sekResult.querySelector("[data-detail-id]")?.addEventListener("click", (e) => {
+        const id = e.currentTarget.dataset.detailId;
+        if (id) openDetail(id, "info");
+      });
+    }
+
+    function renderClientDetailOrList(result) {
+      if (!result.matches || result.matches.length === 0) {
+        sekResult.innerHTML = `
+          <div class="sek-list-view">
+            <h3>No matches</h3>
+            <div class="sek-list-sub">Couldn't find a client matching "${esc(result.query)}".</div>
+          </div>`;
+        return;
+      }
+      if (result.matches.length === 1) {
+        renderClientDetail(result.matches[0]);
+        return;
+      }
+      // Multiple matches — show list with disambiguation note
+      const items = result.matches.map((c) => {
+        const moti = c.motivation ? `<span class="badge ${moClass(c.motivation)}">${esc(c.motivation)}</span>` : "";
+        return `
+          <div class="sek-list-item" data-id="${esc(c.id)}">
+            <div class="sek-list-name">${esc(c.company_name || "(no name)")} ${moti}</div>
+            <div class="sek-list-meta">
+              <span>${esc(c.business_type || "—")}</span>
+              <span>· Manager: ${esc(c.manager || "Unassigned")}</span>
+              ${c.client_name ? `<span>· Contact: ${esc(c.client_name)}</span>` : ""}
+            </div>
+          </div>`;
+      }).join("");
+      sekResult.innerHTML = `
+        <div class="sek-list-view">
+          <div class="sek-disambig">Multiple matches for "${esc(result.query)}" — click one to open it.</div>
+          <h3>Matches <span class="sek-list-count">${result.matches.length}</span></h3>
+          <div class="sek-list-items">${items}</div>
+        </div>`;
+      sekResult.querySelectorAll(".sek-list-item").forEach((el) => {
+        el.addEventListener("click", () => openDetail(el.dataset.id, "info"));
+      });
+    }
+
+    function renderNotesView(result) {
+      if (result.error === "no_match") {
+        sekResult.innerHTML = `<div class="sek-list-view"><h3>No match</h3><div class="sek-list-sub">No client found for "${esc(result.query)}".</div></div>`;
+        return;
+      }
+      if (result.error === "multiple_matches") {
+        const items = result.matches.map((c) => `
+          <div class="sek-list-item" data-id="${esc(c.id)}">
+            <div class="sek-list-name">${esc(c.company_name)}</div>
+          </div>`).join("");
+        sekResult.innerHTML = `
+          <div class="sek-list-view">
+            <div class="sek-disambig">Multiple matches for "${esc(result.query)}" — click one to open it.</div>
+            <h3>Matches <span class="sek-list-count">${result.matches.length}</span></h3>
+            <div class="sek-list-items">${items}</div>
+          </div>`;
+        sekResult.querySelectorAll(".sek-list-item").forEach((el) => {
+          el.addEventListener("click", () => openDetail(el.dataset.id, "info"));
+        });
+        return;
+      }
+      const notes = result.notes || [];
+      const bubbleClass = result.kind === "web" ? "web" : "client";
+      const heading = result.kind === "web" ? "Web Notes" : "Client Notes";
+      const body = notes.length === 0
+        ? `<div class="sek-list-empty-result">No ${result.kind} notes yet.</div>`
+        : `<div class="sek-notes-result-thread">
+            ${notes.map((n) => `
+              <div>
+                <div class="sek-result-bubble ${bubbleClass}">${esc(n.text)}</div>
+                <div class="sek-result-bubble-time">${esc(formatDateTime(n.at))}</div>
+              </div>`).join("")}
+          </div>`;
+      sekResult.innerHTML = `
+        <div class="sek-notes-view">
+          <h3>${heading} <span class="sek-list-count">${notes.length}</span></h3>
+          <div class="sek-list-sub">${esc(result.client.company_name)} · click below to open the full profile</div>
+          ${body}
+          <div class="sek-detail-actions" style="margin-top:12px;">
+            <button class="ghost" data-detail-id="${esc(result.client.id)}">Open profile →</button>
+          </div>
+        </div>`;
+      sekResult.querySelector("[data-detail-id]")?.addEventListener("click", (e) => {
+        openDetail(e.currentTarget.dataset.detailId, "info");
+      });
+    }
+
+    function renderScheduleView(result) {
+      const items = result.items || [];
+      const titleMap = {
+        today: "Today's Schedule",
+        this_week: "This Week",
+        this_month: "This Month",
+        overdue: "Overdue",
+        all: "All Scheduled",
+      };
+      const title = titleMap[result.when] || "Schedule";
+      if (items.length === 0) {
+        sekResult.innerHTML = `
+          <div class="sek-schedule-view">
+            <h3>${esc(title)}</h3>
+            <div class="sek-list-empty-result">Nothing scheduled.</div>
+          </div>`;
+        return;
+      }
+      const itemsHtml = items.map((c) => {
+        const at = new Date(c.follow_up_at);
+        const day = at.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+        const time = at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+        const overdueClass = at < new Date(new Date().toDateString()) ? " overdue" : "";
+        const typeTag = `<span class="fup-type-tag ${fupTypeClass(c.follow_up_type)} sched-type">${esc(c.follow_up_type || "Follow-up")}</span>`;
+        return `
+          <div class="sek-schedule-item${overdueClass}" data-id="${esc(c.id)}">
+            <div class="sched-time">${esc(time)}<div class="day">${esc(day)}</div></div>
+            <div>
+              <div class="sched-name">${esc(c.company_name || "(no name)")}</div>
+              <div class="sched-meta">${esc(c.business_type || "—")}${c.manager ? " · " + esc(c.manager) : ""}${c.client_status ? " · " + esc(c.client_status) : ""}</div>
+            </div>
+            <div>${typeTag}</div>
+          </div>`;
+      }).join("");
+      sekResult.innerHTML = `
+        <div class="sek-schedule-view">
+          <h3>${esc(title)} <span class="sek-list-count">${items.length}</span></h3>
+          <div class="sek-list-sub">Click any row to open the client</div>
+          <div class="sek-schedule-items">${itemsHtml}</div>
+        </div>`;
+      sekResult.querySelectorAll(".sek-schedule-item").forEach((el) => {
+        el.addEventListener("click", () => openDetail(el.dataset.id, "client_status"));
+      });
+    }
+
+    function renderSummaryStats(result) {
+      function bars(map) {
+        const total = Object.values(map).reduce((a, b) => a + b, 0);
+        const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
+        return entries.map(([k, v]) => {
+          const pct = total > 0 ? Math.round((v / total) * 100) : 0;
+          return `
+            <div class="sek-stats-bar">
+              <div class="lbl">${esc(k)}</div>
+              <div class="track"><div class="fill" style="width:${pct}%;"></div></div>
+              <div class="cnt">${v}</div>
+            </div>`;
+        }).join("");
+      }
+      sekResult.innerHTML = `
+        <div class="sek-stats-view">
+          <h3>Pipeline Overview</h3>
+          <div class="sek-stat-grid">
+            <div class="sek-stat"><div class="num">${result.total}</div><div class="label">Total</div></div>
+            <div class="sek-stat ${result.overdue_count > 0 ? "alert" : ""}"><div class="num">${result.overdue_count}</div><div class="label">Overdue</div></div>
+          </div>
+          <div class="sek-stats-section"><h4>By Motivation</h4><div class="sek-stats-bars">${bars(result.by_motivation)}</div></div>
+          <div class="sek-stats-section"><h4>By Web Status</h4><div class="sek-stats-bars">${bars(result.by_web_status)}</div></div>
+          <div class="sek-stats-section"><h4>By Client Status</h4><div class="sek-stats-bars">${bars(result.by_client_status)}</div></div>
+          <div class="sek-stats-section"><h4>By Manager</h4><div class="sek-stats-bars">${bars(result.by_manager)}</div></div>
+        </div>`;
+    }
+
+    function renderToolResult(tool, args, result) {
+      if (tool === "list_clients") {
+        renderClientList(result, describeFilters(args || {}));
+      } else if (tool === "get_client") {
+        renderClientDetailOrList(result);
+      } else if (tool === "get_client_notes") {
+        renderNotesView(result);
+      } else if (tool === "get_schedule") {
+        renderScheduleView(result);
+      } else if (tool === "get_pipeline_summary") {
+        renderSummaryStats(result);
+      }
     }
 
     function parseToolCall(text) {
       if (!text) return null;
-      // Find the first JSON object that has "tool" and "args"
-      const match = text.match(/\{[\s\S]*?"tool"\s*:\s*"[^"]+"[\s\S]*?"args"\s*:\s*\{[\s\S]*?\}\s*\}/);
-      if (!match) return null;
-      try {
-        const parsed = JSON.parse(match[0]);
-        if (parsed && typeof parsed.tool === "string" && parsed.args && SEK_TOOLS[parsed.tool]) {
-          return parsed;
+      // Try to find any JSON-shaped block in the text and pull tool + args from common variations
+      const candidates = [];
+      // Pattern A: {...} containing both "tool" and "args"
+      const a = text.match(/\{[\s\S]*?"tool"\s*:[\s\S]*?\}/g);
+      if (a) candidates.push(...a);
+      // Pattern B: {...} containing "name" or "function" + "arguments"/"parameters"
+      const b = text.match(/\{[\s\S]*?"(?:name|function)"\s*:[\s\S]*?\}/g);
+      if (b) candidates.push(...b);
+      // Pattern C: any top-level {...} block
+      const c = text.match(/\{[\s\S]*\}/);
+      if (c) candidates.push(c[0]);
+
+      for (const raw of candidates) {
+        // Find the matching closing brace by counting depth
+        let depth = 0, end = -1;
+        for (let i = 0; i < raw.length; i++) {
+          if (raw[i] === "{") depth++;
+          else if (raw[i] === "}") { depth--; if (depth === 0) { end = i; break; } }
         }
-      } catch {}
+        const slice = end > 0 ? raw.slice(0, end + 1) : raw;
+        try {
+          const obj = JSON.parse(slice);
+          // Normalize possible field names
+          const tool = obj.tool || obj.name || obj.function || obj.function_name;
+          const args = obj.args || obj.arguments || obj.parameters || obj.filters || {};
+          if (typeof tool === "string" && SEK_TOOLS[tool]) {
+            return { tool, args: args && typeof args === "object" ? args : {} };
+          }
+        } catch {}
+      }
       return null;
     }
 
@@ -2098,11 +2601,12 @@ If the user is just chatting (greetings, questions about you, general questions)
 
     function describeFilters(args) {
       const parts = [];
-      if (args.motivation)    parts.push(`motivation=${args.motivation}`);
-      if (args.web_status)    parts.push(`web=${args.web_status}`);
-      if (args.client_status) parts.push(`status=${args.client_status}`);
-      if (args.business_type) parts.push(`type=${args.business_type}`);
-      if (args.manager)       parts.push(`manager=${args.manager}`);
+      if (args.motivation)     parts.push(`motivation=${args.motivation}`);
+      if (args.web_status)     parts.push(`web=${args.web_status}`);
+      if (args.web_status_not) parts.push(`web≠${args.web_status_not}`);
+      if (args.client_status)  parts.push(`status=${args.client_status}`);
+      if (args.business_type)  parts.push(`type∋"${args.business_type}"`);
+      if (args.manager)        parts.push(`manager=${args.manager}`);
       return parts.length ? `Filters: ${parts.join(", ")}` : "All clients (no filter)";
     }
 
@@ -2160,28 +2664,45 @@ If the user is just chatting (greetings, questions about you, general questions)
 
         // ---- Pass 1: get tool call OR plain reply ----
         const firstReply = await generateOnce(baseMessages);
-        const toolCall = parseToolCall(firstReply);
+        console.log("[Sekretary] First reply:", firstReply);
+        let toolCall = parseToolCall(firstReply);
+        console.log("[Sekretary] Parsed tool call:", toolCall);
+
+        // Heuristic: if user's message looks like a data query but AI didn't call a tool, retry once
+        // with a stricter prompt and NO chat history (chat history pulls small models into "prose mode")
+        const dataQueryHints = /\b(show|list|find|get|tell|give|search|display|who|what|which|where|when|how many|pending|overdue|today|week|landscap|concrete|roof|paver|client)/i;
+        if (!toolCall && dataQueryHints.test(text)) {
+          console.warn("[Sekretary] No tool call on first pass for data-shaped query — retrying with stricter prompt");
+          const strictMessages = [
+            { role: "system", content: sekSystemPrompt() + "\n\n# RETRY MODE\nThe previous attempt did not call a tool. The user is asking about CRM data. Respond with ONLY the JSON tool call. No prose. No 'I'll find that for you' preamble. ONLY: {\"tool\": \"...\", \"args\": {...}}" },
+            { role: "user", content: text },
+          ];
+          const retryReply = await generateOnce(strictMessages);
+          console.log("[Sekretary] Retry reply:", retryReply);
+          const retryCall = parseToolCall(retryReply);
+          console.log("[Sekretary] Retry parsed tool call:", retryCall);
+          if (retryCall) toolCall = retryCall;
+        }
 
         if (toolCall) {
           // Execute the tool
           const tool = SEK_TOOLS[toolCall.tool];
           const result = tool.execute(toolCall.args || {});
-          const filterDesc = describeFilters(toolCall.args || {});
 
-          // Render result in right panel
-          renderClientList(result, filterDesc);
+          // Render result in right panel (routes to correct view type)
+          renderToolResult(toolCall.tool, toolCall.args || {}, result);
 
           // ---- Pass 2: feed result back, get natural-language summary ----
           const augmented = [
             ...baseMessages,
             { role: "assistant", content: firstReply },
-            { role: "user", content: `[Tool result] list_clients returned ${result.length} client(s) matching: ${filterDesc}. Summarize this in 1-2 short sentences for the user. Do NOT output JSON.` },
+            { role: "user", content: buildToolResultMessage(toolCall.tool, toolCall.args || {}, result) },
           ];
 
           // Stream the summary into the bubble
           bubbleEl.textContent = "";
           const summary = await generateOnce(augmented, { stream: true, bubbleEl });
-          const finalSummary = summary || bubbleEl.textContent || `Found ${result.length} client(s).`;
+          const finalSummary = summary || bubbleEl.textContent || "(done)";
           bubbleEl.textContent = finalSummary;
           sekConversation.push({ role: "assistant", content: finalSummary });
         } else {
