@@ -458,6 +458,32 @@
     }
     .cta-builder-btn:hover { background: #4338ca; }
 
+    /* Client Portal Access section (inside Contract Details tab) */
+    .portal-access-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+    }
+    .portal-access-row.portal-access-empty { background: #fef9c3; border-color: #fde68a; }
+    .portal-access-info { flex: 1; min-width: 0; }
+    .portal-access-label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+    .portal-access-email { font-size: 14px; color: #111827; font-weight: 600; word-break: break-all; margin-top: 2px; }
+    .portal-access-btn {
+      flex-shrink: 0;
+      background: #111827; color: #fff;
+      border: none; border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer;
+    }
+    .portal-access-btn:hover:not(:disabled) { background: #1f2937; }
+    .portal-access-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .portal-access-feedback { margin-top: 8px; font-size: 13px; }
+    .portal-access-feedback.success { color: #065f46; }
+    .portal-access-feedback.error   { color: #991b1b; }
+
     /* Contract Builder card layout */
     .builder-card { padding: 0; overflow: hidden; }
     .builder-grid {
@@ -2161,6 +2187,7 @@
     const FOLLOW_UP_TYPES = ["Follow-up", "Appointment"];
     const MANAGERS        = [{ label: "Unassigned", value: "" }, { label: "Ivan", value: "Ivan" }, { label: "Hector", value: "Hector" }, { label: "Jesus", value: "Jesus" }];
     const SIGNING_PAGE_URL = "https://direct-konnect-sign.vercel.app/sign.html";
+    const PORTAL_URL       = "https://minicrm-kappa.vercel.app/portal.html";
 
     // ============================================================
     // TEAM AUTH
@@ -3623,12 +3650,41 @@
     // ---- Contract Details tab ----
     function renderContractDetailsTab(c) {
       const tpl = getContractTemplate(c);
+      const email = (c.email || "").trim();
+      const portalSection = email
+        ? `
+          <div class="portal-access-row">
+            <div class="portal-access-info">
+              <div class="portal-access-label">Sends a magic sign-in link to</div>
+              <div class="portal-access-email">${esc(email)}</div>
+            </div>
+            <button class="portal-access-btn" data-action="send-portal-link" data-email="${esc(email)}">
+              Send portal sign-in link
+            </button>
+          </div>
+          <div class="portal-access-feedback muted" id="portalLinkFeedback"></div>
+        `
+        : `
+          <div class="portal-access-row portal-access-empty">
+            <div class="portal-access-info">
+              <div class="portal-access-label">No client email on file</div>
+              <div class="muted" style="font-size:13px;">Add one in the Info tab to enable portal sign-in.</div>
+            </div>
+            <button class="portal-access-btn" disabled>Send portal sign-in link</button>
+          </div>
+        `;
+
       return `
         <div class="field-block">
           <div class="contract-builder-cta">
             <button class="cta-builder-btn" data-action="open-contract-builder">Save &amp; go to Contract Builder</button>
             <div class="muted" style="margin-top:6px;">Build the contract wording for this client.</div>
           </div>
+        </div>
+
+        <div class="field-block">
+          <div class="field-block-title">Client Portal Access</div>
+          ${portalSection}
         </div>
 
         <div class="field-block">
@@ -4206,8 +4262,61 @@
         contractBuilderClientId = c.id;
         closeDetail();
         switchTab("contract_builder");
+      } else if (action === "send-portal-link") {
+        await handleSendPortalLink(btn);
       }
     });
+
+    // Sends a Supabase magic-link to the client's email so they can sign
+    // into the Client Portal. Uses the same signInWithOtp call portal.html
+    // would have made if the client typed their email manually.
+    async function handleSendPortalLink(btn) {
+      const c = getCurrentClient();
+      const email = (btn.dataset.email || (c && c.email) || "").trim().toLowerCase();
+      const feedback = rightContent.querySelector("#portalLinkFeedback");
+      if (!email) {
+        if (feedback) {
+          feedback.className = "portal-access-feedback error";
+          feedback.textContent = "No email on file for this client.";
+        }
+        return;
+      }
+      const originalLabel = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Sending...";
+      if (feedback) { feedback.className = "portal-access-feedback muted"; feedback.textContent = ""; }
+      try {
+        const { error } = await sb.auth.signInWithOtp({
+          email,
+          options: { emailRedirectTo: PORTAL_URL },
+        });
+        if (error) throw error;
+        btn.textContent = "✓ Link sent";
+        if (feedback) {
+          feedback.className = "portal-access-feedback success";
+          feedback.textContent = `Magic link emailed to ${email}. The client has 1 hour to use it.`;
+        }
+        if (c) {
+          await addSystemNote(c, "client", `Portal sign-in link sent to ${email}.`);
+        }
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = originalLabel;
+        }, 4000);
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+        if (feedback) {
+          feedback.className = "portal-access-feedback error";
+          // Supabase rate-limits the default email service to ~4/hour. Surface
+          // that case in plain English so the team knows to wait, not retry.
+          const msg = (err && err.message ? err.message : String(err)) || "";
+          feedback.textContent = /rate/i.test(msg)
+            ? "Email rate limit hit. Wait a few minutes and try again."
+            : "Couldn't send the link: " + msg;
+        }
+      }
+    }
 
     // Capture date/time edits into the draft so re-renders preserve them
     rightContent.addEventListener("input", (e) => {
