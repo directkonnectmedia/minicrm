@@ -148,7 +148,7 @@
       flex-direction: column;
       max-height: 90vh;
     }
-    .modal-wide { max-width: 920px; }
+    .modal-wide { max-width: 1280px; width: 95vw; }
     .modal-header {
       padding: 14px 18px;
       border-bottom: 1px solid #e5e7eb;
@@ -234,6 +234,7 @@
       align-items: center; justify-content: center;
     }
     .bubble-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; max-width: 88%; align-self: flex-end; }
+    .bubble-wrap.system { align-items: flex-start; align-self: flex-start; }
     .bubble {
       padding: 8px 12px; border-radius: 16px;
       font-size: 13px; word-break: break-word; white-space: pre-wrap;
@@ -241,6 +242,17 @@
     }
     .bubble-client { background: #3b82f6; color: white; border-bottom-right-radius: 4px; }
     .bubble-web    { background: #10b981; color: white; border-bottom-right-radius: 4px; }
+    .bubble-system {
+      color: #4b5563;
+      border: 1px solid #e5e7eb;
+      border-bottom-left-radius: 4px;
+    }
+    .bubble-system-client { background: #f3e8ff; border-color: #e9d5ff; color: #6b21a8; }
+    .bubble-system-web { background: #ffedd5; border-color: #fed7aa; color: #9a3412; }
+    .bubble-sender {
+      font-size: 9px; font-weight: 800; letter-spacing: 0.06em;
+      text-transform: uppercase; color: #9ca3af; padding: 0 6px;
+    }
     .bubble-time { font-size: 10px; color: #9ca3af; padding: 0 6px; }
     .notes-input-bar {
       border-top: 1px solid #e5e7eb;
@@ -256,6 +268,25 @@
     .notes-input-bar textarea:focus { outline: none; border-color: #6366f1; }
     .notes-input-bar button { padding: 8px 14px; font-size: 13px; border-radius: 18px; }
     .notes-cap-hint { font-size: 10px; color: #9ca3af; padding: 4px 12px 6px; text-align: center; background: #fff; border-top: 1px solid #f3f4f6; }
+    .lang-toggle { display: inline-flex; border: 1px solid #d1d5db; border-radius: 999px; overflow: hidden; flex-shrink: 0; }
+    .lang-toggle button {
+      background: #fff; color: #6b7280; border: none; border-radius: 0;
+      padding: 8px 9px; font-size: 11px; font-weight: 700;
+    }
+    .lang-toggle button.active { background: #111827; color: #fff; }
+    .mic-btn {
+      background: #fff; color: #6b7280;
+      border: 1px solid #d1d5db; border-radius: 50%;
+      width: 36px; height: 36px; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 15px; cursor: pointer; flex-shrink: 0;
+      transition: all 120ms ease;
+    }
+    .mic-btn:hover { background: #f3f4f6; color: #1f2937; border-color: #9ca3af; }
+    .mic-btn.listening {
+      background: #fee2e2; border-color: #dc2626; color: #dc2626;
+      animation: micPulse 1.2s infinite;
+    }
 
     /* Right panel */
     .profile-right { display: flex; flex-direction: column; overflow: hidden; }
@@ -1085,9 +1116,14 @@
           <div id="notesThread" class="notes-thread"></div>
           <div class="notes-input-bar">
             <textarea id="noteInput" placeholder="Type a note... (Enter to send, Shift+Enter for newline)"></textarea>
+            <div class="lang-toggle" aria-label="Dictation language">
+              <button type="button" data-dictation-lang="en-US">EN</button>
+              <button type="button" data-dictation-lang="es-MX">ES</button>
+            </div>
+            <button id="micNoteBtn" class="mic-btn" title="Dictate note" aria-label="Dictate note">🎤</button>
             <button id="sendNoteBtn">Send</button>
           </div>
-          <div class="notes-cap-hint">Last 5 notes shown. Older notes auto-drop.</div>
+          <div class="notes-cap-hint">Notes are saved to this client.</div>
         </div>
         <div class="profile-right">
           <div class="right-tabs">
@@ -1383,7 +1419,6 @@
     const MOTIVATIONS     = ["Not Set", "Dead", "Cold", "Warm", "Hot", "VIP"];
     const FOLLOW_UP_TYPES = ["Follow-up", "Appointment"];
     const MANAGERS        = [{ label: "Unassigned", value: "" }, { label: "Ivan", value: "Ivan" }, { label: "Hector", value: "Hector" }];
-    const NOTE_CAP = 5;
     const SIGNING_PAGE_URL = "https://direct-konnect-sign.vercel.app/sign.html";
 
     const CONTRACT_TEMPLATES = [
@@ -1495,14 +1530,43 @@
       };
     }
 
-    function trimNotes(arr) {
-      const a = Array.isArray(arr) ? arr : [];
-      return a.slice(-NOTE_CAP);
+    function normalizeNotes(arr) {
+      return Array.isArray(arr) ? arr : [];
     }
-    function appendNote(arr, text) {
-      if (!text || !text.trim()) return trimNotes(arr);
-      const entry = { at: new Date().toISOString(), text: text.trim() };
-      return trimNotes([...(Array.isArray(arr) ? arr : []), entry]);
+    function appendNote(arr, text, kind = "user") {
+      if (!text || !text.trim()) return normalizeNotes(arr);
+      const entry = { at: new Date().toISOString(), text: text.trim(), kind };
+      return [...normalizeNotes(arr), entry];
+    }
+    const emptyVal = (v) => (v === null || v === undefined || v === "") ? "—" : v;
+    function fmtChange(label, from, to) {
+      return `${label} changed from "${emptyVal(from)}" to "${emptyVal(to)}".`;
+    }
+    function fmtCurrencyChange(label, from, to) {
+      return `${label} changed from ${fmtCurrency(from)} to ${fmtCurrency(to)}.`;
+    }
+    function fmtScheduleChange(from, to) {
+      return `Schedule changed from "${from ? formatDateTime(from) : "Not scheduled"}" to "${to ? formatDateTime(to) : "Not scheduled"}".`;
+    }
+    async function addSystemNote(client, thread, message) {
+      if (!client || !message) return;
+      const field = thread === "web" ? "web_notes" : "client_notes";
+      const next = appendNote(client[field] || [], message, "system");
+      await updateClientField({ [field]: next });
+    }
+    function notesTabForRightTab(rtab) {
+      return rtab === "web_status" ? "web" : "client";
+    }
+    function contractTemplateLabel(id) {
+      return CONTRACT_TEMPLATE_BY_ID[id]?.label || "None";
+    }
+    function pillChangeInfo(field, from, to) {
+      if (field === "manager") return { thread: "client", message: fmtChange("Manager", from || "Unassigned", to || "Unassigned") };
+      if (field === "client_status") return { thread: "client", message: fmtChange("Client Status", from, to) };
+      if (field === "motivation") return { thread: "client", message: fmtChange("Motivation", from, to) };
+      if (field === "web_status") return { thread: "web", message: fmtChange("Web Status", from, to) };
+      if (field === "contract_template") return { thread: "client", message: fmtChange("Contract tier", contractTemplateLabel(from), contractTemplateLabel(to)) };
+      return null;
     }
 
     // ---------- Filters ----------
@@ -1853,7 +1917,7 @@
     function openDetail(id, defaultTab = "info") {
       detailId = id;
       detailRightTab = defaultTab;
-      detailNotesTab = "client";
+      detailNotesTab = notesTabForRightTab(defaultTab);
       detailEditingField = null;
       detailScheduleMode = "view";
       detailScheduleDraft = null;
@@ -1881,12 +1945,23 @@
         notesThreadEl.innerHTML = `No ${detailNotesTab === "client" ? "client" : "web"} notes yet.<br>Type below and hit Send.`;
       } else {
         notesThreadEl.classList.remove("empty");
-        notesThreadEl.innerHTML = notes.map((n) => `
-          <div class="bubble-wrap">
-            <div class="bubble ${bubbleClass}">${esc(n.text)}</div>
-            <div class="bubble-time">${esc(formatNoteTime(n.at))}</div>
-          </div>
-        `).join("");
+        notesThreadEl.innerHTML = notes.map((n) => {
+          const isSystem = n.kind === "system";
+          const sysClass = detailNotesTab === "client" ? "bubble-system-client" : "bubble-system-web";
+          if (isSystem) {
+            return `
+              <div class="bubble-wrap system">
+                <div class="bubble-sender">System</div>
+                <div class="bubble bubble-system ${sysClass}">${esc(n.text)}</div>
+                <div class="bubble-time">${esc(formatNoteTime(n.at))}</div>
+              </div>`;
+          }
+          return `
+            <div class="bubble-wrap">
+              <div class="bubble ${bubbleClass}">${esc(n.text)}</div>
+              <div class="bubble-time">${esc(formatNoteTime(n.at))}</div>
+            </div>`;
+        }).join("");
         // Scroll to bottom (newest)
         setTimeout(() => { notesThreadEl.scrollTop = notesThreadEl.scrollHeight; }, 0);
       }
@@ -2115,16 +2190,25 @@
       if (!c) return;
       const cc = { ...contractData(c) };
       const parts = field.split(".");
+      let noteMessage = "";
       if (parts[1] === "company") cc.company_name = rawValue || null;
-      else if (parts[1] === "client") cc.client_name = rawValue || null;
-      else if (parts[1] === "setup" || parts[1] === "monthly") {
+      if (parts[1] === "company") noteMessage = fmtChange("Contract company", getIdentityValue(c, "company"), rawValue || "—");
+      else if (parts[1] === "client") {
+        cc.client_name = rawValue || null;
+        noteMessage = fmtChange("Contract client", getIdentityValue(c, "client"), rawValue || "—");
+      } else if (parts[1] === "setup" || parts[1] === "monthly") {
         const overrideGroup = parts[1] === "setup" ? "setupOverrides" : "monthlyOverrides";
         const amount = parseMoney(rawValue);
         if (amount == null) { alert("Enter a valid dollar amount."); return; }
+        const oldAmount = getLineAmount(c, parts[1], parts[2]);
+        const tpl = getContractTemplate(c);
+        const line = tpl?.[parts[1]]?.find((it) => it.key === parts[2]);
+        noteMessage = fmtCurrencyChange(line?.label || "Contract line item", oldAmount, amount);
         cc[overrideGroup] = { ...(cc[overrideGroup] || {}), [parts[2]]: amount };
       }
       detailEditingField = null;
       await updateClientField({ contract: cc });
+      if (noteMessage) await addSystemNote(c, "client", noteMessage);
       renderProfile();
     }
     function renderContractEditableRow(label, value, fieldName, kind = "text") {
@@ -2271,7 +2355,10 @@
         detailScheduleMode = "view"; detailScheduleDraft = null; renderProfile();
       } else if (action === "schedule-cancel") {
         if (!confirm("Cancel this schedule? It will be removed.")) return;
+        const c = getCurrentClient();
+        const oldSchedule = c?.follow_up_at;
         await updateClientField({ follow_up_at: null });
+        if (c) await addSystemNote(c, "client", fmtScheduleChange(oldSchedule, null));
         detailScheduleMode = "view"; detailScheduleDraft = null;
         renderProfile();
       } else if (action === "schedule-type") {
@@ -2322,6 +2409,7 @@
     async function handlePillClick(field, value) {
       const c = getCurrentClient();
       if (!c) return;
+      const oldValue = c[field] || "";
       // No-op if already this value
       if ((c[field] || "") === value || (field === "manager" && (c.manager || "") === value)) {
         // Optimistically refresh UI to ensure visual sync
@@ -2330,6 +2418,8 @@
       const updates = {};
       updates[field] = value === "" ? null : value;
       await updateClientField(updates);
+      const info = pillChangeInfo(field, oldValue, value);
+      if (info) await addSystemNote(c, info.thread, info.message);
       renderProfile();
     }
 
@@ -2337,6 +2427,8 @@
       const inp = rightContent.querySelector(`input[data-edit="${field}"]`);
       if (!inp) { detailEditingField = null; renderProfile(); return; }
       let value = inp.value.trim();
+      const c = getCurrentClient();
+      const oldValue = c ? c[field] : "";
 
       if (field.startsWith("contract.")) {
         await saveContractDetailField(field, value);
@@ -2363,12 +2455,16 @@
       updates[field] = value === "" ? null : value;
       detailEditingField = null;
       await updateClientField(updates);
+      if (field === "finished_website") {
+        await addSystemNote(getCurrentClient(), "web", fmtChange("Finished Website", oldValue, value || "—"));
+      }
       renderProfile();
     }
 
     async function handleScheduleSave() {
       const c = getCurrentClient();
       if (!c) return;
+      const oldSchedule = c.follow_up_at;
       const draft = detailScheduleDraft || (() => {
         const parts = splitDateTime(c.follow_up_at);
         return { date: parts.date, time: parts.time || "09:00", type: c.follow_up_type || "Follow-up" };
@@ -2382,6 +2478,7 @@
       if (!draft.date) { alert("Pick a date first."); return; }
       const iso = combineDateTime(draft.date, draft.time || "09:00");
       await updateClientField({ follow_up_at: iso, follow_up_type: draft.type || "Follow-up" });
+      await addSystemNote(c, "client", fmtScheduleChange(oldSchedule, iso));
       detailScheduleMode = "view";
       detailScheduleDraft = null;
       renderProfile();
@@ -2418,6 +2515,7 @@
       const b = e.target.closest("button[data-rtab]");
       if (!b) return;
       detailRightTab = b.dataset.rtab;
+      if (detailRightTab !== "info") detailNotesTab = notesTabForRightTab(detailRightTab);
       detailEditingField = null;
       renderProfile();
     });
@@ -2426,7 +2524,103 @@
     document.getElementById("notesTabClient").addEventListener("click", () => { detailNotesTab = "client"; renderProfile(); });
     document.getElementById("notesTabWeb").addEventListener("click", () => { detailNotesTab = "web"; renderProfile(); });
 
+    function defaultDictationLang() {
+      return (navigator.language || "").toLowerCase().startsWith("es") ? "es-MX" : "en-US";
+    }
+    let dictationLang = localStorage.getItem("dictationLang") || defaultDictationLang();
+    const micNoteBtn = document.getElementById("micNoteBtn");
+    const noteLangButtons = Array.from(document.querySelectorAll("[data-dictation-lang]"));
+    const NoteSpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let noteRecognition = null;
+    let noteListening = false;
+    let noteSttBaseline = "";
+    let noteSttAccumulated = "";
+    let noteUserStopped = true;
+
+    function syncLangToggles() {
+      noteLangButtons.forEach((btn) => btn.classList.toggle("active", btn.dataset.dictationLang === dictationLang));
+    }
+    function setDictationLang(lang) {
+      dictationLang = lang;
+      localStorage.setItem("dictationLang", dictationLang);
+      if (noteRecognition) noteRecognition.lang = dictationLang;
+      syncLangToggles();
+    }
+    noteLangButtons.forEach((btn) => {
+      btn.addEventListener("click", () => setDictationLang(btn.dataset.dictationLang));
+    });
+    syncLangToggles();
+
+    function stopNoteMic() {
+      if (noteRecognition && noteListening) {
+        noteUserStopped = true;
+        try { noteRecognition.stop(); } catch {}
+      }
+    }
+    function setupNoteMicButton() {
+      if (!micNoteBtn) return;
+      if (!NoteSpeechRec) {
+        micNoteBtn.style.display = "none";
+        return;
+      }
+      noteRecognition = new NoteSpeechRec();
+      noteRecognition.continuous = true;
+      noteRecognition.interimResults = true;
+      noteRecognition.lang = dictationLang;
+      noteRecognition.onstart = () => {
+        noteListening = true;
+        micNoteBtn.classList.add("listening");
+        micNoteBtn.title = "Listening... click to stop";
+      };
+      noteRecognition.onresult = (e) => {
+        let newFinal = "";
+        let interim = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const t = e.results[i][0].transcript;
+          if (e.results[i].isFinal) newFinal += t;
+          else interim += t;
+        }
+        if (newFinal) noteSttAccumulated = (noteSttAccumulated + " " + newFinal).trim();
+        noteInput.value = [noteSttBaseline, noteSttAccumulated, interim].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+      };
+      noteRecognition.onerror = (e) => {
+        console.warn("Note dictation error:", e.error);
+        if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+          noteUserStopped = true;
+          alert("Microphone permission denied. Allow microphone access in your browser settings to use voice input.");
+        }
+      };
+      noteRecognition.onend = () => {
+        if (!noteUserStopped) {
+          try {
+            noteRecognition.start();
+            return;
+          } catch (err) {
+            console.warn("Note dictation restart failed:", err);
+          }
+        }
+        noteListening = false;
+        micNoteBtn.classList.remove("listening");
+        micNoteBtn.title = "Dictate note";
+        noteInput.focus();
+      };
+      micNoteBtn.addEventListener("click", () => {
+        if (noteListening) {
+          noteUserStopped = true;
+          try { noteRecognition.stop(); } catch {}
+        } else {
+          noteUserStopped = false;
+          noteSttBaseline = noteInput.value.trim();
+          noteSttAccumulated = "";
+          noteRecognition.lang = dictationLang;
+          try { noteRecognition.start(); } catch (err) { console.warn(err); }
+        }
+      });
+    }
+    setupNoteMicButton();
+
     async function sendNote() {
+      stopNoteMic();
       const text = noteInput.value.trim();
       if (!text) return;
       const c = getCurrentClient();
@@ -2523,21 +2717,32 @@
       events.forEach((e) => calendarInstance.addEvent(e));
     }
 
+    function dismissOnBackdropClick(overlay, closeFn) {
+      let downOnBackdrop = false;
+      overlay.addEventListener("mousedown", (e) => {
+        downOnBackdrop = e.target === overlay;
+      });
+      overlay.addEventListener("click", (e) => {
+        if (downOnBackdrop && e.target === overlay) closeFn();
+        downOnBackdrop = false;
+      });
+    }
+
     // ---------- Wire up ----------
     document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => switchTab(t.dataset.view)));
 
     document.getElementById("openWizard").addEventListener("click", openWizard);
     document.getElementById("closeWizard").addEventListener("click", closeWizard);
-    wizardOverlay.addEventListener("click", (e) => { if (e.target === wizardOverlay) closeWizard(); });
+    dismissOnBackdropClick(wizardOverlay, closeWizard);
     backBtn.addEventListener("click", goBack);
     nextBtn.addEventListener("click", goNext);
 
     document.getElementById("closeDetail").addEventListener("click", closeDetail);
-    detailOverlay.addEventListener("click", (e) => { if (e.target === detailOverlay) closeDetail(); });
+    dismissOnBackdropClick(detailOverlay, closeDetail);
 
     document.getElementById("openFilters").addEventListener("click", openFilterModal);
     document.getElementById("closeFilter").addEventListener("click", closeFilterModal);
-    filterOverlay.addEventListener("click", (e) => { if (e.target === filterOverlay) closeFilterModal(); });
+    dismissOnBackdropClick(filterOverlay, closeFilterModal);
     document.getElementById("filterApply").addEventListener("click", applyFilterFromModal);
     document.getElementById("filterReset").addEventListener("click", resetFiltersModal);
     document.getElementById("clearFilters").addEventListener("click", clearAllFilters);
