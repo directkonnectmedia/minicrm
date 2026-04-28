@@ -444,6 +444,105 @@
     .sent-status-signed { background: #d1fae5; color: #065f46; }
     .sent-status-voided { background: #fee2e2; color: #991b1b; }
 
+    /* Contract Builder CTA from profile */
+    .contract-builder-cta { padding: 0; }
+    .cta-builder-btn {
+      width: 100%;
+      background: #4f46e5; color: #fff;
+      border: none; border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 14px; font-weight: 600;
+      cursor: pointer;
+    }
+    .cta-builder-btn:hover { background: #4338ca; }
+
+    /* Contract Builder card layout */
+    .builder-card { padding: 0; overflow: hidden; }
+    .builder-grid {
+      display: grid;
+      grid-template-columns: 20% 50% 30%;
+      min-height: 70vh;
+    }
+    .builder-panel {
+      padding: 16px;
+      border-right: 1px solid #e5e7eb;
+      overflow-y: auto;
+      max-height: 80vh;
+    }
+    .builder-panel:last-child { border-right: none; }
+
+    /* Left panel — client + template list */
+    .cb-client-card {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .cb-client-card.empty { background: #fff; border-style: dashed; }
+    .cb-client-company { font-weight: 700; color: #111827; font-size: 14px; }
+    .cb-client-name { color: #374151; font-size: 13px; margin-top: 2px; }
+    .cb-client-tier { color: #6b7280; font-size: 12px; margin-top: 6px; }
+    .cb-new-tmpl-btn {
+      width: 100%;
+      background: #111827; color: #fff;
+      border: none; border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 12px;
+    }
+    .cb-new-tmpl-btn:hover { background: #1f2937; }
+    .cb-tmpl-list { display: flex; flex-direction: column; gap: 14px; }
+    .cb-tmpl-section-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #6b7280; margin-bottom: 6px;
+    }
+    .cb-tmpl-item {
+      display: block; width: 100%; text-align: left;
+      background: #fff; color: #111827;
+      border: 1px solid #e5e7eb; border-radius: 8px;
+      padding: 10px 12px; cursor: pointer;
+      margin-bottom: 6px;
+    }
+    .cb-tmpl-item:hover { background: #f9fafb; border-color: #d1d5db; }
+    .cb-tmpl-item.active { border-color: #4f46e5; background: #eef2ff; }
+    .cb-tmpl-name { font-weight: 600; font-size: 13px; }
+    .cb-tmpl-meta { color: #6b7280; font-size: 11px; margin-top: 2px; }
+    .cb-tmpl-empty { color: #9ca3af; font-size: 12px; font-style: italic; padding: 6px 0; }
+
+    /* Middle panel — preview */
+    .cb-middle-empty {
+      text-align: center; color: #9ca3af; padding: 60px 20px;
+    }
+    .cb-middle-empty-title { font-size: 16px; font-weight: 600; color: #6b7280; margin-bottom: 6px; }
+    .cb-middle-empty-sub { font-size: 13px; }
+    .cb-middle-header {
+      display: flex; align-items: center; gap: 10px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e5e7eb;
+      margin-bottom: 16px;
+    }
+    .cb-middle-name { font-size: 16px; font-weight: 700; color: #111827; flex: 1; }
+    .cb-tmpl-badge {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 999px; letter-spacing: 0.05em;
+    }
+    .cb-badge-custom { background: #eef2ff; color: #4338ca; }
+    .cb-badge-universal { background: #ecfdf5; color: #047857; }
+
+    /* Shared contract document styling for previews */
+    .contract-doc {
+      background: #fff;
+      color: #111827;
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 8px 4px;
+    }
+    .contract-doc h1, .contract-doc h2, .contract-doc h3 { margin: 14px 0 8px; }
+    .contract-doc p { margin: 0 0 10px; }
+    .contract-doc ul, .contract-doc ol { margin: 0 0 10px 20px; }
+
     /* Schedule block */
     .schedule-block {
       background: #f9fafb; border: 1px solid #e5e7eb;
@@ -1008,6 +1107,7 @@
     <button class="tab active" data-view="list">📋 List</button>
     <button class="tab" data-view="calendar">📅 Calendar</button>
     <button class="tab" data-view="sekretary">🤖 Sekretary</button>
+    <button class="tab" data-view="contract_builder">📝 Contract Builder</button>
   </div>
 
   <div id="filterChips" class="filter-chips"></div>
@@ -1079,6 +1179,16 @@
             <div class="sek-shell-banner">All chunks complete. Try: "Add a new client" (launches wizard), "Mark Acme as Hot", "Schedule Acme Tuesday 2pm", "Show me hot leads"</div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" data-view="contract_builder">
+    <div class="card builder-card">
+      <div class="builder-grid">
+        <div class="builder-panel" id="cbLeft"></div>
+        <div class="builder-panel" id="cbMiddle"></div>
+        <div class="builder-panel" id="cbRight"></div>
       </div>
     </div>
   </div>
@@ -1908,6 +2018,7 @@
     const noteInput = document.getElementById("noteInput");
 
     let detailId = null;
+    let contractBuilderClientId = null; // currently loaded client in the Contract Builder tab
     let detailRightTab = "info";       // info | client_status | web_status | contract_details | contract_status
     let detailNotesTab = "client";      // client | web
     let detailEditingField = null;      // field name being edited (text-field pencil-edit)
@@ -2248,6 +2359,13 @@
       const tpl = getContractTemplate(c);
       return `
         <div class="field-block">
+          <div class="contract-builder-cta">
+            <button class="cta-builder-btn" data-action="open-contract-builder">Save &amp; go to Contract Builder</button>
+            <div class="muted" style="margin-top:6px;">Build the contract wording for this client.</div>
+          </div>
+        </div>
+
+        <div class="field-block">
           <div class="field-block-title">Tier</div>
           <div class="pill-bar">
             <button class="pill p-mgr-Unassigned${!tpl ? " active" : ""}" data-action="pill" data-field="contract_template" data-value="">None</button>
@@ -2323,6 +2441,143 @@
       `;
     }
 
+    // ============================================================
+    // CONTRACT BUILDER
+    // ============================================================
+    let universalTemplates = [];           // rows from public.contract_text_templates
+    let universalLoaded = false;
+    let builderActiveTemplate = null;      // { source: "custom"|"universal", id, name, body_html }
+
+    function getBuilderClient() {
+      return contractBuilderClientId ? allClients.find((c) => c.id === contractBuilderClientId) : null;
+    }
+
+    async function loadUniversalTemplates() {
+      const { data, error } = await sb.from("contract_text_templates").select("*").order("created_at", { ascending: true });
+      if (error) {
+        console.warn("Universal templates unavailable:", error.message);
+        universalTemplates = [];
+      } else {
+        universalTemplates = data || [];
+      }
+      universalLoaded = true;
+    }
+
+    function renderContractBuilder() {
+      if (!universalLoaded) {
+        loadUniversalTemplates().then(() => renderContractBuilder());
+      }
+      renderCBLeft();
+      renderCBMiddle();
+      renderCBRight();
+    }
+
+    function renderCBLeft() {
+      const el = document.getElementById("cbLeft");
+      if (!el) return;
+      const c = getBuilderClient();
+      const tierLabel = c ? contractTemplateLabel(c.contract_template) : "";
+      const customTpl = c && c.contract && c.contract.custom ? c.contract.custom : null;
+
+      const clientCard = c
+        ? `<div class="cb-client-card">
+            <div class="cb-client-company">${esc(c.company_name || "(no company)")}</div>
+            <div class="cb-client-name">${esc(c.client_name || "(no client name)")}</div>
+            <div class="cb-client-tier">Tier: ${esc(tierLabel || "None")}</div>
+          </div>`
+        : `<div class="cb-client-card empty">
+            <div class="cb-client-company">No client loaded</div>
+            <div class="cb-client-name muted">Open a client profile and use "Save &amp; go to Contract Builder".</div>
+          </div>`;
+
+      const isActive = (source, id) =>
+        builderActiveTemplate && builderActiveTemplate.source === source && builderActiveTemplate.id === id;
+
+      const customSection = c
+        ? `<div class="cb-tmpl-section">
+            <div class="cb-tmpl-section-title">Custom (this client)</div>
+            ${customTpl
+              ? `<button class="cb-tmpl-item ${isActive("custom", "custom") ? "active" : ""}" data-cb-action="select-custom">
+                   <div class="cb-tmpl-name">${esc(customTpl.name || "Custom template")}</div>
+                   <div class="cb-tmpl-meta">Saved ${customTpl.saved_at ? esc(formatDateTime(customTpl.saved_at)) : ""}</div>
+                 </button>`
+              : `<div class="cb-tmpl-empty">No custom template yet.</div>`}
+          </div>`
+        : "";
+
+      const universalSection = `
+        <div class="cb-tmpl-section">
+          <div class="cb-tmpl-section-title">Universal</div>
+          ${universalTemplates.length === 0
+            ? `<div class="cb-tmpl-empty">No universal templates yet.</div>`
+            : universalTemplates.map((t) => `
+                <button class="cb-tmpl-item ${isActive("universal", t.id) ? "active" : ""}" data-cb-action="select-universal" data-id="${esc(t.id)}">
+                  <div class="cb-tmpl-name">${esc(t.name || "(untitled)")}</div>
+                  <div class="cb-tmpl-meta">Saved ${t.created_at ? esc(formatDateTime(t.created_at)) : ""}</div>
+                </button>
+              `).join("")}
+        </div>`;
+
+      el.innerHTML = `
+        ${clientCard}
+        <button class="cb-new-tmpl-btn" data-cb-action="new-template">+ New Template</button>
+        <div class="cb-tmpl-list">
+          ${customSection}
+          ${universalSection}
+        </div>
+      `;
+    }
+
+    function renderCBMiddle() {
+      const el = document.getElementById("cbMiddle");
+      if (!el) return;
+      const t = builderActiveTemplate;
+      if (!t) {
+        el.innerHTML = `
+          <div class="cb-middle-empty">
+            <div class="cb-middle-empty-title">No template selected</div>
+            <div class="cb-middle-empty-sub">Pick a template from the left, or click "+ New Template" to start one.</div>
+          </div>`;
+        return;
+      }
+      const badge = t.source === "custom" ? "Custom" : "Universal";
+      el.innerHTML = `
+        <div class="cb-middle-header">
+          <div class="cb-middle-name">${esc(t.name || "(untitled)")}</div>
+          <span class="cb-tmpl-badge cb-badge-${t.source}">${esc(badge)}</span>
+        </div>
+        <div class="contract-doc">${t.body_html || ""}</div>
+      `;
+    }
+
+    function renderCBRight() {
+      const el = document.getElementById("cbRight");
+      if (!el) return;
+      el.innerHTML = `<div class="muted" style="padding:12px;">Plugin mapping will appear here.</div>`;
+    }
+
+    // Click handler for the contract builder card
+    document.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-cb-action]");
+      if (!btn) return;
+      const action = btn.dataset.cbAction;
+      if (action === "select-custom") {
+        const c = getBuilderClient();
+        const customTpl = c && c.contract && c.contract.custom ? c.contract.custom : null;
+        if (!customTpl) return;
+        builderActiveTemplate = { source: "custom", id: "custom", name: customTpl.name || "Custom", body_html: customTpl.body_html || "" };
+        renderContractBuilder();
+      } else if (action === "select-universal") {
+        const id = btn.dataset.id;
+        const row = universalTemplates.find((r) => r.id === id);
+        if (!row) return;
+        builderActiveTemplate = { source: "universal", id: row.id, name: row.name || "(untitled)", body_html: row.body_html || "" };
+        renderContractBuilder();
+      } else if (action === "new-template") {
+        // Wired in Phase 2.
+      }
+    });
+
     // ---- Right panel event handling ----
     rightContent.addEventListener("click", async (e) => {
       const btn = e.target.closest("[data-action]");
@@ -2371,6 +2626,12 @@
         renderProfile();
       } else if (action === "schedule-save") {
         await handleScheduleSave();
+      } else if (action === "open-contract-builder") {
+        const c = getCurrentClient();
+        if (!c) return;
+        contractBuilderClientId = c.id;
+        closeDetail();
+        switchTab("contract_builder");
       }
     });
 
@@ -2684,6 +2945,9 @@
       if (name === "calendar") {
         initCalendar();
         setTimeout(() => { if (calendarInstance) calendarInstance.updateSize(); }, 50);
+      }
+      if (name === "contract_builder") {
+        renderContractBuilder();
       }
     }
 
