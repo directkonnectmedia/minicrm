@@ -59,12 +59,17 @@
       margin-bottom: 22px;
     }
     .auth-logo {
-      width: 64px; height: 64px;
+      width: 56px; height: 56px;
       border-radius: 14px;
-      object-fit: cover;
-      display: block;
+      background: #111827;
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 22px;
+      letter-spacing: 0.05em;
       margin-bottom: 12px;
-      background: #000;
     }
     .auth-title    { font-size: 20px; font-weight: 700; margin: 0 0 4px; color: #111827; text-align: center; }
     .auth-subtitle { font-size: 14px; color: #6b7280; margin: 0; text-align: center; line-height: 1.5; }
@@ -174,12 +179,17 @@
       min-width: 0;
     }
     .portal-brand-logo {
-      width: 40px; height: 40px;
+      width: 36px; height: 36px;
       border-radius: 8px;
-      object-fit: cover;
-      display: block;
+      background: #111827;
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.05em;
       flex-shrink: 0;
-      background: #000;
     }
     .portal-brand-text { display: flex; flex-direction: column; min-width: 0; }
     .portal-brand-name { font-weight: 700; font-size: 14px; color: #111827; line-height: 1.2; }
@@ -447,7 +457,7 @@
   <div id="view-signin" class="view auth-shell">
     <div class="auth-card">
       <div class="auth-brand">
-        <img class="auth-logo" src="dk-logo.png" alt="Direct Konnect" width="64" height="64">
+        <span class="auth-logo">DK</span>
         <h1 class="auth-title">Direct Konnect</h1>
         <p class="auth-subtitle">Sign in to your client portal.<br>Enter your email and we'll send you a sign-in link.</p>
       </div>
@@ -480,7 +490,7 @@
   <div id="view-booting" class="view active auth-shell">
     <div class="auth-card" style="text-align:center;padding:48px 28px;">
       <div class="auth-brand">
-        <img class="auth-logo" src="dk-logo.png" alt="Direct Konnect" width="64" height="64">
+        <span class="auth-logo">DK</span>
       </div>
       <p class="auth-subtitle">Loading your portal...</p>
     </div>
@@ -493,7 +503,7 @@
   <div id="view-noAccount" class="view auth-shell">
     <div class="auth-card" style="text-align:center;">
       <div class="auth-brand">
-        <img class="auth-logo" src="dk-logo.png" alt="Direct Konnect" width="64" height="64">
+        <span class="auth-logo">DK</span>
         <h1 class="auth-title">No account found</h1>
         <p class="auth-subtitle">
           We don't see a Direct Konnect client account for
@@ -532,7 +542,7 @@
   <div id="view-portal" class="view">
     <header class="portal-header">
       <div class="portal-brand">
-        <img class="portal-brand-logo" src="dk-logo.png" alt="Direct Konnect" width="40" height="40">
+        <span class="portal-brand-logo">DK</span>
         <div class="portal-brand-text">
           <span class="portal-brand-name">Direct Konnect</span>
           <span class="portal-brand-sub">Client Portal</span>
