@@ -164,3 +164,46 @@ alter table public.clients add column if not exists follow_up_type text not null
 alter table public.clients drop constraint if exists clients_follow_up_type_check;
 alter table public.clients add constraint clients_follow_up_type_check
   check (follow_up_type in ('Follow-up', 'Appointment'));
+
+-- Contract details: selected pricing tier and per-client receipt overrides.
+alter table public.clients add column if not exists contract_template text;
+alter table public.clients add column if not exists contract jsonb not null default '{}'::jsonb;
+alter table public.clients drop constraint if exists clients_contract_template_check;
+alter table public.clients add constraint clients_contract_template_check
+  check (
+    contract_template is null or
+    contract_template in ('basic_website', 'premium_website', 'premium_pocket_sekretary')
+  );
+
+-- Public signing records. The separate signing page expects contract_html and
+-- signer_name, so those names are the source of truth for this table.
+create table if not exists public.signed_contracts (
+  id uuid primary key default gen_random_uuid(),
+  token text not null unique,
+  client_id uuid references public.clients(id) on delete set null,
+  template_name text,
+  contract_html text not null,
+  recipient_name text,
+  recipient_email text,
+  company_name text,
+  status text not null default 'pending'
+    check (status in ('pending', 'sent', 'viewed', 'signed', 'voided')),
+  signer_name text,
+  signed_at timestamptz,
+  created_at timestamptz not null default now(),
+  sent_at timestamptz,
+  viewed_at timestamptz
+);
+
+create index if not exists signed_contracts_client_id_idx
+  on public.signed_contracts (client_id);
+create index if not exists signed_contracts_token_idx
+  on public.signed_contracts (token);
+
+alter table public.signed_contracts enable row level security;
+drop policy if exists "anon all" on public.signed_contracts;
+create policy "anon all"
+  on public.signed_contracts
+  for all to anon
+  using (true)
+  with check (true);

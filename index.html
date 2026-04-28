@@ -383,6 +383,36 @@
     .pill.p-fut-Appointment { border-color: #f97316; }
     .pill.p-fut-Appointment.active { background: #f97316; color: white; }
 
+    /* Contract receipt/status */
+    .receipt-subtotal {
+      background: #f9fafb;
+      border-top: 1px solid #e5e7eb;
+      font-weight: 700;
+    }
+    .contract-status-card {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+    .contract-status-title { font-weight: 600; color: #111827; margin-bottom: 4px; }
+    .contract-status-meta { color: #6b7280; font-size: 13px; margin-bottom: 8px; }
+    .sent-status-pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .sent-status-pending { background: #f3f4f6; color: #4b5563; }
+    .sent-status-sent { background: #dbeafe; color: #1e40af; }
+    .sent-status-viewed { background: #fef3c7; color: #92400e; }
+    .sent-status-signed { background: #d1fae5; color: #065f46; }
+    .sent-status-voided { background: #fee2e2; color: #991b1b; }
+
     /* Schedule block */
     .schedule-block {
       background: #f9fafb; border: 1px solid #e5e7eb;
@@ -1064,6 +1094,8 @@
             <button data-rtab="info">Info</button>
             <button data-rtab="client_status">Client Status</button>
             <button data-rtab="web_status">Web Status</button>
+            <button data-rtab="contract_details">Contract Details</button>
+            <button data-rtab="contract_status">Contract Status</button>
           </div>
           <div id="rightContent" class="right-content"></div>
         </div>
@@ -1352,6 +1384,32 @@
     const FOLLOW_UP_TYPES = ["Follow-up", "Appointment"];
     const MANAGERS        = [{ label: "Unassigned", value: "" }, { label: "Ivan", value: "Ivan" }, { label: "Hector", value: "Hector" }];
     const NOTE_CAP = 5;
+    const SIGNING_PAGE_URL = "https://direct-konnect-sign.vercel.app/sign.html";
+
+    const CONTRACT_TEMPLATES = [
+      {
+        id: "basic_website",
+        label: "Basic Website",
+        setup: [{ key: "website_setup", label: "Basic Website Setup", amount: 500 }],
+        monthly: [{ key: "monthly", label: "Website Monthly Subscription", amount: 100 }],
+      },
+      {
+        id: "premium_website",
+        label: "Premium Website",
+        setup: [{ key: "website_setup", label: "Premium Website Setup", amount: 1000 }],
+        monthly: [{ key: "monthly", label: "Website Monthly Subscription", amount: 100 }],
+      },
+      {
+        id: "premium_pocket_sekretary",
+        label: "Premium Website + Pocket Sekretary",
+        setup: [{ key: "website_setup", label: "Premium Website Setup", amount: 1000 }],
+        monthly: [
+          { key: "monthly", label: "Website Monthly Subscription", amount: 100 },
+          { key: "pocket_sekretary", label: "Pocket Sekretary", amount: 50 },
+        ],
+      },
+    ];
+    const CONTRACT_TEMPLATE_BY_ID = Object.fromEntries(CONTRACT_TEMPLATES.map((t) => [t.id, t]));
 
     // ---- Helpers ----
     const esc = (s) => (s ?? "").toString().replace(/[&<>"']/g, (c) => (
@@ -1363,6 +1421,9 @@
     const normPhone = (s) => (s || "").replace(/\D+/g, "");
     const fupTypeClass = (t) => "fup-type-" + (t || "Follow-up").replace(/[-\s]/g, "");
     const slug = (s) => (s || "").replace(/[-\s]/g, "");
+    const fmtCurrency = (n) => Number.isFinite(Number(n))
+      ? Number(n).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 })
+      : "—";
 
     function formatPhone(raw) {
       const d = normPhone(raw).slice(0, 10);
@@ -1551,10 +1612,18 @@
     }
 
     let allClients = [];
+    let signedContracts = [];
     async function load() {
       const { data, error } = await sb.from("clients").select("*").order("created_at", { ascending: false });
       if (error) { alert("Load failed: " + error.message); return; }
       allClients = data || [];
+      const sent = await sb.from("signed_contracts").select("*").order("created_at", { ascending: false });
+      if (sent.error) {
+        console.warn("Signed contracts unavailable:", sent.error.message);
+        signedContracts = [];
+      } else {
+        signedContracts = sent.data || [];
+      }
       populateFilterModalOptions();
       render();
       refreshCalendar();
@@ -1775,7 +1844,7 @@
     const noteInput = document.getElementById("noteInput");
 
     let detailId = null;
-    let detailRightTab = "info";       // info | client_status | web_status
+    let detailRightTab = "info";       // info | client_status | web_status | contract_details | contract_status
     let detailNotesTab = "client";      // client | web
     let detailEditingField = null;      // field name being edited (text-field pencil-edit)
     let detailScheduleMode = "view";    // view | menu | edit
@@ -1830,7 +1899,9 @@
       // Right content
       if (detailRightTab === "info") rightContent.innerHTML = renderInfoTab(c);
       else if (detailRightTab === "client_status") rightContent.innerHTML = renderClientStatusTab(c);
-      else rightContent.innerHTML = renderWebStatusTab(c);
+      else if (detailRightTab === "web_status") rightContent.innerHTML = renderWebStatusTab(c);
+      else if (detailRightTab === "contract_details") rightContent.innerHTML = renderContractDetailsTab(c);
+      else rightContent.innerHTML = renderContractStatusTab(c);
 
       // Auto-focus inline edit input if any
       if (detailEditingField) {
@@ -2007,6 +2078,167 @@
       `;
     }
 
+    function contractData(c) {
+      return (c && c.contract && typeof c.contract === "object" && !Array.isArray(c.contract)) ? c.contract : {};
+    }
+    function getContractTemplate(c) {
+      return CONTRACT_TEMPLATE_BY_ID[c?.contract_template] || null;
+    }
+    function getIdentityValue(c, field) {
+      const cc = contractData(c);
+      if (field === "company") return cc.company_name || c.company_name || "";
+      if (field === "client") return cc.client_name || c.client_name || "";
+      return "";
+    }
+    function getLineAmount(c, group, key) {
+      const tpl = getContractTemplate(c);
+      const line = tpl?.[group]?.find((it) => it.key === key);
+      if (!line) return null;
+      const cc = contractData(c);
+      const overrideGroup = group === "setup" ? "setupOverrides" : "monthlyOverrides";
+      const override = cc[overrideGroup] && cc[overrideGroup][key];
+      return override === undefined || override === null || override === "" ? line.amount : Number(override);
+    }
+    function computeSubtotal(c, group) {
+      const tpl = getContractTemplate(c);
+      if (!tpl) return 0;
+      return (tpl[group] || []).reduce((sum, it) => sum + Number(getLineAmount(c, group, it.key) || 0), 0);
+    }
+    function parseMoney(raw) {
+      const cleaned = (raw || "").replace(/[^0-9.-]/g, "");
+      if (!cleaned) return null;
+      const n = Number(cleaned);
+      return Number.isFinite(n) ? n : null;
+    }
+    async function saveContractDetailField(field, rawValue) {
+      const c = getCurrentClient();
+      if (!c) return;
+      const cc = { ...contractData(c) };
+      const parts = field.split(".");
+      if (parts[1] === "company") cc.company_name = rawValue || null;
+      else if (parts[1] === "client") cc.client_name = rawValue || null;
+      else if (parts[1] === "setup" || parts[1] === "monthly") {
+        const overrideGroup = parts[1] === "setup" ? "setupOverrides" : "monthlyOverrides";
+        const amount = parseMoney(rawValue);
+        if (amount == null) { alert("Enter a valid dollar amount."); return; }
+        cc[overrideGroup] = { ...(cc[overrideGroup] || {}), [parts[2]]: amount };
+      }
+      detailEditingField = null;
+      await updateClientField({ contract: cc });
+      renderProfile();
+    }
+    function renderContractEditableRow(label, value, fieldName, kind = "text") {
+      const inEdit = detailEditingField === fieldName;
+      if (inEdit) {
+        const inputValue = kind === "money" && value != null ? String(value) : (value || "");
+        return `
+          <div class="info-row">
+            <div class="info-label">${esc(label)}</div>
+            <div class="inline-edit-row"><input type="text" data-edit="${esc(fieldName)}" value="${esc(inputValue)}"></div>
+            <div class="row-actions">
+              <button class="icon-btn" data-action="save-edit" data-field="${esc(fieldName)}" title="Save">✓</button>
+              <button class="icon-btn" data-action="cancel-edit" title="Cancel">✕</button>
+            </div>
+          </div>`;
+      }
+      return `
+        <div class="info-row">
+          <div class="info-label">${esc(label)}</div>
+          <div class="info-value${value ? "" : " muted"}">${kind === "money" ? fmtCurrency(value) : (value ? esc(value) : "—")}</div>
+          <div class="row-actions">
+            <button class="icon-btn" data-action="edit" data-field="${esc(fieldName)}" title="Edit">✏️</button>
+          </div>
+        </div>`;
+    }
+    function renderContractSubtotal(label, amount) {
+      return `
+        <div class="info-row receipt-subtotal">
+          <div class="info-label">${esc(label)}</div>
+          <div class="info-value">${fmtCurrency(amount)}</div>
+          <div class="row-actions"></div>
+        </div>`;
+    }
+
+    // ---- Contract Details tab ----
+    function renderContractDetailsTab(c) {
+      const tpl = getContractTemplate(c);
+      return `
+        <div class="field-block">
+          <div class="field-block-title">Tier</div>
+          <div class="pill-bar">
+            <button class="pill p-mgr-Unassigned${!tpl ? " active" : ""}" data-action="pill" data-field="contract_template" data-value="">None</button>
+            ${CONTRACT_TEMPLATES.map((t) => `
+              <button class="pill p-cs-${slug(t.label)}${c.contract_template === t.id ? " active" : ""}" data-action="pill" data-field="contract_template" data-value="${esc(t.id)}">${esc(t.label)}</button>
+            `).join("")}
+          </div>
+        </div>
+
+        <div class="field-block">
+          <div class="field-block-title">Billed To</div>
+          ${renderContractEditableRow("Company", getIdentityValue(c, "company"), "contract.company")}
+          ${renderContractEditableRow("Client", getIdentityValue(c, "client"), "contract.client")}
+        </div>
+
+        ${tpl ? `
+          <div class="field-block">
+            <div class="field-block-title">Setup</div>
+            ${(tpl.setup || []).map((it) => renderContractEditableRow(it.label, getLineAmount(c, "setup", it.key), `contract.setup.${it.key}`, "money")).join("")}
+            ${renderContractSubtotal("Setup Subtotal", computeSubtotal(c, "setup"))}
+          </div>
+
+          <div class="field-block">
+            <div class="field-block-title">Monthly</div>
+            ${(tpl.monthly || []).map((it) => renderContractEditableRow(it.label, getLineAmount(c, "monthly", it.key), `contract.monthly.${it.key}`, "money")).join("")}
+            ${renderContractSubtotal("Monthly Subtotal", computeSubtotal(c, "monthly"))}
+          </div>
+        ` : `
+          <div class="field-block">
+            <div class="field-block-title">Receipt</div>
+            <div class="muted">Pick a tier above to populate setup and monthly line items.</div>
+          </div>
+        `}
+      `;
+    }
+
+    // ---- Contract Status tab ----
+    function renderContractStatusTab(c) {
+      const rows = signedContracts.filter((r) => r.client_id === c.id);
+      if (!rows.length) {
+        return `
+          <div class="field-block">
+            <div class="field-block-title">Contract Status</div>
+            <div class="contract-status-card">
+              <div class="contract-status-title">No contract sent yet</div>
+              <div class="contract-status-meta">Generated contracts will appear here after they are sent for signature.</div>
+            </div>
+          </div>
+        `;
+      }
+      return `
+        <div class="field-block">
+          <div class="field-block-title">Contract Status</div>
+          ${rows.map((row) => {
+            const link = `${SIGNING_PAGE_URL}?t=${encodeURIComponent(row.token || "")}`;
+            const status = row.status || "pending";
+            const signed = status === "signed" && row.signer_name
+              ? `<div class="contract-status-meta">Signed by ${esc(row.signer_name)}${row.signed_at ? ` on ${esc(formatDateTime(row.signed_at))}` : ""}</div>`
+              : "";
+            return `
+              <div class="contract-status-card">
+                <div class="contract-status-title">${esc(row.template_name || "Contract")}</div>
+                <div class="contract-status-meta">Recipient: ${esc(row.recipient_email || "—")}</div>
+                <div class="contract-status-meta">Created: ${row.created_at ? esc(formatDateTime(row.created_at)) : "—"}</div>
+                ${signed}
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                  <span class="sent-status-pill sent-status-${esc(status)}">${esc(status)}</span>
+                  <button class="ghost" data-action="copy" data-value="${esc(link)}">Copy signing link</button>
+                </div>
+              </div>`;
+          }).join("")}
+        </div>
+      `;
+    }
+
     // ---- Right panel event handling ----
     rightContent.addEventListener("click", async (e) => {
       const btn = e.target.closest("[data-action]");
@@ -2105,6 +2337,11 @@
       const inp = rightContent.querySelector(`input[data-edit="${field}"]`);
       if (!inp) { detailEditingField = null; renderProfile(); return; }
       let value = inp.value.trim();
+
+      if (field.startsWith("contract.")) {
+        await saveContractDetailField(field, value);
+        return;
+      }
 
       // Phone: dedupe check
       if (field === "phone") {
