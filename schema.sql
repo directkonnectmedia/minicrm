@@ -220,8 +220,34 @@ create table if not exists public.contract_text_templates (
 
 alter table public.contract_text_templates enable row level security;
 drop policy if exists "anon all" on public.contract_text_templates;
-create policy "anon all"
+drop policy if exists "authenticated all" on public.contract_text_templates;
+create policy "authenticated all"
   on public.contract_text_templates
-  for all to anon
+  for all to authenticated
+  using (true)
+  with check (true);
+
+-- =============================================================
+-- TEAM AUTH RLS LOCKDOWN
+-- =============================================================
+-- The CRM now requires team members to log in via Supabase Auth.
+-- Lock public.clients and public.contract_text_templates to authenticated
+-- requests. Leave public.signed_contracts open for anon: the public sign.html
+-- page (separate Vercel project) still needs anon read+update by token.
+--
+-- Re-running this block is safe; every drop/create is idempotent.
+
+-- public.clients: drop the old anon-everything policies and add a single
+-- authenticated-everything policy. Anonymous visitors can no longer read,
+-- write, update, or delete client records.
+drop policy if exists "anon read"   on public.clients;
+drop policy if exists "anon insert" on public.clients;
+drop policy if exists "anon update" on public.clients;
+drop policy if exists "anon delete" on public.clients;
+drop policy if exists "anon all"    on public.clients;
+drop policy if exists "authenticated all" on public.clients;
+create policy "authenticated all"
+  on public.clients
+  for all to authenticated
   using (true)
   with check (true);
