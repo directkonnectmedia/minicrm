@@ -1267,9 +1267,185 @@
       0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45); }
       50%      { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
     }
+
+    /* ============================ */
+    /* Team auth login overlay      */
+    /* ============================ */
+    .login-shell {
+      position: fixed; inset: 0;
+      background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+      display: none;
+      align-items: center; justify-content: center;
+      padding: 16px;
+      z-index: 5000;
+    }
+    .login-shell.open { display: flex; }
+    body.login-active { overflow: hidden; }
+
+    .login-card {
+      background: #fff;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 420px;
+      padding: 32px 28px;
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.35);
+      animation: loginCardIn 220ms ease-out;
+    }
+    @keyframes loginCardIn {
+      from { transform: translateY(8px); opacity: 0; }
+      to   { transform: translateY(0);   opacity: 1; }
+    }
+
+    .login-brand { text-align: center; margin-bottom: 22px; }
+    .login-logo {
+      width: 56px; height: 56px;
+      background: #4f46e5; color: #fff;
+      border-radius: 14px;
+      font-size: 20px; font-weight: 800; letter-spacing: 0.04em;
+      display: inline-flex; align-items: center; justify-content: center;
+      margin-bottom: 12px;
+    }
+    .login-title { font-size: 18px; font-weight: 700; color: #111827; }
+    .login-sub   { font-size: 13px; color: #6b7280; margin-top: 2px; }
+
+    .login-picker { display: flex; flex-direction: column; gap: 10px; }
+    .login-member-btn {
+      display: flex; align-items: center; gap: 12px;
+      width: 100%;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: all 120ms;
+      text-align: left;
+    }
+    .login-member-btn:hover { border-color: #9ca3af; background: #f9fafb; }
+    .login-member-pill {
+      width: 12px; height: 12px; border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .login-member-name {
+      font-size: 14px; font-weight: 600; color: #111827;
+    }
+
+    .login-pin { display: flex; flex-direction: column; gap: 14px; }
+    .login-back {
+      align-self: flex-start;
+      background: transparent; border: none; color: #4f46e5;
+      font-size: 13px; cursor: pointer; padding: 0;
+    }
+    .login-back:hover { text-decoration: underline; }
+    .login-member-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px;
+      background: #f9fafb;
+      border-radius: 8px;
+    }
+    .login-member-header .login-member-pill { width: 14px; height: 14px; }
+    .login-member-header .login-member-name { font-size: 15px; }
+
+    .login-pin-label {
+      font-size: 12px; font-weight: 600; color: #6b7280;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      text-align: center;
+    }
+    .login-pin-boxes {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    .login-pin-boxes input {
+      width: 100%;
+      height: 56px;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 28px; font-weight: 700;
+      color: #111827;
+      background: #fff;
+      outline: none;
+      transition: border-color 120ms;
+    }
+    .login-pin-boxes input:focus { border-color: #4f46e5; }
+    .login-pin-boxes input.filled { border-color: #4f46e5; background: #eef2ff; }
+
+    .login-stay-toggle {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; color: #374151;
+      cursor: pointer;
+      user-select: none;
+    }
+    .login-stay-toggle input { width: 16px; height: 16px; cursor: pointer; }
+
+    .login-submit {
+      background: #4f46e5; color: #fff;
+      border: none; border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 14px; font-weight: 700;
+      cursor: pointer;
+      transition: background 120ms;
+    }
+    .login-submit:hover { background: #4338ca; }
+    .login-submit:disabled { background: #9ca3af; cursor: wait; }
+
+    .login-error {
+      color: #dc2626;
+      font-size: 13px;
+      text-align: center;
+      min-height: 18px;
+    }
+
+    /* Header logout button */
+    .header-logout {
+      background: #fff; color: #4b5563;
+      border: 1px solid #d1d5db; border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+      transition: all 120ms;
+    }
+    .header-logout:hover { background: #f3f4f6; color: #1f2937; border-color: #9ca3af; }
+    .header-logout-icon { font-size: 15px; }
+    .header-logout-name { color: #111827; }
   </style>
 </head>
 <body>
+  <!-- Login overlay (full-screen gate; hidden once authenticated) -->
+  <div id="loginOverlay" class="login-shell" aria-hidden="true">
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="login-logo">DK</div>
+        <div class="login-title">Direct Konnect CRM</div>
+        <div class="login-sub">Sign in to continue</div>
+      </div>
+
+      <div id="loginPicker" class="login-picker"></div>
+
+      <div id="loginPIN" class="login-pin" hidden>
+        <button type="button" class="login-back" id="loginBackBtn">&larr; Back</button>
+        <div class="login-member-header">
+          <div class="login-member-pill" id="loginMemberPill"></div>
+          <div class="login-member-name" id="loginMemberName"></div>
+        </div>
+        <div class="login-pin-label">Enter your 4-digit PIN</div>
+        <div class="login-pin-boxes" id="loginPinBoxes">
+          <input type="password" inputmode="numeric" maxlength="1" autocomplete="off" data-pin-idx="0" />
+          <input type="password" inputmode="numeric" maxlength="1" autocomplete="off" data-pin-idx="1" />
+          <input type="password" inputmode="numeric" maxlength="1" autocomplete="off" data-pin-idx="2" />
+          <input type="password" inputmode="numeric" maxlength="1" autocomplete="off" data-pin-idx="3" />
+        </div>
+        <label class="login-stay-toggle">
+          <input type="checkbox" id="loginStayToggle" checked />
+          <span>Stay logged in on this device</span>
+        </label>
+        <button type="button" class="login-submit" id="loginSubmitBtn">Sign in</button>
+        <div class="login-error" id="loginError"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="header-bar">
     <div>
       <h1>Mini CRM</h1>
@@ -1279,6 +1455,10 @@
       <button class="primary-lg" id="openWizard">+ Add New Client</button>
       <button class="outline" id="openFilters">🔎 Apply Filters</button>
       <button class="ghost" id="clearFilters" style="display:none;">✕ Clear All Filters</button>
+      <button class="header-logout" id="logoutBtn" style="display:none;" title="Sign out">
+        <span class="header-logout-name" id="logoutNameLabel"></span>
+        <span class="header-logout-icon">&#x21AA;</span>
+      </button>
     </div>
   </div>
 
@@ -1821,6 +2001,129 @@
     const FOLLOW_UP_TYPES = ["Follow-up", "Appointment"];
     const MANAGERS        = [{ label: "Unassigned", value: "" }, { label: "Ivan", value: "Ivan" }, { label: "Hector", value: "Hector" }, { label: "Jesus", value: "Jesus" }];
     const SIGNING_PAGE_URL = "https://direct-konnect-sign.vercel.app/sign.html";
+
+    // ============================================================
+    // TEAM AUTH
+    // ============================================================
+    // One-time Supabase setup (do this once in Supabase dashboard before logging in):
+    //   1. Authentication -> Sign In / Providers -> Email -> turn OFF "Confirm email".
+    //   2. Authentication -> Users -> "Add user" -> "Create new user", with "Auto Confirm User" ON:
+    //        chucho.alberto17@gmail.com / 1718   (Jesus)
+    //        ivan@directkonnect.local   / 0000   (Ivan)
+    //        hector@directkonnect.local / 0001   (Hector)
+    //   3. Run schema.sql in the SQL editor (it tightens RLS on clients + contract_text_templates).
+    // After that, refresh the CRM, click your name, type your PIN, you're in.
+    const TEAM_MEMBERS = [
+      { name: "Jesus",  email: "chucho.alberto17@gmail.com", color: "#10b981" },
+      { name: "Ivan",   email: "ivan@directkonnect.local",   color: "#3b82f6" },
+      { name: "Hector", email: "hector@directkonnect.local", color: "#8b5cf6" },
+    ];
+    const TEAM_BY_EMAIL = Object.fromEntries(TEAM_MEMBERS.map((m) => [m.email, m]));
+    const STAY_LOGGED_IN_KEY = "dk_stay_logged_in";  // localStorage
+    const SESSION_MARKER_KEY = "dk_session_active";  // sessionStorage
+    let currentTeamMember = null;     // selected member during the login flow
+    let signedInMember    = null;     // currently authenticated team member (or null)
+
+    // ---- Login overlay handles ----
+    const loginOverlay   = document.getElementById("loginOverlay");
+    const loginPicker    = document.getElementById("loginPicker");
+    const loginPIN       = document.getElementById("loginPIN");
+    const loginBackBtn   = document.getElementById("loginBackBtn");
+    const loginMemberPill = document.getElementById("loginMemberPill");
+    const loginMemberName = document.getElementById("loginMemberName");
+    const loginPinBoxes  = document.getElementById("loginPinBoxes");
+    const loginStayToggle = document.getElementById("loginStayToggle");
+    const loginSubmitBtn = document.getElementById("loginSubmitBtn");
+    const loginError     = document.getElementById("loginError");
+    const logoutBtn      = document.getElementById("logoutBtn");
+    const logoutNameLabel = document.getElementById("logoutNameLabel");
+
+    function getStayLoggedIn() {
+      try {
+        const v = localStorage.getItem(STAY_LOGGED_IN_KEY);
+        return v === null ? true : v === "true";
+      } catch { return true; }
+    }
+    function setStayLoggedIn(bool) {
+      try { localStorage.setItem(STAY_LOGGED_IN_KEY, bool ? "true" : "false"); } catch {}
+    }
+
+    function showLoginOverlay() {
+      loginError.textContent = "";
+      loginPIN.hidden = true;
+      loginPicker.hidden = false;
+      currentTeamMember = null;
+      renderLoginPicker();
+      loginOverlay.classList.add("open");
+      loginOverlay.setAttribute("aria-hidden", "false");
+      document.body.classList.add("login-active");
+    }
+    function hideLoginOverlay() {
+      loginOverlay.classList.remove("open");
+      loginOverlay.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("login-active");
+    }
+
+    function renderLoginPicker() {
+      loginPicker.innerHTML = TEAM_MEMBERS.map((m) => `
+        <button type="button" class="login-member-btn" data-login-email="${m.email}">
+          <span class="login-member-pill" style="background:${m.color}"></span>
+          <span class="login-member-name">${m.name}</span>
+        </button>
+      `).join("");
+    }
+
+    function showLoginPIN(member) {
+      currentTeamMember = member;
+      loginError.textContent = "";
+      loginMemberPill.style.background = member.color;
+      loginMemberName.textContent = member.name;
+      loginStayToggle.checked = getStayLoggedIn();
+      // Reset PIN boxes
+      loginPinBoxes.querySelectorAll("input").forEach((inp) => { inp.value = ""; inp.classList.remove("filled"); });
+      loginPicker.hidden = true;
+      loginPIN.hidden = false;
+      setTimeout(() => loginPinBoxes.querySelector('input[data-pin-idx="0"]').focus(), 0);
+    }
+
+    function showLoginPicker() {
+      loginError.textContent = "";
+      loginPIN.hidden = true;
+      loginPicker.hidden = false;
+      currentTeamMember = null;
+    }
+
+    // Wire up Phase A interactions (Phase B will add submit/auth)
+    loginPicker.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-login-email]");
+      if (!btn) return;
+      const member = TEAM_BY_EMAIL[btn.dataset.loginEmail];
+      if (member) showLoginPIN(member);
+    });
+    loginBackBtn.addEventListener("click", showLoginPicker);
+
+    // PIN box auto-advance + back-step on delete (works even before submit is wired)
+    loginPinBoxes.addEventListener("input", (e) => {
+      const inp = e.target;
+      if (!inp.matches("input[data-pin-idx]")) return;
+      // Strip non-digits
+      inp.value = inp.value.replace(/\D/g, "").slice(0, 1);
+      if (inp.value) {
+        inp.classList.add("filled");
+        const next = inp.parentElement.querySelector(`input[data-pin-idx="${Number(inp.dataset.pinIdx) + 1}"]`);
+        if (next) next.focus();
+      } else {
+        inp.classList.remove("filled");
+      }
+    });
+    loginPinBoxes.addEventListener("keydown", (e) => {
+      const inp = e.target;
+      if (!inp.matches("input[data-pin-idx]")) return;
+      if (e.key === "Backspace" && !inp.value) {
+        const prev = inp.parentElement.querySelector(`input[data-pin-idx="${Number(inp.dataset.pinIdx) - 1}"]`);
+        if (prev) { prev.focus(); prev.value = ""; prev.classList.remove("filled"); e.preventDefault(); }
+      }
+    });
 
     const CONTRACT_TEMPLATES = [
       {
