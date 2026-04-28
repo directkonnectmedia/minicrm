@@ -3086,12 +3086,20 @@
         fields: [
           { name: "client_name", label: "Client name", type: "text", placeholder: "Jane Doe" },
           { name: "phone", label: "Phone", type: "tel", placeholder: "(555) 123-4567", maxlength: 14, inputmode: "numeric", autocomplete: "tel-national" },
+          { name: "email", label: "Email", type: "email", placeholder: "owner@yourcompany.com", autocomplete: "email", inputmode: "email" },
         ],
         validate: async (data) => {
           const p = normPhone(data.phone);
-          if (!p) return null;
-          const existing = allClients.find((c) => normPhone(c.phone) === p);
-          if (existing) return `This contact already exists — registered under "${existing.company_name}".`;
+          if (p) {
+            const existingByPhone = allClients.find((c) => normPhone(c.phone) === p);
+            if (existingByPhone) return `This contact already exists — registered under "${existingByPhone.company_name}".`;
+          }
+          const e = (data.email || "").trim().toLowerCase();
+          if (e) {
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return "That email doesn't look valid.";
+            const existingByEmail = allClients.find((c) => (c.email || "").toLowerCase() === e);
+            if (existingByEmail) return `This email is already registered under "${existingByEmail.company_name}".`;
+          }
           return null;
         },
       },
@@ -3179,7 +3187,7 @@
       const fuIso = formData.fu_date ? combineDateTime(formData.fu_date, formData.fu_time) : null;
       const rows = [
         ["Company", formData.company_name], ["Business Type", formData.business_type],
-        ["Client", formData.client_name], ["Phone", formData.phone],
+        ["Client", formData.client_name], ["Phone", formData.phone], ["Email", formData.email],
         ["Profile Link", formData.profile_link], ["Post Link", formData.post_link],
         ["Finished Website", formData.finished_website],
         ["Manager", formData.manager], ["Web Status", formData.web_status],
@@ -3243,6 +3251,7 @@
       const row = {
         company_name: formData.company_name || null, business_type: formData.business_type || null,
         client_name: formData.client_name || null, phone: formData.phone || null,
+        email: (formData.email || "").trim().toLowerCase() || null,
         profile_link: formData.profile_link || null, post_link: formData.post_link || null,
         finished_website: formData.finished_website || null,
         manager: formData.manager || null,
@@ -3353,6 +3362,7 @@
         ${renderInfoRow("Business Type", c.business_type, "business_type", "datalist")}
         ${renderInfoRow("Client", c.client_name, "client_name", "text")}
         ${renderInfoRow("Phone", c.phone, "phone", "phone")}
+        ${renderInfoRow("Email", c.email, "email", "email")}
         ${renderInfoRow("Profile Link", c.profile_link, "profile_link", "url")}
         ${renderInfoRow("Post Link", c.post_link, "post_link", "url")}
       `;
@@ -3361,15 +3371,20 @@
     function renderInfoRow(label, value, fieldName, type) {
       const inEdit = detailEditingField === fieldName;
       if (inEdit) {
-        const inputType = type === "phone" ? "tel" : (type === "url" ? "url" : "text");
+        const inputType =
+          type === "phone" ? "tel" :
+          type === "url"   ? "url" :
+          type === "email" ? "email" :
+          "text";
         const v = type === "phone" ? displayPhone(value) : (value || "");
         const phoneAttrs = type === "phone" ? ' maxlength="14" inputmode="numeric" class="phone-input"' : "";
+        const emailAttrs = type === "email" ? ' inputmode="email" autocomplete="email"' : "";
         const datalistAttr = type === "datalist" ? ' list="business_types"' : "";
         return `
           <div class="info-row">
             <div class="info-label">${esc(label)}</div>
             <div class="inline-edit-row">
-              <input type="${inputType}" data-edit="${fieldName}" value="${esc(v)}"${phoneAttrs}${datalistAttr}>
+              <input type="${inputType}" data-edit="${fieldName}" value="${esc(v)}"${phoneAttrs}${emailAttrs}${datalistAttr}>
             </div>
             <div class="row-actions">
               <button class="icon-btn" data-action="save-edit" data-field="${fieldName}" title="Save">✓</button>
@@ -3378,7 +3393,8 @@
           </div>`;
       }
       let displayHtml;
-      if (type === "url" && value) displayHtml = `<a href="${esc(value)}" target="_blank" rel="noopener">${esc(value)}</a>`;
+      if (type === "url"   && value) displayHtml = `<a href="${esc(value)}" target="_blank" rel="noopener">${esc(value)}</a>`;
+      else if (type === "email" && value) displayHtml = `<a href="mailto:${esc(value)}">${esc(value)}</a>`;
       else if (type === "phone" && value) displayHtml = esc(displayPhone(value));
       else if (value) displayHtml = esc(value);
       else displayHtml = `<span class="muted">—</span>`;
@@ -4263,6 +4279,23 @@
             alert(`This phone is already registered under "${dup.company_name}".`);
             return;
           }
+        }
+      }
+      // Email: validate + dedupe + normalize to lowercase. Stored lowercase
+      // because the Client Portal magic-link sign-in matches against it.
+      if (field === "email") {
+        const e = value.toLowerCase();
+        if (e) {
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+            alert("That email doesn't look valid.");
+            return;
+          }
+          const dup = allClients.find((c) => c.id !== detailId && (c.email || "").toLowerCase() === e);
+          if (dup) {
+            alert(`This email is already registered under "${dup.company_name}".`);
+            return;
+          }
+          value = e;
         }
       }
       // Required: company_name

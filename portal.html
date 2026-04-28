@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Direct Konnect — Client Portal</title>
+  <style>
+    /* ================================================================
+       Direct Konnect Client Portal
+       Phase A: UI mock with hardcoded data. No auth, no Supabase yet.
+       To preview a different state during review, flip MOCK_VIEW at the
+       top of the <script> block at the bottom of this file:
+         "signin"   - the email entry form
+         "linkSent" - the "check your email" confirmation
+         "portal"   - the signed-in dashboard with tabs (default)
+       ================================================================ */
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f6f7f9;
+      color: #1a1a1a;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ---------- View switcher (only one visible at a time) ---------- */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ================================================================
+       AUTH VIEWS (signin + linkSent)
+       Centered card on a soft background.
+       ================================================================ */
+    .auth-shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: linear-gradient(180deg, #f6f7f9 0%, #eef0f3 100%);
+    }
+    .auth-card {
+      background: #fff;
+      width: 100%;
+      max-width: 420px;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      box-shadow: 0 12px 40px rgba(17, 24, 39, 0.08);
+      padding: 32px 28px;
+    }
+    .auth-brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 22px;
+    }
+    .auth-logo {
+      width: 56px; height: 56px;
+      border-radius: 14px;
+      background: #111827;
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 22px;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+    .auth-title    { font-size: 20px; font-weight: 700; margin: 0 0 4px; color: #111827; text-align: center; }
+    .auth-subtitle { font-size: 14px; color: #6b7280; margin: 0; text-align: center; line-height: 1.5; }
+
+    .auth-field { margin-top: 22px; margin-bottom: 4px; }
+    .auth-field label {
+      display: block; font-size: 13px; font-weight: 600;
+      color: #374151; margin-bottom: 6px;
+    }
+    .auth-field input {
+      width: 100%; padding: 11px 13px;
+      border: 1px solid #d1d5db; border-radius: 8px;
+      font-size: 15px; font-family: inherit; color: #111827;
+      transition: border-color 120ms, box-shadow 120ms;
+    }
+    .auth-field input:focus {
+      outline: none;
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
+    .auth-error {
+      color: #991b1b; font-size: 13px; background: #fee2e2;
+      padding: 8px 10px; border-radius: 6px; margin-top: 10px;
+      display: none;
+    }
+    .auth-error.show { display: block; }
+    .auth-submit {
+      margin-top: 16px;
+      width: 100%;
+      padding: 12px 16px;
+      background: #111827;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 120ms;
+    }
+    .auth-submit:hover { background: #1f2937; }
+    .auth-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .auth-footer {
+      margin-top: 22px;
+      padding-top: 16px;
+      border-top: 1px solid #f3f4f6;
+      font-size: 12px;
+      color: #9ca3af;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    /* Link-sent confirmation specifics */
+    .auth-checkmark {
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      background: #d1fae5;
+      color: #065f46;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      margin-bottom: 14px;
+    }
+    .auth-email-pill {
+      display: inline-block;
+      background: #f3f4f6;
+      color: #111827;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      margin: 0 2px;
+    }
+    .auth-secondary-btn {
+      display: inline-block;
+      margin-top: 14px;
+      background: transparent;
+      color: #6b7280;
+      border: none;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    .auth-secondary-btn:hover { color: #111827; }
+
+    /* ================================================================
+       PORTAL SHELL (signed-in)
+       Top header bar + main content area.
+       ================================================================ */
+    .portal-header {
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .portal-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+    .portal-brand-logo {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      background: #111827;
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.05em;
+      flex-shrink: 0;
+    }
+    .portal-brand-text { display: flex; flex-direction: column; min-width: 0; }
+    .portal-brand-name { font-weight: 700; font-size: 14px; color: #111827; line-height: 1.2; }
+    .portal-brand-sub  { font-size: 12px; color: #6b7280; line-height: 1.2; margin-top: 2px; }
+
+    .portal-account {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .portal-account-name { font-size: 13px; font-weight: 600; color: #111827; }
+    .portal-account-email { font-size: 12px; color: #6b7280; }
+    .portal-account-info { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3; }
+    .portal-signout {
+      background: #fff;
+      color: #4b5563;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 120ms;
+    }
+    .portal-signout:hover { background: #f3f4f6; color: #111827; border-color: #9ca3af; }
+
+    .portal-main {
+      max-width: 1024px;
+      margin: 0 auto;
+      padding: 28px 24px 48px;
+    }
+    .portal-welcome {
+      margin-bottom: 22px;
+    }
+    .portal-welcome h1 { margin: 0 0 4px; font-size: 24px; font-weight: 700; color: #111827; }
+    .portal-welcome p  { margin: 0; color: #6b7280; font-size: 14px; }
+
+    /* ---------- Tabs ---------- */
+    .portal-tabs {
+      display: flex;
+      gap: 2px;
+      margin-bottom: 18px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .portal-tab {
+      background: transparent;
+      color: #6b7280;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 0;
+      transition: color 120ms, border-color 120ms;
+    }
+    .portal-tab:hover { color: #1f2937; }
+    .portal-tab.active { color: #111827; border-bottom-color: #111827; }
+
+    .portal-tab-panel { display: none; }
+    .portal-tab-panel.active { display: block; }
+
+    /* ================================================================
+       CONTRACT TAB
+       List of contract rows with status, template name, dates, View btn.
+       ================================================================ */
+    .contract-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .contract-row {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .contract-row-main { flex: 1; min-width: 0; }
+    .contract-row-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .contract-row-name { font-weight: 600; color: #111827; font-size: 15px; }
+    .contract-row-meta {
+      margin-top: 6px;
+      font-size: 13px;
+      color: #6b7280;
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .contract-row-meta-label { color: #9ca3af; font-weight: 500; margin-right: 4px; }
+    .contract-row-actions { flex-shrink: 0; display: flex; gap: 8px; }
+
+    .contract-view-btn {
+      background: #fff;
+      color: #111827;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 120ms;
+    }
+    .contract-view-btn:hover { background: #f9fafb; border-color: #9ca3af; }
+    .contract-view-btn.primary {
+      background: #111827; color: #fff; border-color: #111827;
+    }
+    .contract-view-btn.primary:hover { background: #1f2937; border-color: #1f2937; }
+
+    /* Contract status badges (mirrored from CRM, expanded for portal) */
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+    }
+    .cstatus-pending { background: #f3f4f6; color: #4b5563; }
+    .cstatus-sent    { background: #dbeafe; color: #1e40af; }
+    .cstatus-viewed  { background: #ede9fe; color: #5b21b6; }
+    .cstatus-signed  { background: #d1fae5; color: #065f46; }
+    .cstatus-voided  { background: #fee2e2; color: #991b1b; }
+
+    .empty-state {
+      background: #fff;
+      border: 1px dashed #d1d5db;
+      border-radius: 10px;
+      padding: 36px 20px;
+      text-align: center;
+      color: #6b7280;
+      font-size: 14px;
+    }
+    .empty-state-icon { font-size: 32px; opacity: 0.4; display: block; margin-bottom: 8px; }
+    .empty-state-title { font-weight: 600; color: #374151; margin-bottom: 4px; }
+
+    /* ================================================================
+       INVOICE TAB (placeholder)
+       ================================================================ */
+    .invoice-placeholder {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 36px 28px;
+      text-align: center;
+    }
+    .invoice-placeholder-icon {
+      width: 56px; height: 56px;
+      border-radius: 14px;
+      background: #fef3c7;
+      color: #92400e;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      margin-bottom: 12px;
+    }
+    .invoice-placeholder-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #111827;
+      margin: 0 0 6px;
+    }
+    .invoice-placeholder-body {
+      font-size: 14px;
+      color: #6b7280;
+      max-width: 420px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* ================================================================
+       MODALS (contract viewer)
+       ================================================================ */
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(17, 24, 39, 0.55);
+      display: none;
+      align-items: center; justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+    .overlay.open { display: flex; }
+    .modal {
+      background: #fff;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 820px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      max-height: 90vh;
+    }
+    .modal-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .modal-title-group { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .modal-title       { font-size: 16px; font-weight: 600; color: #111827; }
+    .modal-close {
+      background: transparent;
+      color: #6b7280;
+      border: none;
+      font-size: 22px;
+      padding: 4px 8px;
+      line-height: 1;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+    .modal-close:hover { background: #f3f4f6; color: #111827; }
+
+    .contract-body {
+      padding: 22px 28px;
+      overflow-y: auto;
+      flex: 1;
+      font-size: 14px;
+      line-height: 1.65;
+      color: #1f2937;
+      background: #fafafa;
+    }
+    .contract-body h1, .contract-body h2, .contract-body h3 {
+      color: #111827;
+    }
+
+    .modal-footer {
+      padding: 14px 20px;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      background: #f9fafb;
+    }
+    .modal-footer-meta { font-size: 12px; color: #6b7280; }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 540px) {
+      .portal-header { padding: 12px 16px; }
+      .portal-main   { padding: 22px 16px 40px; }
+      .portal-account-info { display: none; }
+      .contract-row { flex-direction: column; align-items: stretch; }
+      .contract-row-actions { justify-content: stretch; }
+      .contract-view-btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============================================================
+       VIEW 1: Sign-in
+       ============================================================ -->
+  <div id="view-signin" class="view auth-shell">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <span class="auth-logo">DK</span>
+        <h1 class="auth-title">Direct Konnect</h1>
+        <p class="auth-subtitle">Sign in to your client portal.<br>Enter your email and we'll send you a sign-in link.</p>
+      </div>
+
+      <form id="signinForm">
+        <div class="auth-field">
+          <label for="signinEmail">Email address</label>
+          <input
+            id="signinEmail"
+            type="email"
+            inputmode="email"
+            autocomplete="email"
+            placeholder="you@yourcompany.com"
+            required
+          />
+        </div>
+        <div class="auth-error" id="signinError"></div>
+        <button type="submit" class="auth-submit" id="signinSubmit">Send magic link</button>
+      </form>
+
+      <div class="auth-footer">
+        Can't get in? Reach out to your account manager and they'll get you sorted.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       VIEW: Booting (brief flash while we check the session)
+       ============================================================ -->
+  <div id="view-booting" class="view active auth-shell">
+    <div class="auth-card" style="text-align:center;padding:48px 28px;">
+      <div class="auth-brand">
+        <span class="auth-logo">DK</span>
+      </div>
+      <p class="auth-subtitle">Loading your portal...</p>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       VIEW: No account found (signed in via magic link, but their
+       email doesn't match any client row in public.clients)
+       ============================================================ -->
+  <div id="view-noAccount" class="view auth-shell">
+    <div class="auth-card" style="text-align:center;">
+      <div class="auth-brand">
+        <span class="auth-logo">DK</span>
+        <h1 class="auth-title">No account found</h1>
+        <p class="auth-subtitle">
+          We don't see a Direct Konnect client account for
+          <span class="auth-email-pill" id="noAccountEmail">your email</span>.
+          <br>If you think this is a mistake, please contact your account manager.
+        </p>
+      </div>
+      <button type="button" class="auth-secondary-btn" id="noAccountSignout">Sign out and try a different email</button>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       VIEW 2: Magic link sent confirmation
+       ============================================================ -->
+  <div id="view-linkSent" class="view auth-shell">
+    <div class="auth-card" style="text-align:center;">
+      <div class="auth-brand">
+        <span class="auth-checkmark">&#x2714;</span>
+        <h1 class="auth-title">Check your email</h1>
+        <p class="auth-subtitle">
+          We sent a sign-in link to
+          <span class="auth-email-pill" id="linkSentEmail">you@yourcompany.com</span>.
+          <br>Click the link in the email to access your portal.
+        </p>
+      </div>
+      <p class="auth-subtitle" style="margin-top:18px;">
+        The link expires in 1 hour. If it doesn't arrive within a couple of minutes, check your spam folder.
+      </p>
+      <button type="button" class="auth-secondary-btn" id="linkSentBack">Use a different email</button>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       VIEW 3: Signed-in portal
+       ============================================================ -->
+  <div id="view-portal" class="view">
+    <header class="portal-header">
+      <div class="portal-brand">
+        <span class="portal-brand-logo">DK</span>
+        <div class="portal-brand-text">
+          <span class="portal-brand-name">Direct Konnect</span>
+          <span class="portal-brand-sub">Client Portal</span>
+        </div>
+      </div>
+      <div class="portal-account">
+        <div class="portal-account-info">
+          <span class="portal-account-name" id="portalAccountName">Acme Roofing</span>
+          <span class="portal-account-email" id="portalAccountEmail">owner@acmeroofing.example</span>
+        </div>
+        <button class="portal-signout" id="portalSignoutBtn">Sign out</button>
+      </div>
+    </header>
+
+    <main class="portal-main">
+      <div class="portal-welcome">
+        <h1 id="portalWelcomeTitle">Welcome, Acme Roofing</h1>
+        <p>Your contracts and billing live here. We'll add more as your project moves.</p>
+      </div>
+
+      <div class="portal-tabs" id="portalTabs">
+        <button class="portal-tab active" data-tab="contract" type="button">Contract</button>
+        <button class="portal-tab"        data-tab="invoice"  type="button">Invoice</button>
+      </div>
+
+      <!-- Contract tab -->
+      <section class="portal-tab-panel active" data-tab-panel="contract">
+        <div id="contractList" class="contract-list">
+          <!-- populated by renderContractList() in boot() -->
+        </div>
+      </section>
+
+      <!-- Invoice tab -->
+      <section class="portal-tab-panel" data-tab-panel="invoice">
+        <div class="invoice-placeholder">
+          <div class="invoice-placeholder-icon">&#x1F4C4;</div>
+          <h2 class="invoice-placeholder-title">Invoices coming soon</h2>
+          <p class="invoice-placeholder-body">
+            We're still putting this part together. For now your account manager will send billing details directly. Once it's live, all your invoices and payment history will show up right here.
+          </p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ============================================================
+       Contract viewer modal
+       ============================================================ -->
+  <div class="overlay" id="contractOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-title" id="contractModalTitle">Contract</span>
+          <span class="badge" id="contractModalBadge"></span>
+        </div>
+        <button class="modal-close" id="contractModalClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="contract-body" id="contractModalBody">
+        <!-- contract HTML injected here -->
+      </div>
+      <div class="modal-footer">
+        <span class="modal-footer-meta" id="contractModalMeta">Sent on April 12, 2026</span>
+        <button class="contract-view-btn" id="contractModalCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // ================================================================
+    // Supabase init. Same project + anon key as the CRM (index.html).
+    // RLS on public.clients gates per-email access via auth.email().
+    // ================================================================
+    const SUPABASE_URL = "https://ljghuyeugzmduzzvngkc.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqZ2h1eWV1Z3ptZHV6enZuZ2tjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MTIzOTIsImV4cCI6MjA5MjI4ODM5Mn0.aoeOD1Xvm_q_ZYlJ_x72J_WvmODkwvbNQ7dwbCa5bTY";
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Where the magic link should drop the client back. Must also be
+    // listed in Supabase Auth -> URL Configuration -> Redirect URLs.
+    const PORTAL_URL = window.location.origin + window.location.pathname;
+
+    // ================================================================
+    // VIEW SWITCHING
+    // ================================================================
+    function showView(name) {
+      document.querySelectorAll(".view").forEach((el) => el.classList.remove("active"));
+      const target = document.getElementById("view-" + name);
+      if (target) target.classList.add("active");
+    }
+
+    // ================================================================
+    // SIGN-IN form (live: dispatches a magic link via Supabase Auth)
+    // ================================================================
+    const signinForm   = document.getElementById("signinForm");
+    const signinEmail  = document.getElementById("signinEmail");
+    const signinError  = document.getElementById("signinError");
+    const signinSubmit = document.getElementById("signinSubmit");
+    const linkSentEmail = document.getElementById("linkSentEmail");
+    const linkSentBack  = document.getElementById("linkSentBack");
+
+    function setSigninError(msg) {
+      if (!msg) { signinError.classList.remove("show"); signinError.textContent = ""; return; }
+      signinError.textContent = msg;
+      signinError.classList.add("show");
+    }
+
+    signinForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = signinEmail.value.trim().toLowerCase();
+      setSigninError("");
+      if (!email) { setSigninError("Enter your email address."); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setSigninError("That doesn't look like a valid email.");
+        return;
+      }
+      signinSubmit.disabled = true;
+      signinSubmit.textContent = "Sending...";
+      try {
+        const { error } = await sb.auth.signInWithOtp({
+          email,
+          options: { emailRedirectTo: PORTAL_URL },
+        });
+        if (error) throw error;
+        linkSentEmail.textContent = email;
+        showView("linkSent");
+      } catch (err) {
+        setSigninError("Couldn't send the link: " + (err.message || err));
+      } finally {
+        signinSubmit.disabled = false;
+        signinSubmit.textContent = "Send magic link";
+      }
+    });
+
+    linkSentBack.addEventListener("click", () => {
+      setSigninError("");
+      showView("signin");
+      signinEmail.focus();
+    });
+
+    // No-account view: sign out + back to signin
+    document.getElementById("noAccountSignout").addEventListener("click", async () => {
+      try { await sb.auth.signOut(); } catch {}
+      showView("signin");
+      signinEmail.value = "";
+      setTimeout(() => signinEmail.focus(), 50);
+    });
+
+    // ================================================================
+    // PORTAL: render header + tabs + contract list
+    // ================================================================
+    function fmtDate(iso) {
+      if (!iso) return "—";
+      try {
+        return new Date(iso).toLocaleDateString(undefined, {
+          year: "numeric", month: "short", day: "numeric",
+        });
+      } catch { return iso; }
+    }
+
+    function renderPortalHeader(client) {
+      document.getElementById("portalAccountName").textContent  = client.company_name;
+      document.getElementById("portalAccountEmail").textContent = client.email;
+      document.getElementById("portalWelcomeTitle").textContent = `Welcome, ${client.company_name}`;
+    }
+
+    const STATUS_LABELS = {
+      pending: "Pending",
+      sent:    "Sent",
+      viewed:  "Viewed",
+      signed:  "Signed",
+      voided:  "Voided",
+    };
+
+    function statusBadge(status) {
+      const safe = STATUS_LABELS[status] ? status : "pending";
+      const label = STATUS_LABELS[safe] || "Pending";
+      return `<span class="badge cstatus-${safe}">${label}</span>`;
+    }
+
+    // Mutates an existing badge <span> so cached DOM refs stay valid across
+    // multiple modal opens (outerHTML would detach the node).
+    function paintBadge(el, status) {
+      const safe  = STATUS_LABELS[status] ? status : "pending";
+      const label = STATUS_LABELS[safe] || "Pending";
+      el.className   = `badge cstatus-${safe}`;
+      el.textContent = label;
+    }
+
+    function contractMetaLine(c) {
+      const bits = [];
+      if (c.signed_at) {
+        bits.push(`<span><span class="contract-row-meta-label">Signed</span>${fmtDate(c.signed_at)}${c.signer_name ? " by " + escapeHtml(c.signer_name) : ""}</span>`);
+      } else if (c.viewed_at) {
+        bits.push(`<span><span class="contract-row-meta-label">Viewed</span>${fmtDate(c.viewed_at)}</span>`);
+      } else if (c.sent_at) {
+        bits.push(`<span><span class="contract-row-meta-label">Sent</span>${fmtDate(c.sent_at)}</span>`);
+      }
+      if (c.sent_at && c.signed_at) {
+        bits.push(`<span><span class="contract-row-meta-label">Sent</span>${fmtDate(c.sent_at)}</span>`);
+      }
+      return bits.join("");
+    }
+
+    function escapeHtml(s) {
+      return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => (
+        { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+      ));
+    }
+
+    function renderContractList(contracts) {
+      const list = document.getElementById("contractList");
+      if (!contracts || contracts.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <span class="empty-state-icon">&#x1F4DD;</span>
+            <div class="empty-state-title">No contracts yet</div>
+            <div>Once your account manager sends you a contract, it will appear here.</div>
+          </div>
+        `;
+        return;
+      }
+      list.innerHTML = contracts.map((c) => {
+        const isUnsigned = c.status !== "signed" && c.status !== "voided";
+        const btnLabel   = isUnsigned ? "Review &amp; sign" : "View contract";
+        const btnClass   = isUnsigned ? "contract-view-btn primary" : "contract-view-btn";
+        return `
+          <div class="contract-row">
+            <div class="contract-row-main">
+              <div class="contract-row-title">
+                <span class="contract-row-name">${escapeHtml(c.template_name || "Contract")}</span>
+                ${statusBadge(c.status)}
+              </div>
+              <div class="contract-row-meta">
+                ${contractMetaLine(c)}
+              </div>
+            </div>
+            <div class="contract-row-actions">
+              <button type="button" class="${btnClass}" data-contract-id="${escapeHtml(c.id)}">${btnLabel}</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    // Tab switching
+    document.getElementById("portalTabs").addEventListener("click", (e) => {
+      const btn = e.target.closest(".portal-tab");
+      if (!btn) return;
+      const tab = btn.dataset.tab;
+      document.querySelectorAll(".portal-tab").forEach((b) => b.classList.toggle("active", b === btn));
+      document.querySelectorAll(".portal-tab-panel").forEach((p) => {
+        p.classList.toggle("active", p.dataset.tabPanel === tab);
+      });
+    });
+
+    // Sign-out (live)
+    document.getElementById("portalSignoutBtn").addEventListener("click", async () => {
+      try { await sb.auth.signOut(); } catch (err) { console.warn("Sign out failed:", err); }
+      currentClient = null;
+      currentContracts = [];
+      signinEmail.value = "";
+      showView("signin");
+      setTimeout(() => signinEmail.focus(), 50);
+    });
+
+    // ================================================================
+    // Contract viewer modal
+    // ================================================================
+    const contractOverlay     = document.getElementById("contractOverlay");
+    const contractModalTitle  = document.getElementById("contractModalTitle");
+    const contractModalBadge  = document.getElementById("contractModalBadge");
+    const contractModalBody   = document.getElementById("contractModalBody");
+    const contractModalMeta   = document.getElementById("contractModalMeta");
+
+    function openContractModal(contract) {
+      contractModalTitle.textContent = contract.template_name || "Contract";
+      paintBadge(contractModalBadge, contract.status);
+
+      contractModalBody.innerHTML = contract.contract_html || "<em>Contract content unavailable.</em>";
+
+      const metaParts = [];
+      if (contract.sent_at)   metaParts.push(`Sent ${fmtDate(contract.sent_at)}`);
+      if (contract.viewed_at) metaParts.push(`Viewed ${fmtDate(contract.viewed_at)}`);
+      if (contract.signed_at) metaParts.push(`Signed ${fmtDate(contract.signed_at)}${contract.signer_name ? " by " + contract.signer_name : ""}`);
+      contractModalMeta.textContent = metaParts.length ? metaParts.join("  \u00B7  ") : "";
+
+      contractOverlay.classList.add("open");
+      document.body.style.overflow = "hidden";
+    }
+    function closeContractModal() {
+      contractOverlay.classList.remove("open");
+      document.body.style.overflow = "";
+    }
+
+    document.getElementById("contractModalClose").addEventListener("click", closeContractModal);
+    document.getElementById("contractModalCloseBtn").addEventListener("click", closeContractModal);
+    contractOverlay.addEventListener("click", (e) => {
+      if (e.target === contractOverlay) closeContractModal();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && contractOverlay.classList.contains("open")) closeContractModal();
+    });
+
+    // ================================================================
+    // LIVE DATA — fetched from Supabase, gated by RLS so each client
+    // only sees their own row + their own signed_contracts.
+    // ================================================================
+    let currentClient    = null;   // matched row from public.clients
+    let currentContracts = [];     // signed_contracts for that client
+
+    // Pull the row that matches the signed-in user's email. RLS does the
+    // gating; we just SELECT and assume the result is empty unless our
+    // email matches. If multiple rows happen to share an email (rare),
+    // we pick the most recent.
+    async function fetchClientForEmail(email) {
+      const { data, error } = await sb
+        .from("clients")
+        .select("id, company_name, email, finished_website, web_status, client_status, manager")
+        .eq("email", email.toLowerCase())
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (error) {
+        console.warn("Client lookup failed:", error);
+        return null;
+      }
+      return (data && data[0]) || null;
+    }
+
+    // Pull every signed_contracts row for a given client_id, newest first.
+    async function fetchContractsForClient(clientId) {
+      const { data, error } = await sb
+        .from("signed_contracts")
+        .select("id, template_name, status, sent_at, viewed_at, signed_at, signer_name, contract_html")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.warn("Contract fetch failed:", error);
+        return [];
+      }
+      return data || [];
+    }
+
+    // Open modal when a contract row's button is clicked
+    document.getElementById("contractList").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-contract-id]");
+      if (!btn) return;
+      const id = btn.dataset.contractId;
+      const contract = currentContracts.find((c) => String(c.id) === id);
+      if (contract) openContractModal(contract);
+    });
+
+    // ================================================================
+    // BOOT
+    // Decide which view to show based on the live Supabase session:
+    //   - no session                    -> signin
+    //   - session, email matches client -> portal
+    //   - session, no client row found  -> noAccount
+    // The Supabase JS client auto-detects the magic-link tokens in the
+    // URL hash on load and creates the session before we get here.
+    // ================================================================
+    async function boot() {
+      let session = null;
+      try {
+        const { data } = await sb.auth.getSession();
+        session = data && data.session ? data.session : null;
+      } catch (err) {
+        console.warn("getSession failed:", err);
+      }
+
+      if (!session) {
+        showView("signin");
+        setTimeout(() => signinEmail.focus(), 50);
+        return;
+      }
+
+      const email = session.user && session.user.email;
+      if (!email) {
+        showView("signin");
+        return;
+      }
+
+      const client = await fetchClientForEmail(email);
+      if (!client) {
+        document.getElementById("noAccountEmail").textContent = email;
+        showView("noAccount");
+        return;
+      }
+
+      currentClient = client;
+      currentContracts = await fetchContractsForClient(client.id);
+      renderPortalHeader({
+        company_name: client.company_name || email,
+        email: email,
+      });
+      renderContractList(currentContracts);
+      showView("portal");
+    }
+
+    // React to auth changes (e.g. token refresh failure pushes us out)
+    sb.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        currentClient = null;
+        currentContracts = [];
+        // Avoid flashing signin during the brief moment between sign-in
+        // and the very-next page load that boot() handles. Only push to
+        // signin on an explicit sign-out.
+        if (event === "SIGNED_OUT") showView("signin");
+      }
+    });
+
+    boot();
+  </script>
+</body>
+</html>

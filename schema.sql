@@ -6,6 +6,7 @@ create table if not exists public.clients (
   client_name text,
   business_type text,
   phone text,
+  email text,
   profile_link text,
   post_link text,
   finished_website text,
@@ -63,6 +64,13 @@ alter table public.clients add column if not exists business_type text;
 alter table public.clients add column if not exists manager text;
 alter table public.clients add column if not exists finished_website text;
 alter table public.clients add column if not exists post_link text;
+
+-- Client contact email. Used by the Client Portal (portal.html) for
+-- magic-link sign-in: portal.html calls auth.signInWithOtp({email}), and
+-- RLS scopes data so each client only sees the row whose email matches
+-- auth.email(). Optional; clients without an email simply can't sign in.
+alter table public.clients add column if not exists email text;
+create index if not exists clients_email_idx on public.clients (lower(email));
 
 -- Rename old source link to profile_link if it still exists.
 do $$
@@ -247,6 +255,10 @@ create policy "authenticated all"
 -- public.clients: drop the old anon-everything policies and add a single
 -- authenticated-everything policy. Anonymous visitors can no longer read,
 -- write, update, or delete client records.
+--
+-- NOTE: this temporary "authenticated all" policy is replaced further
+-- down by the CLIENT PORTAL RLS block, which scopes per-row access
+-- based on whether the caller is a team member or a portal client.
 drop policy if exists "anon read"   on public.clients;
 drop policy if exists "anon insert" on public.clients;
 drop policy if exists "anon update" on public.clients;
@@ -258,3 +270,70 @@ create policy "authenticated all"
   for all to authenticated
   using (true)
   with check (true);
+
+-- =============================================================
+-- CLIENT PORTAL RLS
+-- =============================================================
+-- The Client Portal (portal.html) signs clients in via Supabase Auth
+-- magic links. Both the team and the client hit the database as the
+-- `authenticated` role; we tell them apart by inspecting the JWT:
+--   - team members have user_metadata.roles containing
+--     'admin', 'sales', or 'web_designer'
+--   - clients have no roles array, or an empty one
+--
+-- The helper public.is_team_member() centralises that check so policies
+-- stay terse. Re-running this block is safe -- every drop/create is
+-- idempotent.
+
+create or replace function public.is_team_member() returns boolean
+  language sql stable
+as $$
+  select case
+    when auth.jwt() is null then false
+    when (auth.jwt() #> '{user_metadata,roles}') is null then false
+    when jsonb_typeof(auth.jwt() #> '{user_metadata,roles}') = 'array'
+      then (auth.jwt() #> '{user_metadata,roles}') ?| array['admin', 'sales', 'web_designer']
+    else false
+  end;
+$$;
+
+-- public.clients: team gets full access, portal clients see only their
+-- own row (matched by email). Replaces the broad "authenticated all"
+-- policy created above so portal clients cannot enumerate other clients.
+drop policy if exists "authenticated all" on public.clients;
+drop policy if exists "team or own row"   on public.clients;
+create policy "team or own row"
+  on public.clients for all to authenticated
+  using (
+    public.is_team_member()
+    or lower(email) = lower(auth.email())
+  )
+  with check (
+    public.is_team_member()
+  );
+
+-- public.signed_contracts: team gets full read+write; portal clients
+-- can read contracts attached to their own client row. The existing
+-- "anon all" policy stays so the public sign.html page (separate Vercel
+-- project) keeps working with the anonymous token.
+drop policy if exists "team or own contracts" on public.signed_contracts;
+create policy "team or own contracts"
+  on public.signed_contracts for all to authenticated
+  using (
+    public.is_team_member()
+    or client_id in (
+      select id from public.clients where lower(email) = lower(auth.email())
+    )
+  )
+  with check (
+    public.is_team_member()
+  );
+
+-- public.contract_text_templates: lock down to team only. Portal clients
+-- have no business reading internal contract wording presets.
+drop policy if exists "authenticated all"   on public.contract_text_templates;
+drop policy if exists "team only templates" on public.contract_text_templates;
+create policy "team only templates"
+  on public.contract_text_templates for all to authenticated
+  using (public.is_team_member())
+  with check (public.is_team_member());
