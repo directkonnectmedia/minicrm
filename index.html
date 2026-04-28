@@ -660,6 +660,91 @@
     .cb-save-choice-sub { font-size: 12px; color: #6b7280; }
     .cb-save-error { color: #dc2626; font-size: 13px; margin-top: 10px; min-height: 18px; }
 
+    /* Right panel — Generate + plugin mapping */
+    .builder-generate-btn {
+      width: 100%;
+      background: #16a34a; color: #fff;
+      border: none; border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 14px; font-weight: 700;
+      cursor: pointer;
+    }
+    .builder-generate-btn:hover { background: #15803d; }
+    .builder-generate-btn:disabled {
+      background: #d1d5db; color: #6b7280; cursor: not-allowed;
+    }
+    .builder-generate-hint {
+      color: #9ca3af; font-size: 12px;
+      margin-top: 6px; text-align: center;
+    }
+    .builder-mapping-title {
+      margin-top: 18px;
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #6b7280;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .builder-mapping {
+      margin-top: 8px;
+      display: flex; flex-direction: column;
+    }
+    .builder-mapping-row {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid #f3f4f6;
+      align-items: center;
+    }
+    .builder-mapping-key { display: flex; }
+    .builder-mapping-value {
+      font-size: 13px; color: #111827;
+      word-break: break-word;
+    }
+    .builder-mapping-value.muted { color: #9ca3af; font-style: italic; }
+
+    /* Contract preview modal */
+    .contract-preview-shell {
+      padding: 24px 32px;
+      max-height: 75vh;
+      overflow-y: auto;
+      background: #f9fafb;
+    }
+    .contract-preview-shell .contract-doc {
+      background: #fff;
+      padding: 32px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      max-width: 760px;
+      margin: 0 auto;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    .filled-value {
+      font-weight: 600;
+      color: #111827;
+    }
+    .filled-value.missing {
+      background: #fef3c7;
+      color: #92400e;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+    .signature-block {
+      margin: 24px 0 12px;
+      max-width: 320px;
+    }
+    .signature-line {
+      border-bottom: 1px solid #111827;
+      height: 36px;
+    }
+    .signature-caption {
+      font-size: 12px; color: #6b7280;
+      margin-top: 4px; text-align: center;
+    }
+
     /* Schedule block */
     .schedule-block {
       background: #f9fafb; border: 1px solid #e5e7eb;
@@ -1438,6 +1523,23 @@
       <div class="modal-footer">
         <button class="ghost" id="cbEditorCancel">Cancel</button>
         <button id="cbEditorContinue">Continue to save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contract Builder — Generated contract preview -->
+  <div class="overlay" id="cbPreviewOverlay">
+    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="cbPreviewHeader">
+      <div class="modal-header">
+        <div class="modal-title" id="cbPreviewHeader">Contract Preview</div>
+        <button class="modal-close" id="cbPreviewClose" aria-label="Close">×</button>
+      </div>
+      <div class="contract-preview-shell">
+        <div class="contract-doc" id="cbPreviewBody"></div>
+      </div>
+      <div class="modal-footer">
+        <span></span>
+        <button id="cbPreviewCloseBtn">Close</button>
       </div>
     </div>
   </div>
@@ -2739,7 +2841,145 @@
     function renderCBRight() {
       const el = document.getElementById("cbRight");
       if (!el) return;
-      el.innerHTML = `<div class="muted" style="padding:12px;">Plugin mapping will appear here.</div>`;
+      const c = getBuilderClient();
+      const t = builderActiveTemplate;
+      const canGenerate = !!c && !!t;
+      const hint = !c
+        ? "Pick a client first."
+        : !t
+          ? "Pick a template first."
+          : "";
+
+      const mappingRows = PLUGIN_CATALOG.map((p) => {
+        const resolved = c ? resolvePluginValue(c, p.key) : { display: "Pick a client to see value", muted: true };
+        return `
+          <div class="builder-mapping-row">
+            <div class="builder-mapping-key">${chipHTML(p)}</div>
+            <div class="builder-mapping-value ${resolved.muted ? "muted" : ""}">${esc(resolved.display)}</div>
+          </div>`;
+      }).join("");
+
+      el.innerHTML = `
+        <button class="builder-generate-btn" id="cbGenerateBtn" ${canGenerate ? "" : "disabled"}>
+          Generate Contract
+        </button>
+        ${hint ? `<div class="builder-generate-hint">${esc(hint)}</div>` : ""}
+        <div class="builder-mapping-title">Plugin -> Value</div>
+        <div class="builder-mapping">
+          ${mappingRows}
+        </div>
+      `;
+      const genBtn = document.getElementById("cbGenerateBtn");
+      if (genBtn && canGenerate) {
+        genBtn.addEventListener("click", openContractPreview);
+      }
+    }
+
+    // ---- Plugin value resolution ----
+    function countSignatureChips(html) {
+      if (!html) return 0;
+      const tmp = document.createElement("div");
+      tmp.innerHTML = html;
+      return tmp.querySelectorAll('[data-plugin="signature"]').length;
+    }
+
+    function resolvePluginValue(c, key) {
+      switch (key) {
+        case "service_provider_name":
+          return { display: SERVICE_PROVIDER_NAME, muted: false };
+        case "company_name": {
+          const v = getIdentityValue(c, "company") || c.company_name || "";
+          return v ? { display: v, muted: false } : { display: "(missing)", muted: true };
+        }
+        case "client_name": {
+          const v = getIdentityValue(c, "client") || c.client_name || "";
+          return v ? { display: v, muted: false } : { display: "(missing)", muted: true };
+        }
+        case "tier": {
+          const v = contractTemplateLabel(c.contract_template);
+          return v ? { display: v, muted: false } : { display: "No tier selected", muted: true };
+        }
+        case "setup": {
+          const tpl = getContractTemplate(c);
+          if (!tpl) return { display: "Pick a tier", muted: true };
+          const item = (tpl.setup || []).find((it) => it.key === "setup_fee" || it.key === "setup");
+          if (!item) return { display: "Not in tier", muted: true };
+          return { display: fmtCurrency(getLineAmount(c, "setup", item.key)), muted: false };
+        }
+        case "monthly_subscription": {
+          const tpl = getContractTemplate(c);
+          if (!tpl) return { display: "Pick a tier", muted: true };
+          const item = (tpl.monthly || []).find((it) => it.key === "monthly_subscription" || it.key === "subscription");
+          if (!item) return { display: "Not in tier", muted: true };
+          return { display: fmtCurrency(getLineAmount(c, "monthly", item.key)), muted: false };
+        }
+        case "pocket_sekretary": {
+          const tpl = getContractTemplate(c);
+          if (!tpl) return { display: "Pick a tier", muted: true };
+          const item = (tpl.monthly || []).find((it) => it.key === "pocket_sekretary");
+          if (!item) return { display: "Not in tier", muted: true };
+          return { display: fmtCurrency(getLineAmount(c, "monthly", item.key)), muted: false };
+        }
+        case "setup_subtotal":
+          return { display: fmtCurrency(computeSubtotal(c, "setup")), muted: false };
+        case "monthly_subtotal":
+          return { display: fmtCurrency(computeSubtotal(c, "monthly")), muted: false };
+        case "today_date":
+          return { display: new Date().toLocaleDateString(), muted: false };
+        case "signature": {
+          const count = countSignatureChips(builderActiveTemplate ? builderActiveTemplate.body_html : "");
+          return { display: `${count} signature(s) detected`, muted: count === 0 };
+        }
+        default:
+          return { display: "—", muted: true };
+      }
+    }
+
+    // ---- Generate Contract preview ----
+    const cbPreviewOverlay = document.getElementById("cbPreviewOverlay");
+    dismissOnBackdropClick(cbPreviewOverlay, () => closeContractPreview());
+    function openContractPreview() {
+      const c = getBuilderClient();
+      const t = builderActiveTemplate;
+      if (!c || !t) return;
+      const headerEl = document.getElementById("cbPreviewHeader");
+      const bodyEl = document.getElementById("cbPreviewBody");
+      const company = getIdentityValue(c, "company") || c.company_name || "(no company)";
+      headerEl.textContent = `${t.name || "Contract"} — ${company}`;
+      bodyEl.innerHTML = renderContractWithValues(t.body_html || "", c);
+      cbPreviewOverlay.classList.add("open");
+    }
+    function closeContractPreview() { cbPreviewOverlay.classList.remove("open"); }
+
+    function buildReplacementNode(key, c, originalLabel) {
+      if (key === "signature") {
+        const wrap = document.createElement("div");
+        wrap.className = "signature-block";
+        wrap.innerHTML = `<div class="signature-line"></div><div class="signature-caption">(Signature)</div>`;
+        return wrap;
+      }
+      const resolved = resolvePluginValue(c, key);
+      const span = document.createElement("span");
+      if (resolved.muted) {
+        span.className = "filled-value missing";
+        span.textContent = `[Missing: ${originalLabel}]`;
+      } else {
+        span.className = "filled-value";
+        span.textContent = resolved.display;
+      }
+      return span;
+    }
+
+    function renderContractWithValues(html, c) {
+      const tmp = document.createElement("div");
+      tmp.innerHTML = html;
+      tmp.querySelectorAll("[data-plugin]").forEach((node) => {
+        const key = node.getAttribute("data-plugin");
+        const label = node.textContent || (PLUGIN_BY_KEY[key] && PLUGIN_BY_KEY[key].label) || key;
+        const repl = buildReplacementNode(key, c, label);
+        node.parentNode.replaceChild(repl, node);
+      });
+      return tmp.innerHTML;
     }
 
     // ---- Plugin catalog (chips) ----
@@ -2804,6 +3044,8 @@
     });
     dismissOnBackdropClick(cbEditorOverlay, closeCBEditor);
     dismissOnBackdropClick(cbSaveOverlay, closeCBSaveModal);
+    document.getElementById("cbPreviewClose").addEventListener("click", () => closeContractPreview());
+    document.getElementById("cbPreviewCloseBtn").addEventListener("click", () => closeContractPreview());
 
     document.getElementById("cbEditorContinue").addEventListener("click", () => {
       builderEditorDraftHTML = cbEditor.innerHTML;
@@ -3367,7 +3609,8 @@
 
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
-        if (cbSaveOverlay.classList.contains("open")) closeCBSaveModal();
+        if (cbPreviewOverlay.classList.contains("open")) closeContractPreview();
+        else if (cbSaveOverlay.classList.contains("open")) closeCBSaveModal();
         else if (cbEditorOverlay.classList.contains("open")) closeCBEditor();
         else if (filterOverlay.classList.contains("open")) closeFilterModal();
         else if (wizardOverlay.classList.contains("open")) closeWizard();
