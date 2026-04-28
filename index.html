@@ -2188,12 +2188,52 @@
     // a fallback for first-paint / accounts the user has not yet logged in
     // with; the canonical roles for a signed-in user come from
     // session.user.user_metadata.roles after login.
-    const TEAM_MEMBERS = [
+    // Static fallback used only if /api/team/picker is unreachable (offline,
+    // env var missing, etc.). The canonical roster comes from Supabase Auth
+    // and is fetched dynamically by renderLoginPicker(); see /api/team/picker.
+    const TEAM_MEMBERS_FALLBACK = [
       { name: "Jesus",  email: "chucho.alberto17@gmail.com", color: "#10b981", roles: ["admin"] },
       { name: "Ivan",   email: "ivan@directkonnect.local",   color: "#3b82f6", roles: ["admin"] },
       { name: "Hector", email: "hector@directkonnect.local", color: "#8b5cf6", roles: ["sales"] },
     ];
-    const TEAM_BY_EMAIL = Object.fromEntries(TEAM_MEMBERS.map((m) => [m.email, m]));
+    let   TEAM_MEMBERS    = TEAM_MEMBERS_FALLBACK.slice();
+    let   TEAM_BY_EMAIL   = Object.fromEntries(TEAM_MEMBERS.map((m) => [m.email, m]));
+
+    // Deterministic color palette so each account always gets the same pill
+    // color across refreshes / devices, even before the server roster loads.
+    const PICKER_COLORS = [
+      "#10b981", "#3b82f6", "#8b5cf6", "#f59e0b",
+      "#ef4444", "#ec4899", "#14b8a6", "#6366f1",
+      "#f97316", "#0ea5e9",
+    ];
+    function colorForEmail(email) {
+      const s = String(email || "").toLowerCase();
+      let h = 0;
+      for (let i = 0; i < s.length; i++) {
+        h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+      }
+      return PICKER_COLORS[Math.abs(h) % PICKER_COLORS.length];
+    }
+    function adoptTeamRoster(serverList) {
+      // Merge server-supplied members with any fallback entries that match by
+      // email, preserving locally-known colors when possible. New members
+      // (added through the admin panel) get a deterministic hash color.
+      const fallbackByEmail = Object.fromEntries(
+        TEAM_MEMBERS_FALLBACK.map((m) => [String(m.email || "").toLowerCase(), m])
+      );
+      TEAM_MEMBERS = (serverList || [])
+        .filter((m) => m && m.email)
+        .map((m) => {
+          const fb = fallbackByEmail[String(m.email).toLowerCase()];
+          return {
+            name: m.name || (fb && fb.name) || m.email,
+            email: m.email,
+            color: (fb && fb.color) || colorForEmail(m.email),
+            roles: m.roles || (fb && fb.roles) || [],
+          };
+        });
+      TEAM_BY_EMAIL = Object.fromEntries(TEAM_MEMBERS.map((m) => [m.email, m]));
+    }
     const STAY_LOGGED_IN_KEY = "dk_stay_logged_in";  // localStorage
     const SESSION_MARKER_KEY = "dk_session_active";  // sessionStorage
     let currentTeamMember = null;     // selected member during the login flow
@@ -2282,13 +2322,39 @@
       document.body.classList.remove("login-active");
     }
 
-    function renderLoginPicker() {
+    function paintLoginPicker() {
       loginPicker.innerHTML = TEAM_MEMBERS.map((m) => `
         <button type="button" class="login-member-btn" data-login-email="${m.email}">
           <span class="login-member-pill" style="background:${m.color}"></span>
           <span class="login-member-name">${m.name}</span>
         </button>
       `).join("");
+    }
+
+    let pickerFetchInFlight = null;
+    async function fetchPickerRoster() {
+      if (pickerFetchInFlight) return pickerFetchInFlight;
+      pickerFetchInFlight = (async () => {
+        try {
+          const r = await fetch("/api/team/picker", { headers: { "Cache-Control": "no-cache" } });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const data = await r.json();
+          if (data && Array.isArray(data.members) && data.members.length > 0) {
+            adoptTeamRoster(data.members);
+          }
+        } catch (err) {
+          console.warn("Login picker roster fetch failed; using fallback list.", err);
+        } finally {
+          pickerFetchInFlight = null;
+        }
+      })();
+      return pickerFetchInFlight;
+    }
+
+    async function renderLoginPicker() {
+      paintLoginPicker();
+      await fetchPickerRoster();
+      paintLoginPicker();
     }
 
     function showLoginPIN(member) {
@@ -2455,6 +2521,10 @@
     logoutBtn.addEventListener("click", handleLogout);
 
     async function checkAuthOnLoad() {
+      // Kick off the team roster fetch in parallel with session restoration
+      // so the right name/color is available for the signed-in pill even
+      // for accounts that aren't in the static fallback list.
+      const rosterPromise = fetchPickerRoster();
       let session = null;
       try {
         const { data } = await sb.auth.getSession();
@@ -2462,6 +2532,7 @@
       } catch (err) {
         console.warn("getSession failed:", err);
       }
+      try { await rosterPromise; } catch {}
 
       // Stay-logged-in OFF: if browser was closed since last login, force re-auth.
       if (session && !getStayLoggedIn()) {
@@ -2482,7 +2553,10 @@
       }
 
       const email = session.user && session.user.email;
-      signedInMember = (email && TEAM_BY_EMAIL[email]) || { name: email || "Team Member", email, color: "#6b7280", roles: [] };
+      const fromMeta = session.user && session.user.user_metadata;
+      const fallbackName = (fromMeta && typeof fromMeta.display_name === "string" && fromMeta.display_name.trim())
+        || (email ? email.split("@")[0] : "Team Member");
+      signedInMember = (email && TEAM_BY_EMAIL[email]) || { name: fallbackName, email, color: colorForEmail(email), roles: [] };
       signedInRoles = readUserRoles(session.user);
       if (signedInRoles.length === 0 && Array.isArray(signedInMember.roles)) {
         signedInRoles = signedInMember.roles.slice();
