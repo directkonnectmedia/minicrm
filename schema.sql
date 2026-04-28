@@ -30,7 +30,13 @@ create table if not exists public.clients (
 
 alter table public.clients enable row level security;
 
--- No-auth v1: allow anon role full access.
+-- No-auth v1 anon policies. Created here for fresh installs; the TEAM AUTH
+-- LOCKDOWN block at the bottom drops them and replaces with authenticated-only.
+-- Wrapped in drop-if-exists so re-running the whole file never errors.
+drop policy if exists "anon read"   on public.clients;
+drop policy if exists "anon insert" on public.clients;
+drop policy if exists "anon update" on public.clients;
+drop policy if exists "anon delete" on public.clients;
 create policy "anon read"   on public.clients for select to anon using (true);
 create policy "anon insert" on public.clients for insert to anon with check (true);
 create policy "anon update" on public.clients for update to anon using (true) with check (true);
@@ -43,6 +49,7 @@ begin
   return new;
 end; $$;
 
+drop trigger if exists clients_set_updated_at on public.clients;
 create trigger clients_set_updated_at
 before update on public.clients
 for each row execute function public.set_updated_at();

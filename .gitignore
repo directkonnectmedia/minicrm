@@ -4,3 +4,9 @@
 # Planning + ideas docs — kept local
 PLAN.md
 IDEAS.md
+
+# Local environment / secrets — never commit
+.env
+.env.*
+!.env.example
+node_modules/

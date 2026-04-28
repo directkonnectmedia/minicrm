@@ -1396,19 +1396,117 @@
       min-height: 18px;
     }
 
-    /* Header logout button */
-    .header-logout {
+    /* Header profile pill + dropdown menu */
+    .profile-wrap { position: relative; display: inline-flex; }
+    .profile-pill {
       background: #fff; color: #4b5563;
       border: 1px solid #d1d5db; border-radius: 8px;
-      padding: 8px 12px;
+      padding: 6px 10px;
       font-size: 13px; font-weight: 600;
       cursor: pointer;
-      display: inline-flex; align-items: center; gap: 6px;
+      display: inline-flex; align-items: center; gap: 8px;
       transition: all 120ms;
     }
-    .header-logout:hover { background: #f3f4f6; color: #1f2937; border-color: #9ca3af; }
-    .header-logout-icon { font-size: 15px; }
-    .header-logout-name { color: #111827; }
+    .profile-pill:hover { background: #f3f4f6; color: #1f2937; border-color: #9ca3af; }
+    .profile-pill-name { color: #111827; }
+    .profile-pill-roles { display: inline-flex; gap: 4px; }
+    .profile-pill-caret { font-size: 11px; color: #6b7280; }
+    .profile-pill[aria-expanded="true"] { background: #f3f4f6; border-color: #9ca3af; }
+
+    /* Role badge */
+    .role-badge {
+      display: inline-flex; align-items: center;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 11px; font-weight: 600;
+      line-height: 1.5;
+      letter-spacing: 0.01em;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .role-badge.role-admin        { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+    .role-badge.role-sales        { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+    .role-badge.role-web_designer { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+    .role-badge.role-unknown      { background: #f3f4f6; color: #4b5563; border-color: #e5e7eb; }
+
+    /* Dropdown menu under the profile pill */
+    .profile-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      min-width: 240px;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+      z-index: 1100;
+      overflow: hidden;
+    }
+    .profile-menu-head {
+      padding: 12px 14px;
+      background: #f9fafb;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .profile-menu-name { font-weight: 700; color: #111827; font-size: 14px; }
+    .profile-menu-email { font-size: 12px; color: #6b7280; margin-top: 2px; word-break: break-all; }
+    .profile-menu-roles { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+    .profile-menu-item {
+      width: 100%;
+      background: #fff;
+      color: #1f2937;
+      border: none;
+      text-align: left;
+      padding: 10px 14px;
+      font-size: 13px; font-weight: 500;
+      cursor: pointer;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .profile-menu-item:hover { background: #f3f4f6; }
+    .profile-menu-item-icon { font-size: 14px; width: 18px; text-align: center; color: #6b7280; }
+    .profile-menu-item-danger { color: #b91c1c; }
+    .profile-menu-item-danger .profile-menu-item-icon { color: #b91c1c; }
+
+    /* Team Members modal */
+    .team-list { padding: 8px 14px 0; overflow-y: auto; flex: 1; }
+    .team-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 8px;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .team-row:last-child { border-bottom: none; }
+    .team-row-main { flex: 1; min-width: 0; }
+    .team-row-name { font-weight: 600; color: #111827; font-size: 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .team-row-email { font-size: 12px; color: #6b7280; margin-top: 2px; word-break: break-all; }
+    .team-row-meta { font-size: 11px; color: #9ca3af; margin-top: 4px; }
+    .team-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .team-row.team-row-banned .team-row-name { color: #6b7280; text-decoration: line-through; }
+    .team-row.team-row-self  { background: #f9fafb; }
+
+    .team-add-card {
+      margin: 12px 14px 14px;
+      padding: 14px;
+      border: 1px dashed #d1d5db;
+      border-radius: 10px;
+      background: #fafafa;
+    }
+    .team-add-title { font-weight: 600; color: #111827; font-size: 14px; margin-bottom: 10px; }
+    .team-add-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .team-add-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #4b5563; font-weight: 600; }
+    .team-add-grid input { padding: 7px 9px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; }
+    .team-add-roles { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #4b5563; font-weight: 600; }
+    .team-add-roles-checks { display: flex; gap: 14px; flex-wrap: wrap; padding-top: 2px; }
+    .team-add-roles-checks label { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: #1f2937; font-size: 13px; }
+    .team-add-feedback { font-size: 12px; min-height: 16px; margin-top: 8px; }
+    .team-add-feedback.error   { color: #b91c1c; }
+    .team-add-feedback.success { color: #166534; }
+    .team-add-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+    .team-empty { padding: 24px 14px; text-align: center; color: #6b7280; font-size: 13px; }
+    .team-loading { padding: 24px 14px; text-align: center; color: #6b7280; font-size: 13px; }
+    .team-error   { padding: 12px 14px; color: #b91c1c; font-size: 13px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; margin: 8px 14px; }
   </style>
 </head>
 <body>
@@ -1455,10 +1553,28 @@
       <button class="primary-lg" id="openWizard">+ Add New Client</button>
       <button class="outline" id="openFilters">🔎 Apply Filters</button>
       <button class="ghost" id="clearFilters" style="display:none;">✕ Clear All Filters</button>
-      <button class="header-logout" id="logoutBtn" style="display:none;" title="Sign out">
-        <span class="header-logout-name" id="logoutNameLabel"></span>
-        <span class="header-logout-icon">&#x21AA;</span>
-      </button>
+      <div class="profile-wrap" id="profileWrap" style="display:none;">
+        <button class="profile-pill" id="profilePillBtn" type="button" aria-haspopup="menu" aria-expanded="false">
+          <span class="profile-pill-name" id="profilePillName"></span>
+          <span class="profile-pill-roles" id="profilePillRoles"></span>
+          <span class="profile-pill-caret">&#x25BE;</span>
+        </button>
+        <div class="profile-menu" id="profileMenu" role="menu" hidden>
+          <div class="profile-menu-head">
+            <div class="profile-menu-name" id="profileMenuName"></div>
+            <div class="profile-menu-email" id="profileMenuEmail"></div>
+            <div class="profile-menu-roles" id="profileMenuRoles"></div>
+          </div>
+          <button class="profile-menu-item" id="manageTeamBtn" type="button" role="menuitem" hidden>
+            <span class="profile-menu-item-icon">&#x2699;</span>
+            <span>Manage team</span>
+          </button>
+          <button class="profile-menu-item profile-menu-item-danger" id="logoutBtn" type="button" role="menuitem">
+            <span class="profile-menu-item-icon">&#x21AA;</span>
+            <span>Sign out</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1573,6 +1689,50 @@
         <div class="builder-panel" id="cbLeft"></div>
         <div class="builder-panel" id="cbMiddle"></div>
         <div class="builder-panel" id="cbRight"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Team Members modal (admin only) -->
+  <div class="overlay" id="teamOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="teamTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="teamTitle">Team Members</div>
+        <button class="modal-close" id="closeTeam" aria-label="Close">×</button>
+      </div>
+      <div id="teamError" class="team-error" style="display:none;"></div>
+      <div id="teamList" class="team-list">
+        <div class="team-loading">Loading team members…</div>
+      </div>
+      <div class="team-add-card">
+        <div class="team-add-title">Add a team member</div>
+        <div class="team-add-grid">
+          <label>Name
+            <input type="text" id="teamAddName" placeholder="e.g. Test Monkey" autocomplete="off">
+          </label>
+          <label>Email
+            <input type="email" id="teamAddEmail" placeholder="test@directkonnect.local" autocomplete="off">
+          </label>
+          <label>4-digit PIN
+            <input type="text" id="teamAddPin" maxlength="4" inputmode="numeric" pattern="\d{4}" placeholder="0002" autocomplete="off">
+          </label>
+          <label>&nbsp;
+            <span style="font-size:11px;font-weight:500;color:#6b7280;line-height:1.4;">PIN becomes the password for this account. They sign in via the picker.</span>
+          </label>
+          <div class="team-add-roles">
+            Roles (pick at least one)
+            <div class="team-add-roles-checks">
+              <label><input type="checkbox" data-add-role="admin"> Admin</label>
+              <label><input type="checkbox" data-add-role="sales"> Sales</label>
+              <label><input type="checkbox" data-add-role="web_designer"> Web Designer</label>
+            </div>
+          </div>
+        </div>
+        <div class="team-add-feedback" id="teamAddFeedback"></div>
+        <div class="team-add-actions">
+          <button class="ghost" id="teamAddResetBtn" type="button">Reset</button>
+          <button id="teamAddSubmitBtn" type="button">Create account</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2013,16 +2173,47 @@
     //        hector@directkonnect.local / 0001   (Hector)
     //   3. Run schema.sql in the SQL editor (it tightens RLS on clients + contract_text_templates).
     // After that, refresh the CRM, click your name, type your PIN, you're in.
+    // Roles this app understands. A user can hold any combination.
+    //   admin         -> can manage team accounts (Manage team menu item)
+    //   sales         -> regular CRM access (display only today)
+    //   web_designer  -> regular CRM access (display only today)
+    const ROLE_LABELS = {
+      admin: "Admin",
+      sales: "Sales",
+      web_designer: "Web Designer",
+    };
+    const VALID_ROLES = Object.keys(ROLE_LABELS);
+
+    // Static roster used to render the login picker. The roles[] here is just
+    // a fallback for first-paint / accounts the user has not yet logged in
+    // with; the canonical roles for a signed-in user come from
+    // session.user.user_metadata.roles after login.
     const TEAM_MEMBERS = [
-      { name: "Jesus",  email: "chucho.alberto17@gmail.com", color: "#10b981" },
-      { name: "Ivan",   email: "ivan@directkonnect.local",   color: "#3b82f6" },
-      { name: "Hector", email: "hector@directkonnect.local", color: "#8b5cf6" },
+      { name: "Jesus",  email: "chucho.alberto17@gmail.com", color: "#10b981", roles: ["admin"] },
+      { name: "Ivan",   email: "ivan@directkonnect.local",   color: "#3b82f6", roles: ["admin"] },
+      { name: "Hector", email: "hector@directkonnect.local", color: "#8b5cf6", roles: ["sales"] },
     ];
     const TEAM_BY_EMAIL = Object.fromEntries(TEAM_MEMBERS.map((m) => [m.email, m]));
     const STAY_LOGGED_IN_KEY = "dk_stay_logged_in";  // localStorage
     const SESSION_MARKER_KEY = "dk_session_active";  // sessionStorage
     let currentTeamMember = null;     // selected member during the login flow
     let signedInMember    = null;     // currently authenticated team member (or null)
+    let signedInRoles     = [];       // roles[] from the live Supabase session
+
+    // Reads roles[] from a Supabase auth user. Falls back to a legacy single
+    // `role` string if the account has not been migrated yet.
+    function readUserRoles(user) {
+      if (!user || !user.user_metadata) return [];
+      const meta = user.user_metadata;
+      if (Array.isArray(meta.roles)) {
+        return meta.roles.filter((r) => typeof r === "string" && VALID_ROLES.includes(r));
+      }
+      if (typeof meta.role === "string" && VALID_ROLES.includes(meta.role)) {
+        return [meta.role];
+      }
+      return [];
+    }
+    function isAdmin() { return signedInRoles.includes("admin"); }
 
     // ---- Login overlay handles ----
     const loginOverlay   = document.getElementById("loginOverlay");
@@ -2036,7 +2227,34 @@
     const loginSubmitBtn = document.getElementById("loginSubmitBtn");
     const loginError     = document.getElementById("loginError");
     const logoutBtn      = document.getElementById("logoutBtn");
-    const logoutNameLabel = document.getElementById("logoutNameLabel");
+    // Profile dropdown handles
+    const profileWrap     = document.getElementById("profileWrap");
+    const profilePillBtn  = document.getElementById("profilePillBtn");
+    const profilePillName = document.getElementById("profilePillName");
+    const profilePillRoles = document.getElementById("profilePillRoles");
+    const profileMenu     = document.getElementById("profileMenu");
+    const profileMenuName = document.getElementById("profileMenuName");
+    const profileMenuEmail = document.getElementById("profileMenuEmail");
+    const profileMenuRoles = document.getElementById("profileMenuRoles");
+    const manageTeamBtn   = document.getElementById("manageTeamBtn");
+
+    function renderRoleBadges(target, roles) {
+      target.innerHTML = "";
+      if (!roles || roles.length === 0) {
+        const span = document.createElement("span");
+        span.className = "role-badge role-unknown";
+        span.textContent = "No role";
+        target.appendChild(span);
+        return;
+      }
+      roles.forEach((r) => {
+        const span = document.createElement("span");
+        const safeClass = VALID_ROLES.includes(r) ? r : "unknown";
+        span.className = `role-badge role-${safeClass}`;
+        span.textContent = ROLE_LABELS[r] || r;
+        target.appendChild(span);
+      });
+    }
 
     function getStayLoggedIn() {
       try {
@@ -2148,7 +2366,7 @@
       setStayLoggedIn(loginStayToggle.checked);
       setLoginBusy(true);
       try {
-        const { error } = await sb.auth.signInWithPassword({
+        const { data: signInData, error } = await sb.auth.signInWithPassword({
           email: currentTeamMember.email,
           password: pin,
         });
@@ -2160,6 +2378,11 @@
         }
         try { sessionStorage.setItem(SESSION_MARKER_KEY, "1"); } catch {}
         signedInMember = currentTeamMember;
+        signedInRoles = readUserRoles(signInData && signInData.user);
+        if (signedInRoles.length === 0 && signedInMember && Array.isArray(signedInMember.roles)) {
+          // Fallback for accounts not yet synced via setup-team-accounts.js.
+          signedInRoles = signedInMember.roles.slice();
+        }
         applyAuthUIState();
         hideLoginOverlay();
         await load();
@@ -2174,19 +2397,54 @@
 
     function applyAuthUIState() {
       if (signedInMember) {
-        logoutBtn.style.display = "inline-flex";
-        logoutNameLabel.textContent = signedInMember.name;
+        profileWrap.style.display = "inline-flex";
+        profilePillName.textContent = signedInMember.name;
+        renderRoleBadges(profilePillRoles, signedInRoles);
+        profileMenuName.textContent = signedInMember.name;
+        profileMenuEmail.textContent = signedInMember.email;
+        renderRoleBadges(profileMenuRoles, signedInRoles);
+        manageTeamBtn.hidden = !isAdmin();
       } else {
-        logoutBtn.style.display = "none";
-        logoutNameLabel.textContent = "";
+        profileWrap.style.display = "none";
+        closeProfileMenu();
       }
     }
+
+    // ---- Profile dropdown open/close ----
+    function openProfileMenu() {
+      profileMenu.hidden = false;
+      profilePillBtn.setAttribute("aria-expanded", "true");
+    }
+    function closeProfileMenu() {
+      profileMenu.hidden = true;
+      profilePillBtn.setAttribute("aria-expanded", "false");
+    }
+    function toggleProfileMenu() {
+      if (profileMenu.hidden) openProfileMenu(); else closeProfileMenu();
+    }
+    profilePillBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleProfileMenu();
+    });
+    document.addEventListener("click", (e) => {
+      if (profileMenu.hidden) return;
+      if (profileWrap.contains(e.target)) return;
+      closeProfileMenu();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !profileMenu.hidden) closeProfileMenu();
+    });
+    manageTeamBtn.addEventListener("click", () => {
+      closeProfileMenu();
+      openTeamModal();
+    });
 
     async function handleLogout() {
       if (!confirm("Sign out of the CRM?")) return;
       try { await sb.auth.signOut(); } catch (err) { console.warn("Sign out failed:", err); }
       try { sessionStorage.removeItem(SESSION_MARKER_KEY); } catch {}
       signedInMember = null;
+      signedInRoles = [];
       applyAuthUIState();
       // Reset CRM client list so cached data isn't visible after sign-out
       allClients = [];
@@ -2217,13 +2475,18 @@
 
       if (!session) {
         signedInMember = null;
+        signedInRoles = [];
         applyAuthUIState();
         showLoginOverlay();
         return false;
       }
 
       const email = session.user && session.user.email;
-      signedInMember = (email && TEAM_BY_EMAIL[email]) || { name: email || "Team Member", email, color: "#6b7280" };
+      signedInMember = (email && TEAM_BY_EMAIL[email]) || { name: email || "Team Member", email, color: "#6b7280", roles: [] };
+      signedInRoles = readUserRoles(session.user);
+      if (signedInRoles.length === 0 && Array.isArray(signedInMember.roles)) {
+        signedInRoles = signedInMember.roles.slice();
+      }
       try { sessionStorage.setItem(SESSION_MARKER_KEY, "1"); } catch {}
       applyAuthUIState();
       hideLoginOverlay();
@@ -2234,10 +2497,214 @@
     sb.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT" || !session) {
         signedInMember = null;
+        signedInRoles = [];
         applyAuthUIState();
         try { sessionStorage.removeItem(SESSION_MARKER_KEY); } catch {}
         showLoginOverlay();
       }
+    });
+
+    // ====== Team Members modal (admin only) ======
+    const teamOverlay        = document.getElementById("teamOverlay");
+    const teamList           = document.getElementById("teamList");
+    const teamError          = document.getElementById("teamError");
+    const teamAddName        = document.getElementById("teamAddName");
+    const teamAddEmail       = document.getElementById("teamAddEmail");
+    const teamAddPin         = document.getElementById("teamAddPin");
+    const teamAddRoleChecks  = document.querySelectorAll("[data-add-role]");
+    const teamAddFeedback    = document.getElementById("teamAddFeedback");
+    const teamAddSubmitBtn   = document.getElementById("teamAddSubmitBtn");
+    const teamAddResetBtn    = document.getElementById("teamAddResetBtn");
+    const closeTeamBtn       = document.getElementById("closeTeam");
+
+    async function adminFetch(method, body) {
+      const { data: sessionData } = await sb.auth.getSession();
+      const session = sessionData && sessionData.session;
+      if (!session) throw new Error("not signed in");
+      const opts = {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const res = await fetch("/api/admin/team", opts);
+      let payload = null;
+      try { payload = await res.json(); } catch {}
+      if (!res.ok) {
+        const msg = (payload && (payload.error || payload.message)) || `HTTP ${res.status}`;
+        const err = new Error(msg);
+        err.detail = payload;
+        err.status = res.status;
+        throw err;
+      }
+      return payload;
+    }
+
+    function setTeamError(msg) {
+      if (!msg) { teamError.style.display = "none"; teamError.textContent = ""; return; }
+      teamError.textContent = msg;
+      teamError.style.display = "block";
+    }
+    function setTeamAddFeedback(msg, kind) {
+      teamAddFeedback.textContent = msg || "";
+      teamAddFeedback.className = "team-add-feedback" + (kind ? " " + kind : "");
+    }
+
+    function fmtDate(iso) {
+      if (!iso) return "—";
+      try { return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }); }
+      catch { return iso; }
+    }
+    function isMemberBanned(m) {
+      if (!m.banned_until) return false;
+      const t = Date.parse(m.banned_until);
+      return Number.isFinite(t) && t > Date.now();
+    }
+
+    function renderTeamMembers(members) {
+      teamList.innerHTML = "";
+      if (!members || members.length === 0) {
+        teamList.innerHTML = '<div class="team-empty">No team members yet. Add one below.</div>';
+        return;
+      }
+      const myEmail = signedInMember && signedInMember.email;
+      members
+        .slice()
+        .sort((a, b) => (a.name || a.email || "").localeCompare(b.name || b.email || ""))
+        .forEach((m) => {
+          const banned = isMemberBanned(m);
+          const isSelf = myEmail && m.email && myEmail.toLowerCase() === m.email.toLowerCase();
+          const row = document.createElement("div");
+          row.className = "team-row" + (banned ? " team-row-banned" : "") + (isSelf ? " team-row-self" : "");
+
+          const main = document.createElement("div");
+          main.className = "team-row-main";
+          const nameEl = document.createElement("div");
+          nameEl.className = "team-row-name";
+          nameEl.textContent = m.name || m.email;
+          if (isSelf) {
+            const youTag = document.createElement("span");
+            youTag.className = "role-badge role-unknown";
+            youTag.textContent = "You";
+            nameEl.appendChild(youTag);
+          }
+          if (banned) {
+            const bannedTag = document.createElement("span");
+            bannedTag.className = "role-badge role-unknown";
+            bannedTag.textContent = "Deactivated";
+            nameEl.appendChild(bannedTag);
+          }
+          const rolesEl = document.createElement("span");
+          rolesEl.className = "profile-pill-roles";
+          renderRoleBadges(rolesEl, m.roles);
+          nameEl.appendChild(rolesEl);
+          main.appendChild(nameEl);
+
+          const emailEl = document.createElement("div");
+          emailEl.className = "team-row-email";
+          emailEl.textContent = m.email;
+          main.appendChild(emailEl);
+
+          const metaEl = document.createElement("div");
+          metaEl.className = "team-row-meta";
+          metaEl.textContent = `Last sign-in: ${fmtDate(m.last_sign_in_at)}  ·  Created: ${fmtDate(m.created_at)}`;
+          main.appendChild(metaEl);
+
+          const actions = document.createElement("div");
+          actions.className = "team-row-actions";
+          if (!isSelf) {
+            const toggleBtn = document.createElement("button");
+            toggleBtn.className = "ghost";
+            toggleBtn.textContent = banned ? "Activate" : "Deactivate";
+            toggleBtn.addEventListener("click", () => toggleMemberBanned(m, !banned));
+            actions.appendChild(toggleBtn);
+          }
+          row.appendChild(main);
+          row.appendChild(actions);
+          teamList.appendChild(row);
+        });
+    }
+
+    async function loadTeamMembers() {
+      setTeamError("");
+      teamList.innerHTML = '<div class="team-loading">Loading team members…</div>';
+      try {
+        const payload = await adminFetch("GET");
+        renderTeamMembers(payload && payload.members);
+      } catch (err) {
+        teamList.innerHTML = "";
+        setTeamError("Could not load team members: " + err.message);
+      }
+    }
+
+    async function toggleMemberBanned(member, banned) {
+      const verb = banned ? "deactivate" : "reactivate";
+      if (!confirm(`${verb[0].toUpperCase() + verb.slice(1)} ${member.name || member.email}?`)) return;
+      try {
+        await adminFetch("PATCH", { id: member.id, banned });
+        await loadTeamMembers();
+      } catch (err) {
+        setTeamError(`Could not ${verb}: ${err.message}`);
+      }
+    }
+
+    function getCheckedAddRoles() {
+      return Array.from(teamAddRoleChecks)
+        .filter((cb) => cb.checked)
+        .map((cb) => cb.dataset.addRole);
+    }
+    function resetAddForm() {
+      teamAddName.value = "";
+      teamAddEmail.value = "";
+      teamAddPin.value = "";
+      teamAddRoleChecks.forEach((cb) => { cb.checked = false; });
+      setTeamAddFeedback("");
+    }
+    teamAddResetBtn.addEventListener("click", resetAddForm);
+    teamAddPin.addEventListener("input", () => {
+      teamAddPin.value = teamAddPin.value.replace(/\D/g, "").slice(0, 4);
+    });
+
+    teamAddSubmitBtn.addEventListener("click", async () => {
+      const name = teamAddName.value.trim();
+      const email = teamAddEmail.value.trim();
+      const pin = teamAddPin.value.trim();
+      const roles = getCheckedAddRoles();
+      setTeamAddFeedback("");
+      if (!name)  return setTeamAddFeedback("Name is required.", "error");
+      if (!email) return setTeamAddFeedback("Email is required.", "error");
+      if (!/^\d{4}$/.test(pin)) return setTeamAddFeedback("PIN must be exactly 4 digits.", "error");
+      if (roles.length === 0)   return setTeamAddFeedback("Pick at least one role.", "error");
+
+      teamAddSubmitBtn.disabled = true;
+      teamAddSubmitBtn.textContent = "Creating…";
+      try {
+        await adminFetch("POST", { name, email, pin, roles });
+        setTeamAddFeedback(`Created ${name} (${email}).`, "success");
+        resetAddForm();
+        await loadTeamMembers();
+      } catch (err) {
+        setTeamAddFeedback("Create failed: " + err.message, "error");
+      } finally {
+        teamAddSubmitBtn.disabled = false;
+        teamAddSubmitBtn.textContent = "Create account";
+      }
+    });
+
+    function openTeamModal() {
+      if (!isAdmin()) return;
+      resetAddForm();
+      teamOverlay.classList.add("open");
+      loadTeamMembers();
+    }
+    function closeTeamModal() {
+      teamOverlay.classList.remove("open");
+    }
+    closeTeamBtn.addEventListener("click", closeTeamModal);
+    teamOverlay.addEventListener("click", (e) => {
+      if (e.target === teamOverlay) closeTeamModal();
     });
 
     const CONTRACT_TEMPLATES = [

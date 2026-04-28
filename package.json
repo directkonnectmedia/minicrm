@@ -1,0 +1,10 @@
+{
+  "name": "minicrm",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "description": "Direct Konnect mini CRM. Single-page app (index.html) + Vercel serverless functions (api/) backed by Supabase."
+}
