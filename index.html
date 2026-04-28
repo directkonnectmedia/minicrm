@@ -543,6 +543,123 @@
     .contract-doc p { margin: 0 0 10px; }
     .contract-doc ul, .contract-doc ol { margin: 0 0 10px 20px; }
 
+    /* Plugin chips (visible inside the editor and in template previews) */
+    .pc-chip {
+      display: inline-block;
+      padding: 1px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      margin: 0 2px;
+      vertical-align: baseline;
+      user-select: none;
+    }
+    .pc-red    { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .pc-blue   { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+    .pc-purple { background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; }
+    .pc-pink   { background: #fce7f3; color: #9d174d; border: 1px solid #fbcfe8; }
+    .pc-orange { background: #ffedd5; color: #9a3412; border: 1px solid #fed7aa; }
+    .pc-green  { background: #dcfce7; color: #14532d; border: 1px solid #bbf7d0; }
+    .pc-teal   { background: #ccfbf1; color: #115e59; border: 1px solid #99f6e4; }
+    .pc-amber  { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    .pc-indigo { background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; }
+    .pc-gray   { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
+    .pc-black  { background: #111827; color: #f9fafb; border: 1px solid #111827; }
+
+    /* Editor modal */
+    .cb-editor-shell {
+      display: flex;
+      gap: 0;
+      flex: 1;
+      min-height: 70vh;
+      max-height: 75vh;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .cb-editor-pane {
+      flex: 1; display: flex; flex-direction: column;
+      border-right: 1px solid #e5e7eb;
+      min-width: 0;
+    }
+    .cb-toolbar {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      padding: 8px 12px;
+      border-bottom: 1px solid #e5e7eb;
+      background: #f9fafb;
+    }
+    .cb-toolbar button {
+      background: #fff; color: #111827;
+      border: 1px solid #d1d5db; border-radius: 6px;
+      padding: 4px 10px; font-size: 12px; cursor: pointer;
+    }
+    .cb-toolbar button:hover { background: #f3f4f6; }
+    .cb-toolbar-sep {
+      width: 1px; background: #e5e7eb;
+      margin: 2px 4px;
+    }
+    .cb-editor {
+      flex: 1;
+      padding: 16px 20px;
+      overflow-y: auto;
+      font-size: 14px;
+      line-height: 1.7;
+      outline: none;
+      color: #111827;
+      background: #fff;
+      min-height: 50vh;
+    }
+    .cb-editor:empty:before {
+      content: "Start writing your contract here. Use the plugins on the right to insert dynamic fields...";
+      color: #9ca3af;
+    }
+    .cb-plugins-pane {
+      width: 280px;
+      flex-shrink: 0;
+      padding: 14px;
+      overflow-y: auto;
+      background: #fafafa;
+    }
+    .cb-plugins-title {
+      font-size: 13px; font-weight: 700; color: #111827;
+      margin-bottom: 4px;
+    }
+    .cb-plugins-hint { font-size: 11px; color: #6b7280; margin-bottom: 12px; }
+    .cb-plugins-list { display: flex; flex-direction: column; gap: 6px; }
+    .cb-plugins-list button {
+      text-align: left;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 8px 10px;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .cb-plugins-list button:hover { background: #f3f4f6; }
+    .cb-plugins-list .pc-chip {
+      pointer-events: none;
+    }
+
+    /* Save Choice modal */
+    .cb-save-choice {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .cb-save-choice-btn {
+      background: #fff;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 16px;
+      text-align: left;
+      cursor: pointer;
+      transition: all 120ms;
+    }
+    .cb-save-choice-btn:hover { border-color: #4f46e5; background: #eef2ff; }
+    .cb-save-choice-title { font-weight: 700; font-size: 14px; color: #111827; margin-bottom: 4px; }
+    .cb-save-choice-sub { font-size: 12px; color: #6b7280; }
+    .cb-save-error { color: #dc2626; font-size: 13px; margin-top: 10px; min-height: 18px; }
+
     /* Schedule block */
     .schedule-block {
       background: #f9fafb; border: 1px solid #e5e7eb;
@@ -1283,6 +1400,75 @@
       <div class="modal-footer">
         <button class="ghost" id="filterReset">Reset</button>
         <button id="filterApply">Apply Filters</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contract Builder — Editor modal -->
+  <div class="overlay" id="cbEditorOverlay">
+    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="cbEditorTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="cbEditorTitle">New Template</div>
+        <button class="modal-close" id="cbEditorClose" aria-label="Close">×</button>
+      </div>
+      <div class="cb-editor-shell">
+        <div class="cb-editor-pane">
+          <div class="cb-toolbar">
+            <button type="button" data-cb-cmd="bold" title="Bold"><b>B</b></button>
+            <button type="button" data-cb-cmd="italic" title="Italic"><i>I</i></button>
+            <button type="button" data-cb-cmd="underline" title="Underline"><u>U</u></button>
+            <span class="cb-toolbar-sep"></span>
+            <button type="button" data-cb-cmd="formatBlock" data-cb-arg="H1" title="Heading 1">H1</button>
+            <button type="button" data-cb-cmd="formatBlock" data-cb-arg="H2" title="Heading 2">H2</button>
+            <button type="button" data-cb-cmd="formatBlock" data-cb-arg="P" title="Paragraph">P</button>
+            <span class="cb-toolbar-sep"></span>
+            <button type="button" data-cb-cmd="insertUnorderedList" title="Bulleted list">• List</button>
+            <button type="button" data-cb-cmd="insertOrderedList" title="Numbered list">1. List</button>
+            <span class="cb-toolbar-sep"></span>
+            <button type="button" data-cb-cmd="removeFormat" title="Clear formatting">Clear</button>
+          </div>
+          <div id="cbEditor" class="cb-editor" contenteditable="true"></div>
+        </div>
+        <div class="cb-plugins-pane">
+          <div class="cb-plugins-title">Plugins</div>
+          <div class="cb-plugins-hint">Click to insert at cursor (or replace selection).</div>
+          <div id="cbPluginsList" class="cb-plugins-list"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" id="cbEditorCancel">Cancel</button>
+        <button id="cbEditorContinue">Continue to save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contract Builder — Save Choice modal -->
+  <div class="overlay" id="cbSaveOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cbSaveTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="cbSaveTitle">Save Template</div>
+        <button class="modal-close" id="cbSaveClose" aria-label="Close">×</button>
+      </div>
+      <div class="step-body">
+        <div class="field">
+          <label>Template name</label>
+          <input type="text" id="cbSaveName" placeholder="e.g. Premium Website Contract v1" />
+        </div>
+        <div class="cb-save-choice">
+          <button type="button" class="cb-save-choice-btn" id="cbSaveCustom">
+            <div class="cb-save-choice-title">Custom Template</div>
+            <div class="cb-save-choice-sub">Save for the currently loaded client only.</div>
+          </button>
+          <button type="button" class="cb-save-choice-btn" id="cbSaveUniversal">
+            <div class="cb-save-choice-title">Universal Template</div>
+            <div class="cb-save-choice-sub">Save to the shared library, reusable for any client.</div>
+          </button>
+        </div>
+        <div id="cbSaveError" class="cb-save-error"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" id="cbSaveBack">Back to editor</button>
+        <span></span>
       </div>
     </div>
   </div>
@@ -2556,6 +2742,172 @@
       el.innerHTML = `<div class="muted" style="padding:12px;">Plugin mapping will appear here.</div>`;
     }
 
+    // ---- Plugin catalog (chips) ----
+    const SERVICE_PROVIDER_NAME = "Direct Konnect";
+    const PLUGIN_CATALOG = [
+      { key: "service_provider_name", label: "Service Provider Name", color: "red" },
+      { key: "company_name",          label: "Company Name",          color: "blue" },
+      { key: "client_name",           label: "Client Name",           color: "purple" },
+      { key: "tier",                  label: "Tier",                  color: "pink" },
+      { key: "setup",                 label: "Setup",                 color: "orange" },
+      { key: "monthly_subscription",  label: "Monthly Subscription",  color: "green" },
+      { key: "pocket_sekretary",      label: "Pocket Sekretary",      color: "teal" },
+      { key: "setup_subtotal",        label: "Setup Subtotal",        color: "amber" },
+      { key: "monthly_subtotal",      label: "Monthly Subtotal",      color: "indigo" },
+      { key: "today_date",            label: "Today's Date",          color: "gray" },
+      { key: "signature",             label: "Signature",             color: "black" },
+    ];
+    const PLUGIN_BY_KEY = Object.fromEntries(PLUGIN_CATALOG.map((p) => [p.key, p]));
+
+    function chipHTML(p) {
+      return `<span class="pc-chip pc-${p.color}" data-plugin="${p.key}" contenteditable="false">${esc(p.label)}</span>`;
+    }
+
+    // ---- Editor modal state ----
+    const cbEditorOverlay = document.getElementById("cbEditorOverlay");
+    const cbEditor        = document.getElementById("cbEditor");
+    const cbPluginsList   = document.getElementById("cbPluginsList");
+    const cbSaveOverlay   = document.getElementById("cbSaveOverlay");
+    const cbSaveName      = document.getElementById("cbSaveName");
+    const cbSaveError     = document.getElementById("cbSaveError");
+    let editorSavedRange  = null;
+    let builderEditorDraftHTML = "";
+
+    function renderPluginsPanel() {
+      cbPluginsList.innerHTML = PLUGIN_CATALOG.map((p) => `
+        <button type="button" data-cb-plugin="${esc(p.key)}">
+          ${chipHTML(p)}
+        </button>
+      `).join("");
+    }
+    renderPluginsPanel();
+
+    function openCBEditor() {
+      cbEditor.innerHTML = builderEditorDraftHTML || "";
+      cbEditorOverlay.classList.add("open");
+      setTimeout(() => cbEditor.focus(), 0);
+    }
+    function closeCBEditor() { cbEditorOverlay.classList.remove("open"); }
+    function openCBSaveModal() {
+      cbSaveError.textContent = "";
+      cbSaveOverlay.classList.add("open");
+      setTimeout(() => cbSaveName.focus(), 0);
+    }
+    function closeCBSaveModal() { cbSaveOverlay.classList.remove("open"); }
+
+    document.getElementById("cbEditorClose").addEventListener("click", closeCBEditor);
+    document.getElementById("cbEditorCancel").addEventListener("click", closeCBEditor);
+    document.getElementById("cbSaveClose").addEventListener("click", closeCBSaveModal);
+    document.getElementById("cbSaveBack").addEventListener("click", () => {
+      closeCBSaveModal();
+      cbEditorOverlay.classList.add("open");
+    });
+    dismissOnBackdropClick(cbEditorOverlay, closeCBEditor);
+    dismissOnBackdropClick(cbSaveOverlay, closeCBSaveModal);
+
+    document.getElementById("cbEditorContinue").addEventListener("click", () => {
+      builderEditorDraftHTML = cbEditor.innerHTML;
+      closeCBEditor();
+      openCBSaveModal();
+    });
+
+    // Toolbar (execCommand is deprecated but still works in all modern browsers)
+    document.querySelector(".cb-toolbar").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-cb-cmd]");
+      if (!btn) return;
+      e.preventDefault();
+      cbEditor.focus();
+      const cmd = btn.dataset.cbCmd;
+      const arg = btn.dataset.cbArg || null;
+      try { document.execCommand(cmd, false, arg); } catch (err) { console.warn(err); }
+    });
+
+    // Persist editor selection so chip insertion lands at the right spot
+    function saveEditorRange() {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const r = sel.getRangeAt(0);
+      if (cbEditor.contains(r.commonAncestorContainer)) {
+        editorSavedRange = r.cloneRange();
+      }
+    }
+    cbEditor.addEventListener("mouseup", saveEditorRange);
+    cbEditor.addEventListener("keyup", saveEditorRange);
+    cbEditor.addEventListener("blur", saveEditorRange);
+
+    function insertPluginChip(key) {
+      const p = PLUGIN_BY_KEY[key];
+      if (!p) return;
+      cbEditor.focus();
+      const sel = window.getSelection();
+      if (editorSavedRange) {
+        sel.removeAllRanges();
+        sel.addRange(editorSavedRange);
+      }
+      const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+      if (!range || !cbEditor.contains(range.commonAncestorContainer)) {
+        // Fall back to appending at the end
+        cbEditor.insertAdjacentHTML("beforeend", chipHTML(p) + "&nbsp;");
+        return;
+      }
+      range.deleteContents();
+      const tmp = document.createElement("span");
+      tmp.innerHTML = chipHTML(p) + "\u00a0";
+      const frag = document.createDocumentFragment();
+      while (tmp.firstChild) frag.appendChild(tmp.firstChild);
+      range.insertNode(frag);
+      // Move caret after the inserted nodes
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      editorSavedRange = range.cloneRange();
+    }
+
+    cbPluginsList.addEventListener("mousedown", (e) => {
+      // Prevent stealing focus from the editor before we read the saved range
+      const btn = e.target.closest("[data-cb-plugin]");
+      if (btn) e.preventDefault();
+    });
+    cbPluginsList.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-cb-plugin]");
+      if (!btn) return;
+      insertPluginChip(btn.dataset.cbPlugin);
+    });
+
+    // Save handlers
+    document.getElementById("cbSaveCustom").addEventListener("click", async () => {
+      cbSaveError.textContent = "";
+      const c = getBuilderClient();
+      if (!c) { cbSaveError.textContent = "No client loaded. Open a client first."; return; }
+      const name = (cbSaveName.value || "").trim() || "Custom Template";
+      const newContract = { ...(c.contract || {}), custom: { name, body_html: builderEditorDraftHTML, saved_at: new Date().toISOString() } };
+      const { error } = await sb.from("clients").update({ contract: newContract }).eq("id", c.id);
+      if (error) { cbSaveError.textContent = "Save failed: " + error.message; return; }
+      const idx = allClients.findIndex((x) => x.id === c.id);
+      if (idx >= 0) allClients[idx] = { ...allClients[idx], contract: newContract };
+      try { await addSystemNote(allClients[idx], "client", `Custom contract template saved: ${name}`); } catch {}
+      builderActiveTemplate = { source: "custom", id: "custom", name, body_html: builderEditorDraftHTML };
+      builderEditorDraftHTML = "";
+      closeCBSaveModal();
+      renderContractBuilder();
+    });
+
+    document.getElementById("cbSaveUniversal").addEventListener("click", async () => {
+      cbSaveError.textContent = "";
+      const name = (cbSaveName.value || "").trim();
+      if (!name) { cbSaveError.textContent = "Universal templates require a name."; return; }
+      const { data, error } = await sb.from("contract_text_templates")
+        .insert({ name, body_html: builderEditorDraftHTML })
+        .select()
+        .single();
+      if (error) { cbSaveError.textContent = "Save failed: " + error.message; return; }
+      universalTemplates = [...universalTemplates, data];
+      builderActiveTemplate = { source: "universal", id: data.id, name: data.name, body_html: data.body_html };
+      builderEditorDraftHTML = "";
+      closeCBSaveModal();
+      renderContractBuilder();
+    });
+
     // Click handler for the contract builder card
     document.addEventListener("click", async (e) => {
       const btn = e.target.closest("[data-cb-action]");
@@ -2574,7 +2926,9 @@
         builderActiveTemplate = { source: "universal", id: row.id, name: row.name || "(untitled)", body_html: row.body_html || "" };
         renderContractBuilder();
       } else if (action === "new-template") {
-        // Wired in Phase 2.
+        builderEditorDraftHTML = "";
+        cbSaveName.value = "";
+        openCBEditor();
       }
     });
 
@@ -3013,7 +3367,9 @@
 
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
-        if (filterOverlay.classList.contains("open")) closeFilterModal();
+        if (cbSaveOverlay.classList.contains("open")) closeCBSaveModal();
+        else if (cbEditorOverlay.classList.contains("open")) closeCBEditor();
+        else if (filterOverlay.classList.contains("open")) closeFilterModal();
         else if (wizardOverlay.classList.contains("open")) closeWizard();
         else if (detailOverlay.classList.contains("open")) closeDetail();
       }

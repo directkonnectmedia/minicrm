@@ -207,3 +207,21 @@ create policy "anon all"
   for all to anon
   using (true)
   with check (true);
+
+-- Reusable contract wording templates ("universal" templates) for the
+-- Contract Builder. Per-client "custom" templates live inside clients.contract.
+create table if not exists public.contract_text_templates (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  body_html text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.contract_text_templates enable row level security;
+drop policy if exists "anon all" on public.contract_text_templates;
+create policy "anon all"
+  on public.contract_text_templates
+  for all to anon
+  using (true)
+  with check (true);
