@@ -2123,6 +2123,121 @@
         const prev = inp.parentElement.querySelector(`input[data-pin-idx="${Number(inp.dataset.pinIdx) - 1}"]`);
         if (prev) { prev.focus(); prev.value = ""; prev.classList.remove("filled"); e.preventDefault(); }
       }
+      if (e.key === "Enter") { e.preventDefault(); handleLoginSubmit(); }
+    });
+
+    function getPINFromBoxes() {
+      return Array.from(loginPinBoxes.querySelectorAll("input[data-pin-idx]"))
+        .map((i) => i.value)
+        .join("");
+    }
+
+    function setLoginBusy(busy) {
+      loginSubmitBtn.disabled = busy;
+      loginSubmitBtn.textContent = busy ? "Signing in..." : "Sign in";
+    }
+
+    async function handleLoginSubmit() {
+      if (!currentTeamMember) return;
+      const pin = getPINFromBoxes();
+      loginError.textContent = "";
+      if (pin.length !== 4) {
+        loginError.textContent = "Enter all 4 digits.";
+        return;
+      }
+      setStayLoggedIn(loginStayToggle.checked);
+      setLoginBusy(true);
+      try {
+        const { error } = await sb.auth.signInWithPassword({
+          email: currentTeamMember.email,
+          password: pin,
+        });
+        if (error) {
+          loginError.textContent = "Wrong PIN. Try again.";
+          loginPinBoxes.querySelectorAll("input").forEach((i) => { i.value = ""; i.classList.remove("filled"); });
+          loginPinBoxes.querySelector('input[data-pin-idx="0"]').focus();
+          return;
+        }
+        try { sessionStorage.setItem(SESSION_MARKER_KEY, "1"); } catch {}
+        signedInMember = currentTeamMember;
+        applyAuthUIState();
+        hideLoginOverlay();
+        await load();
+      } catch (err) {
+        loginError.textContent = "Sign in failed: " + (err.message || err);
+      } finally {
+        setLoginBusy(false);
+      }
+    }
+
+    loginSubmitBtn.addEventListener("click", handleLoginSubmit);
+
+    function applyAuthUIState() {
+      if (signedInMember) {
+        logoutBtn.style.display = "inline-flex";
+        logoutNameLabel.textContent = signedInMember.name;
+      } else {
+        logoutBtn.style.display = "none";
+        logoutNameLabel.textContent = "";
+      }
+    }
+
+    async function handleLogout() {
+      if (!confirm("Sign out of the CRM?")) return;
+      try { await sb.auth.signOut(); } catch (err) { console.warn("Sign out failed:", err); }
+      try { sessionStorage.removeItem(SESSION_MARKER_KEY); } catch {}
+      signedInMember = null;
+      applyAuthUIState();
+      // Reset CRM client list so cached data isn't visible after sign-out
+      allClients = [];
+      signedContracts = [];
+      try { render(); refreshCalendar(); } catch {}
+      showLoginOverlay();
+    }
+    logoutBtn.addEventListener("click", handleLogout);
+
+    async function checkAuthOnLoad() {
+      let session = null;
+      try {
+        const { data } = await sb.auth.getSession();
+        session = data && data.session ? data.session : null;
+      } catch (err) {
+        console.warn("getSession failed:", err);
+      }
+
+      // Stay-logged-in OFF: if browser was closed since last login, force re-auth.
+      if (session && !getStayLoggedIn()) {
+        let marker = null;
+        try { marker = sessionStorage.getItem(SESSION_MARKER_KEY); } catch {}
+        if (!marker) {
+          try { await sb.auth.signOut(); } catch {}
+          session = null;
+        }
+      }
+
+      if (!session) {
+        signedInMember = null;
+        applyAuthUIState();
+        showLoginOverlay();
+        return false;
+      }
+
+      const email = session.user && session.user.email;
+      signedInMember = (email && TEAM_BY_EMAIL[email]) || { name: email || "Team Member", email, color: "#6b7280" };
+      try { sessionStorage.setItem(SESSION_MARKER_KEY, "1"); } catch {}
+      applyAuthUIState();
+      hideLoginOverlay();
+      return true;
+    }
+
+    // React to auth events from anywhere (e.g. token expiry)
+    sb.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        signedInMember = null;
+        applyAuthUIState();
+        try { sessionStorage.removeItem(SESSION_MARKER_KEY); } catch {}
+        showLoginOverlay();
+      }
     });
 
     const CONTRACT_TEMPLATES = [
@@ -5943,7 +6058,10 @@ SOLO para charla casual (saludos, "¿cómo estás?", preguntas sobre ti mismo). 
       });
     }
 
-    load();
+    (async () => {
+      const ok = await checkAuthOnLoad();
+      if (ok) await load();
+    })();
   </script>
 </body>
 </html>
