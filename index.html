@@ -407,6 +407,8 @@
     .pill.p-mgr-Ivan.active   { background: #3b82f6; color: white; }
     .pill.p-mgr-Hector { border-color: #8b5cf6; }
     .pill.p-mgr-Hector.active { background: #8b5cf6; color: white; }
+    .pill.p-mgr-Jesus  { border-color: #10b981; }
+    .pill.p-mgr-Jesus.active  { background: #10b981; color: white; }
 
     /* Schedule type pills */
     .pill.p-fut-Followup    { border-color: #3b82f6; }
@@ -1465,6 +1467,7 @@
             <option value="">Any</option>
             <option value="Ivan">Ivan</option>
             <option value="Hector">Hector</option>
+            <option value="Jesus">Jesus</option>
             <option value="__unassigned">Unassigned</option>
           </select>
         </div>
@@ -1650,7 +1653,7 @@
         qProfileLink: "Profile / social media link? (or 'skip')",
         qPostLink: "Specific post link? (or 'skip')",
         qFinishedWebsite: "Finished website URL? (or 'skip')",
-        qManager: "Manager — Ivan, Hector, or 'skip' for unassigned?",
+        qManager: "Manager — Ivan, Hector, Jesus, or 'skip' for unassigned?",
         qWebStatus: "Web status? (Not Started, In Progress, Review, Needs Fixing, Finished — or 'skip' for Not Started)",
         qClientStatus: "Client status? (New Lead, Contacted, Interested, Proposal Sent, Negotiation, Follow Up, Closed Won, Closed Lost, Nurture — or 'skip' for New Lead)",
         qMotivation: "Motivation? (Not Set, Dead, Cold, Warm, Hot, VIP — or 'skip' for Not Set)",
@@ -1741,7 +1744,7 @@
         qProfileLink: "¿Enlace de perfil / red social? (o 'skip')",
         qPostLink: "¿Enlace de publicación específica? (o 'skip')",
         qFinishedWebsite: "¿URL del sitio web terminado? (o 'skip')",
-        qManager: "Encargado — ¿Ivan, Hector, o 'skip' para sin asignar?",
+        qManager: "Encargado — ¿Ivan, Hector, Jesus, o 'skip' para sin asignar?",
         qWebStatus: "¿Estado del sitio? (Not Started, In Progress, Review, Needs Fixing, Finished — o 'skip' para Not Started)",
         qClientStatus: "¿Estado del cliente? (New Lead, Contacted, Interested, Proposal Sent, Negotiation, Follow Up, Closed Won, Closed Lost, Nurture — o 'skip' para New Lead)",
         qMotivation: "¿Motivación? (Not Set, Dead, Cold, Warm, Hot, VIP — o 'skip' para Not Set)",
@@ -1816,7 +1819,7 @@
     const CLIENT_STATUSES = ["New Lead","Contacted","Interested","Proposal Sent","Negotiation","Follow Up","Closed Won","Closed Lost","Nurture"];
     const MOTIVATIONS     = ["Not Set", "Dead", "Cold", "Warm", "Hot", "VIP"];
     const FOLLOW_UP_TYPES = ["Follow-up", "Appointment"];
-    const MANAGERS        = [{ label: "Unassigned", value: "" }, { label: "Ivan", value: "Ivan" }, { label: "Hector", value: "Hector" }];
+    const MANAGERS        = [{ label: "Unassigned", value: "" }, { label: "Ivan", value: "Ivan" }, { label: "Hector", value: "Hector" }, { label: "Jesus", value: "Jesus" }];
     const SIGNING_PAGE_URL = "https://direct-konnect-sign.vercel.app/sign.html";
 
     const CONTRACT_TEMPLATES = [
@@ -2142,7 +2145,7 @@
       },
       { title: "Assignment", desc: "Who's handling this and where does it stand?",
         fields: [
-          { name: "manager", label: "Manager", type: "select", options: ["", "Ivan", "Hector"], optionLabels: { "": "— Unassigned —" } },
+          { name: "manager", label: "Manager", type: "select", options: ["", "Ivan", "Hector", "Jesus"], optionLabels: { "": "— Unassigned —" } },
           { name: "web_status", label: "Web status", type: "select", options: WEB_STATUSES },
           { name: "client_status", label: "Client status", type: "select", options: CLIENT_STATUSES },
           { name: "motivation", label: "Motivation", type: "select", options: MOTIVATIONS },
@@ -3866,7 +3869,7 @@
           web_status_not:"EXCLUDE clients with this web_status. Use 'Finished' to find work that still needs to be done.",
           client_status: "One of: New Lead, Contacted, Interested, Proposal Sent, Negotiation, Follow Up, Closed Won, Closed Lost, Nurture",
           business_type: "Free text — partial OK (e.g., 'concrete' matches 'Concrete')",
-          manager:       "One of: Ivan, Hector, or 'Unassigned'",
+          manager:       "One of: Ivan, Hector, Jesus, or 'Unassigned'",
         },
         execute: (args) => {
           const a = args || {};
@@ -3982,7 +3985,7 @@
         params: {
           query: "Company name or client name (fuzzy match)",
           field: "One of: motivation, web_status, client_status, manager",
-          value: "New value — must be valid for the chosen field. For manager, use 'Ivan', 'Hector', or 'Unassigned'.",
+          value: "New value — must be valid for the chosen field. For manager, use 'Ivan', 'Hector', 'Jesus', or 'Unassigned'.",
         },
         tier: "green",
         execute: async (args) => {
@@ -3994,7 +3997,7 @@
             motivation:    MOTIVATIONS,
             web_status:    WEB_STATUSES,
             client_status: CLIENT_STATUSES,
-            manager:       ["Ivan", "Hector", "Unassigned"],
+            manager:       ["Ivan", "Hector", "Jesus", "Unassigned"],
           };
           if (!validFields[args.field]) return { error: "invalid_field", field: args.field, valid: Object.keys(validFields) };
           let value = args.value;
@@ -4166,7 +4169,7 @@
       {
         nameKey: "stepAssignment",
         fields: [
-          { name: "manager",       labelKey: "fieldManager",       questionKey: "qManager",       choices: ["Ivan", "Hector"] },
+          { name: "manager",       labelKey: "fieldManager",       questionKey: "qManager",       choices: ["Ivan", "Hector", "Jesus"] },
           { name: "web_status",    labelKey: "fieldWebStatus",     questionKey: "qWebStatus",     choices: WEB_STATUSES },
           { name: "client_status", labelKey: "fieldClientStatus",  questionKey: "qClientStatus",  choices: CLIENT_STATUSES },
           { name: "motivation",    labelKey: "fieldMotivation",    questionKey: "qMotivation",    choices: MOTIVATIONS },
@@ -4615,7 +4618,7 @@ Si el usuario pregunta CUALQUIER COSA sobre sus clientes/negocios/agenda/notas/p
 Si te encuentras empezando con "Voy a", "Claro", "Déjame", "Encontré", "Aquí están" — DETENTE. Da el JSON de la herramienta.
 
 # Idioma
-El usuario puede hablar en español o inglés. Tu respuesta de chat (después de que la herramienta se ejecute) debe ser en español. PERO los nombres de las herramientas, los argumentos y los valores enum (como "Hot", "Cold", "Ivan", "Hector", "Concrete", "In Progress") siempre van en INGLÉS — están atados a la base de datos. NUNCA traduzcas valores enum.
+El usuario puede hablar en español o inglés. Tu respuesta de chat (después de que la herramienta se ejecute) debe ser en español. PERO los nombres de las herramientas, los argumentos y los valores enum (como "Hot", "Cold", "Ivan", "Hector", "Jesus", "Concrete", "In Progress") siempre van en INGLÉS — están atados a la base de datos. NUNCA traduzcas valores enum.
 
 # Herramientas disponibles
 
