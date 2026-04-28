@@ -27,8 +27,13 @@
     }
 
     /* ---------- View switcher (only one visible at a time) ---------- */
-    .view { display: none; }
+    /* `:not(.active)` bumps specificity above .auth-shell's display:flex so
+       inactive views are reliably hidden no matter what other classes they
+       carry. Active auth views need flex (centered card); active portal
+       view needs block. */
+    .view:not(.active) { display: none !important; }
     .view.active { display: block; }
+    .view.active.auth-shell { display: flex; }
 
     /* ================================================================
        AUTH VIEWS (signin + linkSent)
@@ -900,10 +905,36 @@
     //   - no session                    -> signin
     //   - session, email matches client -> portal
     //   - session, no client row found  -> noAccount
-    // The Supabase JS client auto-detects the magic-link tokens in the
-    // URL hash on load and creates the session before we get here.
+    //
+    // Magic-link redirect handling: Supabase's PKCE flow drops us back
+    // here as portal.html?code=XYZ. We have to call exchangeCodeForSession
+    // explicitly -- relying on the SDK's auto-detection races against
+    // boot() and intermittently leaves us with no session, which then
+    // looks to the user like the magic link did nothing. After the
+    // exchange succeeds we strip the ?code so refreshing won't try to
+    // reuse a one-time code (which would fail with "code already used").
     // ================================================================
+    async function consumeMagicLinkCode() {
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get("code");
+      if (!code) return;
+      try {
+        const { error } = await sb.auth.exchangeCodeForSession(code);
+        if (error) console.warn("exchangeCodeForSession error:", error);
+      } catch (err) {
+        console.warn("exchangeCodeForSession threw:", err);
+      }
+      // Clean every Supabase-related query param so a refresh doesn't
+      // try to consume the code (or replay an error) a second time.
+      ["code", "state", "error", "error_code", "error_description"].forEach(
+        (p) => url.searchParams.delete(p)
+      );
+      window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+    }
+
     async function boot() {
+      await consumeMagicLinkCode();
+
       let session = null;
       try {
         const { data } = await sb.auth.getSession();
