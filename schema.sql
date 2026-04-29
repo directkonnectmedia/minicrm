@@ -215,6 +215,17 @@ create index if not exists signed_contracts_client_id_idx
 create index if not exists signed_contracts_token_idx
   on public.signed_contracts (token);
 
+-- Allow the 'saved' status. A "saved" contract is a snapshot generated
+-- via the CRM's Contract Builder and parked on the client's profile so
+-- the team can re-open it later. It has never been sent to a client and
+-- the Client Portal hides these rows. Keeping the migration in its own
+-- block (drop+add) so re-running schema.sql is safe.
+alter table public.signed_contracts
+  drop constraint if exists signed_contracts_status_check;
+alter table public.signed_contracts
+  add constraint signed_contracts_status_check
+  check (status in ('pending', 'saved', 'sent', 'viewed', 'signed', 'voided'));
+
 alter table public.signed_contracts enable row level security;
 drop policy if exists "anon all" on public.signed_contracts;
 create policy "anon all"

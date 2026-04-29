@@ -441,6 +441,7 @@
       letter-spacing: 0.03em;
     }
     .sent-status-pending { background: #f3f4f6; color: #4b5563; }
+    .sent-status-saved   { background: #e0e7ff; color: #3730a3; }
     .sent-status-sent { background: #dbeafe; color: #1e40af; }
     .sent-status-viewed { background: #fef3c7; color: #92400e; }
     .sent-status-signed { background: #d1fae5; color: #065f46; }
@@ -1907,8 +1908,11 @@
         <div class="contract-doc" id="cbPreviewBody"></div>
       </div>
       <div class="modal-footer">
-        <span></span>
-        <button id="cbPreviewCloseBtn">Close</button>
+        <span class="muted" id="cbPreviewSaveStatus" style="font-size:13px;"></span>
+        <div style="display:flex;gap:8px;">
+          <button class="ghost" id="cbPreviewCloseBtn">Close</button>
+          <button id="cbPreviewSaveBtn">Save to client profile</button>
+        </div>
       </div>
     </div>
   </div>
@@ -3732,8 +3736,8 @@
           <div class="field-block">
             <div class="field-block-title">Contract Status</div>
             <div class="contract-status-card">
-              <div class="contract-status-title">No contract sent yet</div>
-              <div class="contract-status-meta">Generated contracts will appear here after they are sent for signature.</div>
+              <div class="contract-status-title">No contracts yet</div>
+              <div class="contract-status-meta">Save a generated contract from the Contract Builder, or send one for signature, and it will show up here.</div>
             </div>
           </div>
         `;
@@ -3742,20 +3746,32 @@
         <div class="field-block">
           <div class="field-block-title">Contract Status</div>
           ${rows.map((row) => {
-            const link = `${SIGNING_PAGE_URL}?t=${encodeURIComponent(row.token || "")}`;
             const status = row.status || "pending";
+            const isSaved = status === "saved";
+            const link = `${SIGNING_PAGE_URL}?t=${encodeURIComponent(row.token || "")}`;
+            const recipientLine = isSaved
+              ? `<div class="contract-status-meta">Saved as draft &mdash; not sent to a client.</div>`
+              : `<div class="contract-status-meta">Recipient: ${esc(row.recipient_email || "—")}</div>`;
             const signed = status === "signed" && row.signer_name
               ? `<div class="contract-status-meta">Signed by ${esc(row.signer_name)}${row.signed_at ? ` on ${esc(formatDateTime(row.signed_at))}` : ""}</div>`
               : "";
+            const actions = isSaved
+              ? `
+                <button class="ghost" data-action="view-saved-contract" data-id="${esc(row.id)}">View contract</button>
+                <button class="danger" data-action="delete-saved-contract" data-id="${esc(row.id)}" data-name="${esc(row.template_name || "Contract")}">Delete</button>
+              `
+              : `
+                <button class="ghost" data-action="copy" data-value="${esc(link)}">Copy signing link</button>
+              `;
             return `
               <div class="contract-status-card">
                 <div class="contract-status-title">${esc(row.template_name || "Contract")}</div>
-                <div class="contract-status-meta">Recipient: ${esc(row.recipient_email || "—")}</div>
+                ${recipientLine}
                 <div class="contract-status-meta">Created: ${row.created_at ? esc(formatDateTime(row.created_at)) : "—"}</div>
                 ${signed}
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
                   <span class="sent-status-pill sent-status-${esc(status)}">${esc(status)}</span>
-                  <button class="ghost" data-action="copy" data-value="${esc(link)}">Copy signing link</button>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;">${actions}</div>
                 </div>
               </div>`;
           }).join("")}
@@ -3972,6 +3988,23 @@
     // ---- Generate Contract preview ----
     const cbPreviewOverlay = document.getElementById("cbPreviewOverlay");
     dismissOnBackdropClick(cbPreviewOverlay, () => closeContractPreview());
+
+    // The preview modal is reused in two modes:
+    //   "preview" -- live render from the builder, shows the Save button
+    //   "view"    -- re-opening a contract already saved on the client
+    //                profile, hides the Save button + remembers the row
+    let cbPreviewMode = "preview";
+    let cbPreviewSavedRow = null;
+
+    function setPreviewMode(mode, savedRow) {
+      cbPreviewMode = mode;
+      cbPreviewSavedRow = savedRow || null;
+      const saveBtn  = document.getElementById("cbPreviewSaveBtn");
+      const status   = document.getElementById("cbPreviewSaveStatus");
+      if (saveBtn) saveBtn.style.display = (mode === "preview") ? "" : "none";
+      if (status)  { status.textContent = ""; status.className = "muted"; status.style.cssText = "font-size:13px;"; }
+    }
+
     function openContractPreview() {
       const c = getBuilderClient();
       const t = builderActiveTemplate;
@@ -3981,9 +4014,88 @@
       const company = getIdentityValue(c, "company") || c.company_name || "(no company)";
       headerEl.textContent = `${t.name || "Contract"} — ${company}`;
       bodyEl.innerHTML = renderContractWithValues(t.body_html || "", c);
+      setPreviewMode("preview");
       cbPreviewOverlay.classList.add("open");
     }
-    function closeContractPreview() { cbPreviewOverlay.classList.remove("open"); }
+
+    // Re-open a previously saved contract for read-only viewing.
+    function openSavedContractView(row) {
+      const headerEl = document.getElementById("cbPreviewHeader");
+      const bodyEl   = document.getElementById("cbPreviewBody");
+      headerEl.textContent = `${row.template_name || "Contract"} — saved ${row.created_at ? formatDateTime(row.created_at) : ""}`.trim();
+      bodyEl.innerHTML = row.contract_html || "<em>This saved contract has no content.</em>";
+      setPreviewMode("view", row);
+      cbPreviewOverlay.classList.add("open");
+    }
+
+    function closeContractPreview() {
+      cbPreviewOverlay.classList.remove("open");
+      // Reset state so the next open starts clean
+      setPreviewMode("preview");
+    }
+
+    // Save the current preview HTML to public.signed_contracts as a
+    // status='saved' row attached to the active builder client.
+    async function handleSaveContractToProfile() {
+      const c = getBuilderClient();
+      const t = builderActiveTemplate;
+      const saveBtn = document.getElementById("cbPreviewSaveBtn");
+      const status  = document.getElementById("cbPreviewSaveStatus");
+      const bodyEl  = document.getElementById("cbPreviewBody");
+      if (!c || !t || !bodyEl) return;
+
+      const html = bodyEl.innerHTML;
+      const templateName = t.name || "Contract";
+      const company = getIdentityValue(c, "company") || c.company_name || null;
+
+      // Token is required by NOT NULL on the table; for a saved-only row
+      // it's never used by the public sign page. Use a UUID so it's
+      // unguessable in case anyone tries to brute-force /sign?t=...
+      const token = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ("saved-" + Date.now() + "-" + Math.random().toString(36).slice(2));
+
+      const originalLabel = saveBtn.textContent;
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Saving...";
+      status.className = "muted";
+      status.textContent = "";
+
+      try {
+        const { error } = await sb.from("signed_contracts").insert({
+          token,
+          client_id: c.id,
+          template_name: templateName,
+          contract_html: html,
+          company_name: company,
+          recipient_email: c.email || null,
+          status: "saved",
+        });
+        if (error) throw error;
+        await refreshSignedContracts();
+        await addSystemNote(c, "client", `Contract "${templateName}" saved to profile.`);
+        status.style.color = "#065f46";
+        status.textContent = "Saved to client profile. Open the Contract Status tab to view.";
+        saveBtn.textContent = "✓ Saved";
+        setTimeout(() => {
+          saveBtn.disabled = false;
+          saveBtn.textContent = originalLabel;
+        }, 3500);
+      } catch (err) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalLabel;
+        status.style.color = "#991b1b";
+        status.textContent = "Save failed: " + (err && err.message ? err.message : String(err));
+      }
+    }
+
+    // Pulls the latest signed_contracts so the Contract Status tab is
+    // up to date the next time it renders. Cheap; one query.
+    async function refreshSignedContracts() {
+      const { data, error } = await sb
+        .from("signed_contracts")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (!error && Array.isArray(data)) signedContracts = data;
+    }
 
     function buildReplacementNode(key, c, originalLabel) {
       if (key === "signature") {
@@ -4080,6 +4192,7 @@
     dismissOnBackdropClick(cbSaveOverlay, closeCBSaveModal);
     document.getElementById("cbPreviewClose").addEventListener("click", () => closeContractPreview());
     document.getElementById("cbPreviewCloseBtn").addEventListener("click", () => closeContractPreview());
+    document.getElementById("cbPreviewSaveBtn").addEventListener("click", () => handleSaveContractToProfile());
 
     document.getElementById("cbEditorContinue").addEventListener("click", () => {
       builderEditorDraftHTML = cbEditor.innerHTML;
@@ -4264,8 +4377,43 @@
         switchTab("contract_builder");
       } else if (action === "send-portal-link") {
         await handleSendPortalLink(btn);
+      } else if (action === "view-saved-contract") {
+        const id = btn.dataset.id;
+        const row = signedContracts.find((r) => String(r.id) === String(id));
+        if (row) openSavedContractView(row);
+      } else if (action === "delete-saved-contract") {
+        await handleDeleteSavedContract(btn);
       }
     });
+
+    // Delete a saved-only contract row. Restricted to status='saved' so
+    // the team can never accidentally remove a real signed/sent contract
+    // through this path.
+    async function handleDeleteSavedContract(btn) {
+      const id = btn.dataset.id;
+      const name = btn.dataset.name || "this contract";
+      if (!id) return;
+      const row = signedContracts.find((r) => String(r.id) === String(id));
+      if (!row || row.status !== "saved") {
+        alert("Only saved drafts can be deleted from here.");
+        return;
+      }
+      if (!confirm(`Delete "${name}"? This removes the saved draft from the client's profile and cannot be undone.`)) return;
+      const c = getCurrentClient();
+      btn.disabled = true;
+      const originalLabel = btn.textContent;
+      btn.textContent = "Deleting...";
+      const { error } = await sb.from("signed_contracts").delete().eq("id", id).eq("status", "saved");
+      if (error) {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+        alert("Delete failed: " + error.message);
+        return;
+      }
+      signedContracts = signedContracts.filter((r) => String(r.id) !== String(id));
+      if (c) await addSystemNote(c, "client", `Saved contract "${name}" deleted from profile.`);
+      renderProfile();
+    }
 
     // Sends a Supabase magic-link to the client's email so they can sign
     // into the Client Portal. Uses the same signInWithOtp call portal.html

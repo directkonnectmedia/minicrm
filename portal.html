@@ -882,6 +882,9 @@
         .from("signed_contracts")
         .select("id, template_name, status, sent_at, viewed_at, signed_at, signer_name, contract_html")
         .eq("client_id", clientId)
+        // Exclude internal-only "saved" drafts -- those are CRM snapshots
+        // the team uses for reference and the client should never see them.
+        .neq("status", "saved")
         .order("created_at", { ascending: false });
       if (error) {
         console.warn("Contract fetch failed:", error);
