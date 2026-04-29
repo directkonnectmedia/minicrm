@@ -1097,9 +1097,17 @@
 
       // Decide whether to enter sign mode. The contract is signable iff:
       //   1. status is received or viewed (not already signed/voided), AND
-      //   2. there is at least one .signature-block left for the client.
+      //   2. there is at least one unsigned signature spot left.
+      // We accept ANY of three node shapes as an unsigned spot, because
+      // older saved contracts stored them differently:
+      //   - .signature-block       (current CRM save format)
+      //   - .signature-sign-btn    (legacy: old CRM saved its in-modal buttons)
+      //   - [data-plugin=signature] (raw template chip that never got rendered)
+      // All three get converted into a fresh, freshly-wired clickable button.
       const isSignable = (contract.status === "received" || contract.status === "viewed");
-      const blanks = contractModalBody.querySelectorAll(".signature-block");
+      const blanks = contractModalBody.querySelectorAll(
+        '.signature-block, .signature-sign-btn, [data-plugin="signature"]'
+      );
       const signBtn = document.getElementById("contractModalSignBtn");
       portalSignedSpotsCount = 0;
 
@@ -1113,8 +1121,9 @@
         banner.id = "signModeBanner";
         banner.textContent = `Sign mode is active. Tap each yellow box below to add your signature (${blanks.length} spot${blanks.length === 1 ? "" : "s"} left).`;
         contractModalBody.insertBefore(banner, contractModalBody.firstChild);
-        // Convert each blank signature line into a yellow clickable
-        // sign-here button (mirror of the CRM provider flow).
+        // Convert each unsigned spot into a yellow clickable sign-here
+        // button (mirror of the CRM provider flow). Even legacy buttons
+        // get re-created so they go through our delegated click handler.
         blanks.forEach((node, idx) => {
           const btn = document.createElement("button");
           btn.type = "button";
