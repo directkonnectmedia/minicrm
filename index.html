@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Dancing+Script:wght@500;700&family=Great+Vibes&family=Sacramento&display=swap" rel="stylesheet">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -1694,6 +1695,27 @@
       border-radius: 10px;
       background: #fafafa;
     }
+    .team-backup-card {
+      margin: 12px 14px 0;
+      padding: 14px;
+      border: 1px solid #c7d2fe;
+      border-radius: 10px;
+      background: #eef2ff;
+    }
+    .team-backup-title { font-weight: 700; color: #312e81; font-size: 14px; margin-bottom: 4px; }
+    .team-backup-blurb { font-size: 12px; color: #4338ca; line-height: 1.45; margin-bottom: 10px; }
+    .team-backup-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .team-backup-actions button {
+      background: #4f46e5; color: #fff; border: none;
+      padding: 8px 14px; border-radius: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: background 120ms;
+    }
+    .team-backup-actions button:hover  { background: #4338ca; }
+    .team-backup-actions button:disabled { background: #c7d2fe; cursor: not-allowed; }
+    .team-backup-status { font-size: 12px; color: #4338ca; }
+    .team-backup-status.ok    { color: #065f46; }
+    .team-backup-status.error { color: #991b1b; }
     .team-add-title { font-weight: 600; color: #111827; font-size: 14px; margin-bottom: 10px; }
     .team-add-grid {
       display: grid;
@@ -1908,6 +1930,14 @@
       <div id="teamError" class="team-error" style="display:none;"></div>
       <div id="teamList" class="team-list">
         <div class="team-loading">Loading team members…</div>
+      </div>
+      <div class="team-backup-card">
+        <div class="team-backup-title">CRM Backup</div>
+        <div class="team-backup-blurb">Download a snapshot of every client, note, contract, template, and team member as an Excel file. Use this any time before a risky change, so you always have a safety net.</div>
+        <div class="team-backup-actions">
+          <button id="backupDownloadBtn" type="button">Download backup (.xlsx)</button>
+          <span id="backupStatus" class="team-backup-status"></span>
+        </div>
       </div>
       <div class="team-add-card">
         <div class="team-add-title">Add a team member</div>
@@ -3051,6 +3081,199 @@
     teamOverlay.addEventListener("click", (e) => {
       if (e.target === teamOverlay) closeTeamModal();
     });
+
+    // ================================================================
+    // CRM BACKUP (admin only, lives in the Manage Team modal)
+    // Pulls every team-visible row + the team roster into a single
+    // multi-tab Excel file. SheetJS is loaded from a CDN in <head>.
+    // ================================================================
+    function setBackupStatus(text, kind) {
+      const el = document.getElementById("backupStatus");
+      if (!el) return;
+      el.textContent = text || "";
+      el.classList.remove("ok", "error");
+      if (kind === "ok")    el.classList.add("ok");
+      if (kind === "error") el.classList.add("error");
+    }
+
+    // Excel cells max out at 32,767 chars. Anything longer gets capped
+    // with a clear marker so the team knows the cell was trimmed
+    // (Supabase still has the full value).
+    function capCell(s) {
+      if (typeof s !== "string") return s;
+      if (s.length <= 32760) return s;
+      return s.slice(0, 32760) + "...[TRUNCATED]";
+    }
+
+    function ts() {
+      const d = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+    }
+
+    async function handleDownloadBackup() {
+      const btn = document.getElementById("backupDownloadBtn");
+      if (!btn) return;
+      if (typeof XLSX === "undefined") {
+        setBackupStatus("SheetJS failed to load (CDN unreachable). Refresh and try again.", "error");
+        return;
+      }
+
+      const originalLabel = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Gathering data...";
+      setBackupStatus("Pulling fresh data from Supabase...", "");
+
+      try {
+        // Pull current session for the /api/admin/team call.
+        let bearer = "";
+        try {
+          const { data } = await sb.auth.getSession();
+          bearer = (data && data.session && data.session.access_token) || "";
+        } catch (err) { console.warn("getSession failed:", err); }
+        if (!bearer) throw new Error("Couldn't read your session. Sign out and back in.");
+
+        // Three Supabase tables in parallel + the team API.
+        const [clientsRes, contractsRes, templatesRes, teamRes] = await Promise.all([
+          sb.from("clients").select("*").order("created_at", { ascending: false }),
+          sb.from("signed_contracts").select("*").order("created_at", { ascending: false }),
+          sb.from("contract_text_templates").select("*").order("created_at", { ascending: true }),
+          fetch("/api/admin/team", { headers: { Authorization: `Bearer ${bearer}` } })
+            .then(async (r) => {
+              const body = await r.json().catch(() => null);
+              if (!r.ok) throw new Error("team fetch failed: " + (body && body.error ? body.error : r.status));
+              return body;
+            }),
+        ]);
+
+        if (clientsRes.error)   throw new Error("clients query failed: "   + clientsRes.error.message);
+        if (contractsRes.error) throw new Error("contracts query failed: " + contractsRes.error.message);
+        if (templatesRes.error) throw new Error("templates query failed: " + templatesRes.error.message);
+
+        const clientsRows   = clientsRes.data   || [];
+        const contractsRows = contractsRes.data || [];
+        const templatesRows = templatesRes.data || [];
+        const teamRows      = (teamRes && Array.isArray(teamRes.members)) ? teamRes.members : [];
+
+        // Build a quick lookup so the contract/notes tabs can show a
+        // friendly company name alongside the bare client_id UUID.
+        const clientById = new Map();
+        clientsRows.forEach((c) => clientById.set(c.id, c));
+
+        setBackupStatus("Building workbook...", "");
+        downloadBackupWorkbook({ clientsRows, contractsRows, templatesRows, teamRows, clientById });
+
+        setBackupStatus("Backup downloaded.", "ok");
+        btn.textContent = "Done";
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = originalLabel;
+        }, 4000);
+      } catch (err) {
+        console.error("Backup failed:", err);
+        setBackupStatus("Backup failed: " + (err && err.message ? err.message : String(err)), "error");
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      }
+    }
+
+    // Build the multi-tab workbook from the four pulled datasets and
+    // write it to disk via SheetJS.
+    function downloadBackupWorkbook({ clientsRows, contractsRows, templatesRows, teamRows, clientById }) {
+      const wb = XLSX.utils.book_new();
+
+      // ---- About tab -------------------------------------------------
+      const aboutRows = [
+        { Field: "Generated at", Value: new Date().toISOString() },
+        { Field: "Generated by", Value: (signedInMember && signedInMember.email) || "" },
+        { Field: "Notes",        Value: "Snapshot of the Direct Konnect CRM. Open in Excel or Google Sheets. Cells longer than 32,760 characters are truncated and flagged in the row." },
+        { Field: "Clients",      Value: clientsRows.length },
+        { Field: "Signed contracts", Value: contractsRows.length },
+        { Field: "Contract templates", Value: templatesRows.length },
+        { Field: "Team members", Value: teamRows.length },
+      ];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(aboutRows), "About");
+
+      // ---- Clients tab ----------------------------------------------
+      // Stringify the jsonb note arrays so the cell stays readable; the
+      // expanded note rows live on their own tabs below.
+      const clientsForSheet = clientsRows.map((c) => {
+        const out = {};
+        Object.keys(c).forEach((k) => {
+          let v = c[k];
+          if (v && typeof v === "object") v = JSON.stringify(v);
+          out[k] = capCell(v);
+        });
+        return out;
+      });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(clientsForSheet), "Clients");
+
+      // ---- Client Notes / Web Notes tabs ----------------------------
+      // Both columns are jsonb arrays; flatten to one row per note for
+      // easy review and search.
+      function flattenNotes(field) {
+        const out = [];
+        clientsRows.forEach((c) => {
+          const arr = Array.isArray(c[field]) ? c[field] : [];
+          arr.forEach((n) => {
+            out.push({
+              client_id:    c.id,
+              company_name: c.company_name || "",
+              created_at:   (n && n.created_at) || (n && n.timestamp) || "",
+              author:       (n && n.author)     || (n && n.by)        || "",
+              body:         capCell(typeof n === "string" ? n : ((n && (n.body || n.text)) || JSON.stringify(n))),
+            });
+          });
+        });
+        return out;
+      }
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flattenNotes("client_notes")), "Client Notes");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flattenNotes("web_notes")),    "Web Notes");
+
+      // ---- Signed Contracts tab -------------------------------------
+      const contractsForSheet = contractsRows.map((row) => {
+        const c = clientById.get(row.client_id);
+        const out = { company_name: (c && c.company_name) || "" };
+        Object.keys(row).forEach((k) => {
+          let v = row[k];
+          if (v && typeof v === "object") v = JSON.stringify(v);
+          out[k] = capCell(v);
+        });
+        out.html_truncated = (typeof row.contract_html === "string" && row.contract_html.length > 32760) ? true : false;
+        return out;
+      });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(contractsForSheet), "Signed Contracts");
+
+      // ---- Contract Templates tab -----------------------------------
+      const templatesForSheet = templatesRows.map((row) => {
+        const out = {};
+        Object.keys(row).forEach((k) => {
+          let v = row[k];
+          if (v && typeof v === "object") v = JSON.stringify(v);
+          out[k] = capCell(v);
+        });
+        out.html_truncated = (typeof row.body_html === "string" && row.body_html.length > 32760) ? true : false;
+        return out;
+      });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(templatesForSheet), "Contract Templates");
+
+      // ---- Team Members tab -----------------------------------------
+      const teamForSheet = teamRows.map((m) => ({
+        id:              m.id,
+        name:            m.name || "",
+        email:           m.email || "",
+        roles:           Array.isArray(m.roles) ? m.roles.join(", ") : (m.roles || ""),
+        banned_until:    m.banned_until || "",
+        created_at:      m.created_at || "",
+        last_sign_in_at: m.last_sign_in_at || "",
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(teamForSheet), "Team Members");
+
+      const filename = `directkonnect-crm-backup-${ts()}.xlsx`;
+      XLSX.writeFile(wb, filename);
+    }
+
+    document.getElementById("backupDownloadBtn").addEventListener("click", handleDownloadBackup);
 
     const CONTRACT_TEMPLATES = [
       {
