@@ -4728,7 +4728,24 @@
       const firstPlaced = bodyEl.querySelector(".signature-placed");
       const signerName  = (firstPlaced && firstPlaced.dataset.signerName) || SERVICE_PROVIDER_NAME || "Signer";
 
-      const newHtml = bodyEl.innerHTML;
+      // Build the HTML we're about to persist by:
+      //  1. cloning the live preview body (so we don't mutate what the user
+      //     is looking at),
+      //  2. converting any *unsigned* yellow .signature-sign-btn placeholders
+      //     back into plain .signature-block lines so the client sees a clean
+      //     signature line where they're meant to sign, and
+      //  3. stripping the resign control off any placed signatures (the
+      //     client should never see a "Resign" link on the provider's sig).
+      const exportRoot = bodyEl.cloneNode(true);
+      exportRoot.querySelectorAll(".signature-sign-btn").forEach((btn) => {
+        const block = document.createElement("div");
+        block.className = "signature-block";
+        block.innerHTML = `<div class="signature-line"></div><div class="signature-caption">(Signature)</div>`;
+        btn.parentNode.replaceChild(block, btn);
+      });
+      exportRoot.querySelectorAll(".signature-placed-resign").forEach((el) => el.remove());
+
+      const newHtml = exportRoot.innerHTML;
       const nowIso  = new Date().toISOString();
 
       const originalLabel = signBtn.textContent;
@@ -4787,7 +4804,7 @@
     // need to add a system note tied to the client.
     function signedContractClient(row) {
       if (!row || !row.client_id) return null;
-      return clients.find((c) => c.id === row.client_id) || null;
+      return allClients.find((c) => c.id === row.client_id) || null;
     }
 
     // Transition a `provider_signed` contract to `sent`, recording sent_at.
