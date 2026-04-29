@@ -4051,7 +4051,6 @@
             const status = row.status || "pending";
             const isSaved          = status === "saved";
             const isProviderSigned = status === "provider_signed";
-            const link = `${SIGNING_PAGE_URL}?t=${encodeURIComponent(row.token || "")}`;
             const recipientLine = isSaved
               ? `<div class="contract-status-meta">Saved as draft &mdash; not sent to a client.</div>`
               : isProviderSigned
@@ -4078,7 +4077,7 @@
             } else {
               actions = `
                 <button class="ghost" data-action="view-saved-contract" data-id="${esc(row.id)}">View contract</button>
-                <button class="ghost" data-action="copy" data-value="${esc(link)}">Copy signing link</button>
+                ${row.recipient_email ? `<button class="ghost" data-action="send-portal-link" data-email="${esc(row.recipient_email)}">Resend portal link</button>` : ""}
               `;
             }
             return `
@@ -4807,7 +4806,10 @@
       return allClients.find((c) => c.id === row.client_id) || null;
     }
 
-    // Transition a `provider_signed` contract to `sent`, recording sent_at.
+    // Transition a `provider_signed` contract to `sent`, recording sent_at,
+    // and email the client a Client Portal magic-link so they can come in
+    // and find the contract waiting for them. The contract itself is
+    // delivered via the portal -- there is no standalone signing page.
     async function handleSendContract(btn) {
       const id = btn.dataset.id;
       const name = btn.dataset.name || "this contract";
@@ -4818,7 +4820,12 @@
         alert("This contract isn't ready to send yet.");
         return;
       }
-      if (!confirm(`Mark "${name}" as sent to ${row.recipient_email || "the client"}?\n\n(This won't email the client yet — that piece is coming later.)`)) return;
+      const email = (row.recipient_email || "").trim().toLowerCase();
+      if (!email) {
+        alert("This client has no email on file. Add an email on the Info tab first.");
+        return;
+      }
+      if (!confirm(`Send "${name}" to ${email}?\n\nThe contract will be visible in their Client Portal and they'll get a sign-in link by email.`)) return;
 
       const originalLabel = btn.textContent;
       btn.disabled = true;
@@ -4826,10 +4833,12 @@
 
       const nowIso = new Date().toISOString();
       try {
-        const { error } = await sb.from("signed_contracts")
+        // Step 1: flip the contract status. This is the source of truth --
+        // once status >= 'sent' the row is visible to the client through RLS.
+        const { error: upErr } = await sb.from("signed_contracts")
           .update({ status: "sent", sent_at: nowIso })
           .eq("id", id);
-        if (error) throw error;
+        if (upErr) throw upErr;
 
         const local = signedContracts.find((r) => r.id === row.id);
         if (local) { local.status = "sent"; local.sent_at = nowIso; }
@@ -4838,7 +4847,29 @@
         const c = signedContractClient(row);
         if (c) await addSystemNote(c, "client", `Contract "${name}" marked as sent.`);
 
+        // Step 2: email the portal magic-link. We do this AFTER the status
+        // change so a flaky email step never leaves the contract in a
+        // half-sent state. If the email fails (rate limit, etc.), surface
+        // the issue but keep the sent status; the team can resend later
+        // via the "Resend portal link" button on the card.
+        let mailNote = "";
+        try {
+          const { error: mailErr } = await sb.auth.signInWithOtp({
+            email,
+            options: { emailRedirectTo: PORTAL_URL },
+          });
+          if (mailErr) throw mailErr;
+          if (c) await addSystemNote(c, "client", `Portal sign-in link emailed to ${email}.`);
+          mailNote = `Magic link emailed to ${email}.`;
+        } catch (mailErr) {
+          const msg = (mailErr && mailErr.message ? mailErr.message : String(mailErr)) || "";
+          mailNote = /rate/i.test(msg)
+            ? `Status updated, but the magic-link email hit a rate limit. Use "Resend portal link" in a few minutes.`
+            : `Status updated, but the magic-link email failed: ${msg}`;
+        }
+
         renderProfile();
+        alert(`Contract sent. ${mailNote}`);
       } catch (err) {
         btn.disabled = false;
         btn.textContent = originalLabel;
