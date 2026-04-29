@@ -3555,6 +3555,14 @@
     // Status tab stays current without a manual refresh.
     let contractChannel = null;
     let contractRefreshTimer = null;
+    function scheduleContractRefresh() {
+      clearTimeout(contractRefreshTimer);
+      contractRefreshTimer = setTimeout(async () => {
+        await refreshSignedContracts();
+        try { renderProfile(); } catch (_) {}
+        try { render(); } catch (_) {}
+      }, 250);
+    }
     function subscribeToContractChanges() {
       if (contractChannel) return; // idempotent on re-load
       contractChannel = sb
@@ -3562,16 +3570,19 @@
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "signed_contracts" },
-          () => {
-            clearTimeout(contractRefreshTimer);
-            contractRefreshTimer = setTimeout(async () => {
-              await refreshSignedContracts();
-              try { renderProfile(); } catch (_) {}
-              try { render(); } catch (_) {}
-            }, 250);
-          }
+          () => scheduleContractRefresh()
         )
         .subscribe();
+
+      // Fallback: even if Supabase Realtime isn't enabled on the table
+      // (publication missing, or websocket blocked), refetch every time
+      // the CRM tab regains focus. That covers the common case of "I
+      // just signed in the portal in another tab and switched back" --
+      // the user will always see fresh status the moment they look.
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") scheduleContractRefresh();
+      });
+      window.addEventListener("focus", () => scheduleContractRefresh());
     }
 
     tbody.addEventListener("click", async (e) => {
@@ -4296,7 +4307,10 @@
       }
       return `
         <div class="field-block">
-          <div class="field-block-title">Contract Status</div>
+          <div class="field-block-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <span>Contract Status</span>
+            <button class="ghost" data-action="refresh-contracts" style="font-size:12px;padding:4px 10px;">Refresh</button>
+          </div>
           ${rows.map((row) => {
             const status = row.status || "pending";
             const isSaved          = status === "saved";
@@ -5427,6 +5441,17 @@
         if (row) openSavedContractView(row);
       } else if (action === "delete-saved-contract") {
         await handleDeleteSavedContract(btn);
+      } else if (action === "refresh-contracts") {
+        const original = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = "Refreshing...";
+        try {
+          await refreshSignedContracts();
+          renderProfile();
+        } finally {
+          btn.disabled = false;
+          btn.textContent = original;
+        }
       } else if (action === "sign-contract") {
         const id = btn.dataset.id;
         const row = signedContracts.find((r) => String(r.id) === String(id));
