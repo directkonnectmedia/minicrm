@@ -569,6 +569,7 @@
       grid-template-columns: 20% 50% 30%;
       min-height: 70vh;
     }
+    .builder-grid.plan-grid { grid-template-columns: 20% 80%; }
     .builder-panel {
       padding: 16px;
       border-right: 1px solid #e5e7eb;
@@ -984,6 +985,67 @@
     .cb-save-choice-title { font-weight: 700; font-size: 14px; color: #111827; margin-bottom: 4px; }
     .cb-save-choice-sub { font-size: 12px; color: #6b7280; }
     .cb-save-error { color: #dc2626; font-size: 13px; margin-top: 10px; min-height: 18px; }
+
+    /* Plan Builder wizard */
+    .plan-wizard-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 18px;
+      align-items: start;
+      padding: 6px 0;
+    }
+    .plan-wizard-question { min-height: 220px; display: flex; flex-direction: column; gap: 14px; }
+    .plan-wizard-step-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #6b7280; }
+    .plan-wizard-prompt { font-size: 18px; font-weight: 700; color: #111827; line-height: 1.35; }
+    .plan-wizard-yesno { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+    .plan-wizard-yesno-btn {
+      background: #fff;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 120ms;
+      color: #111827;
+    }
+    .plan-wizard-yesno-btn:hover { border-color: #4f46e5; background: #eef2ff; }
+    .plan-wizard-yesno-btn.active { border-color: #4f46e5; background: #4f46e5; color: #fff; }
+    .plan-wizard-name-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .plan-wizard-checklist {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .plan-wizard-checklist-title { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #0B5394; margin-bottom: 8px; }
+    .plan-wizard-checklist-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+    .plan-wizard-checklist-list li { display: flex; align-items: center; gap: 8px; color: #374151; }
+    .plan-wizard-checklist-list li.included { color: #15803d; font-weight: 600; }
+    .plan-wizard-checklist-list li.pending { color: #9ca3af; }
+    .plan-wizard-checklist-list li .pw-mark { width: 18px; text-align: center; font-weight: 700; }
+
+    /* Plan Builder right-panel mini tabs */
+    .plan-tabs { display: flex; gap: 6px; border-bottom: 1px solid #e5e7eb; margin-bottom: 14px; }
+    .plan-tab {
+      background: transparent;
+      border: none;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #6b7280;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    .plan-tab:hover { color: #111827; }
+    .plan-tab.active { color: #4f46e5; border-bottom-color: #4f46e5; }
+    .plan-tab-body { padding: 8px 4px; }
 
     /* Right panel — Generate + plugin mapping */
     .builder-generate-btn {
@@ -2154,9 +2216,9 @@
 
   <div class="tab-content" data-view="plan_builder">
     <div class="card builder-card">
-      <div class="cb-middle-empty" style="padding:60px 20px;">
-        <div class="cb-middle-empty-title">Plan Builder</div>
-        <div class="cb-middle-empty-sub">Coming soon. The wizard for creating Plans (services, fees, setup / monthly / financing) will live here.</div>
+      <div class="builder-grid plan-grid">
+        <div class="builder-panel" id="pbLeft"></div>
+        <div class="builder-panel" id="pbRight"></div>
       </div>
     </div>
   </div>
@@ -2564,6 +2626,32 @@
         <span class="muted" id="invoicePreviewStatus" style="font-size:13px;"></span>
         <div style="display:flex;gap:8px;">
           <button class="ghost" id="invoicePreviewToggleStatus">Mark as Paid</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Plan Builder wizard modal -->
+  <div class="overlay" id="planWizardOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="planWizardTitle" style="max-width: 760px;">
+      <div class="modal-header">
+        <div class="modal-title" id="planWizardTitle">Create Plan</div>
+        <button class="modal-close" id="planWizardClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="step-body">
+        <div class="plan-wizard-grid">
+          <div class="plan-wizard-question" id="planWizardQuestion"></div>
+          <div class="plan-wizard-checklist">
+            <div class="plan-wizard-checklist-title">Included in this plan</div>
+            <ul id="planWizardChecklist" class="plan-wizard-checklist-list"></ul>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <span class="muted" id="planWizardStatus" style="font-size:13px;"></span>
+        <div style="display:flex;gap:8px;">
+          <button class="ghost" id="planWizardBack">Back</button>
+          <button id="planWizardNext">Next</button>
         </div>
       </div>
     </div>
@@ -5207,6 +5295,273 @@
       }
     }
 
+    // ============================================================
+    // PLAN BUILDER
+    // ============================================================
+    // Plans are reusable, universal-only bundles the team sells.
+    // The wizard captures only the *skeleton* (which categories
+    // a plan includes via has_* booleans). Per-tab editors that
+    // populate the matching jsonb columns will land in a later pass.
+    let plans = [];
+    let plansLoaded = false;
+    let activePlanId = null;
+    let activePlanTab = null;
+
+    const PLAN_TAB_DEFS = [
+      { key: "one_time",     flag: "has_one_time",     label: "One-time" },
+      { key: "setup",        flag: "has_setup",        label: "Setup Fee" },
+      { key: "subscription", flag: "has_subscription", label: "Subscription" },
+      { key: "addons",       flag: "has_addons",       label: "Add-ons" },
+    ];
+
+    function activePlanTabsFor(plan) {
+      if (!plan) return [];
+      return PLAN_TAB_DEFS.filter((t) => plan[t.flag] === true);
+    }
+
+    async function loadPlans() {
+      const { data, error } = await sb.from("plans").select("*").order("created_at", { ascending: false });
+      if (error) {
+        console.warn("Plans unavailable:", error.message);
+        plans = [];
+      } else {
+        plans = data || [];
+      }
+      plansLoaded = true;
+    }
+
+    function getActivePlan() {
+      return activePlanId ? plans.find((p) => p.id === activePlanId) : null;
+    }
+
+    function renderPlanBuilder() {
+      if (!plansLoaded) {
+        loadPlans().then(() => renderPlanBuilder());
+      }
+      renderPBLeft();
+      renderPBRight();
+    }
+
+    function renderPBLeft() {
+      const el = document.getElementById("pbLeft");
+      if (!el) return;
+      const list = plans.length === 0
+        ? `<div class="cb-tmpl-empty">No plans yet. Click "+ Create Plan" to start.</div>`
+        : plans.map((p) => {
+            const summary = activePlanTabsFor(p).map((t) => t.label).join(", ") || "Empty skeleton";
+            const isActive = p.id === activePlanId;
+            return `
+              <button class="cb-tmpl-item ${isActive ? "active" : ""}" data-pb-action="select-plan" data-id="${esc(p.id)}">
+                <div class="cb-tmpl-name">${esc(p.name || "(untitled)")}</div>
+                <div class="cb-tmpl-meta">${esc(summary)}</div>
+              </button>`;
+          }).join("");
+      el.innerHTML = `
+        <button class="cb-new-tmpl-btn" data-pb-action="create-plan">+ Create Plan</button>
+        <div class="cb-tmpl-list">
+          <div class="cb-tmpl-section">
+            <div class="cb-tmpl-section-title">Saved Plans</div>
+            ${list}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderPBRight() {
+      const el = document.getElementById("pbRight");
+      if (!el) return;
+      const plan = getActivePlan();
+      if (!plan) {
+        el.innerHTML = `
+          <div class="cb-middle-empty" style="padding:60px 20px;">
+            <div class="cb-middle-empty-title">No plan selected</div>
+            <div class="cb-middle-empty-sub">Select a plan from the left, or click "+ Create Plan" to start.</div>
+          </div>`;
+        return;
+      }
+      const tabs = activePlanTabsFor(plan);
+      // Keep activePlanTab in sync if it's stale or empty.
+      if (!activePlanTab || !tabs.find((t) => t.key === activePlanTab)) {
+        activePlanTab = tabs.length ? tabs[0].key : null;
+      }
+      const tabBar = tabs.length === 0
+        ? `<div class="muted" style="padding:8px 4px;">This plan has no included components.</div>`
+        : `<div class="plan-tabs">
+            ${tabs.map((t) => `
+              <button class="plan-tab ${t.key === activePlanTab ? "active" : ""}" data-pb-action="select-plan-tab" data-tab="${esc(t.key)}">${esc(t.label)}</button>
+            `).join("")}
+          </div>`;
+      const activeTabDef = tabs.find((t) => t.key === activePlanTab);
+      const tabBody = activeTabDef
+        ? `<div class="plan-tab-body">
+            <div class="muted">Coming soon &mdash; editor for <strong>${esc(activeTabDef.label)}</strong> goes here.</div>
+          </div>`
+        : "";
+      el.innerHTML = `
+        <div class="cb-middle-header">
+          <div class="cb-middle-name">${esc(plan.name || "(untitled)")}</div>
+        </div>
+        <div style="padding:16px 20px;">
+          ${tabBar}
+          ${tabBody}
+        </div>
+      `;
+    }
+
+    // ---- Plan wizard ----
+    // Steps 1-4 ask one yes/no per category and write into the
+    // matching has_* boolean. Step 5 asks for a name. The right
+    // half of the modal shows a live "Included in this plan"
+    // checklist that updates as the user advances.
+    const PLAN_WIZARD_STEPS = [
+      { flag: "has_one_time",     label: "One-time payment", prompt: "Does this plan include a one-time payment?" },
+      { flag: "has_setup",        label: "Setup fee",        prompt: "Does this plan include a setup fee?" },
+      { flag: "has_subscription", label: "Subscription",     prompt: "Does this plan include a subscription?" },
+      { flag: "has_addons",       label: "Add-ons",          prompt: "Does this plan include add-ons?" },
+    ];
+    const PLAN_WIZARD_TOTAL_STEPS = PLAN_WIZARD_STEPS.length + 1; // + name step
+
+    let planWizardState = null;
+
+    const planWizardOverlay   = document.getElementById("planWizardOverlay");
+    const planWizardTitle     = document.getElementById("planWizardTitle");
+    const planWizardClose     = document.getElementById("planWizardClose");
+    const planWizardQuestion  = document.getElementById("planWizardQuestion");
+    const planWizardChecklist = document.getElementById("planWizardChecklist");
+    const planWizardBack      = document.getElementById("planWizardBack");
+    const planWizardNext      = document.getElementById("planWizardNext");
+    const planWizardStatus    = document.getElementById("planWizardStatus");
+
+    function openPlanWizard() {
+      planWizardState = {
+        step: 1,
+        draft: {
+          has_one_time: false,
+          has_setup: false,
+          has_subscription: false,
+          has_addons: false,
+          name: "",
+        },
+      };
+      planWizardStatus.textContent = "";
+      planWizardOverlay.classList.add("open");
+      renderPlanWizard();
+    }
+
+    function closePlanWizard() {
+      planWizardOverlay.classList.remove("open");
+      planWizardState = null;
+    }
+    planWizardClose.addEventListener("click", closePlanWizard);
+
+    function renderPlanWizard() {
+      if (!planWizardState) return;
+      const { step, draft } = planWizardState;
+      planWizardTitle.textContent = `Create Plan \u2014 Step ${step} of ${PLAN_WIZARD_TOTAL_STEPS}`;
+
+      // Active question pane
+      if (step >= 1 && step <= PLAN_WIZARD_STEPS.length) {
+        const def = PLAN_WIZARD_STEPS[step - 1];
+        const current = draft[def.flag];
+        planWizardQuestion.innerHTML = `
+          <div class="plan-wizard-step-label">Step ${step} / ${PLAN_WIZARD_TOTAL_STEPS}</div>
+          <div class="plan-wizard-prompt">${esc(def.prompt)}</div>
+          <div class="plan-wizard-yesno">
+            <button type="button" class="plan-wizard-yesno-btn ${current === true ? "active" : ""}" data-pw-answer="yes">Yes</button>
+            <button type="button" class="plan-wizard-yesno-btn ${current === false ? "active" : ""}" data-pw-answer="no">No</button>
+          </div>
+        `;
+      } else {
+        // Name step
+        planWizardQuestion.innerHTML = `
+          <div class="plan-wizard-step-label">Step ${step} / ${PLAN_WIZARD_TOTAL_STEPS}</div>
+          <div class="plan-wizard-prompt">Name your plan.</div>
+          <input type="text" id="planWizardNameInput" class="plan-wizard-name-input" placeholder="e.g. Premium Website Bundle" value="${esc(draft.name)}">
+        `;
+        const nameInput = document.getElementById("planWizardNameInput");
+        nameInput.addEventListener("input", (e) => { planWizardState.draft.name = e.target.value; });
+        setTimeout(() => nameInput.focus(), 0);
+      }
+
+      // Live checklist: tick = included, dash = answered No, dot = not answered yet
+      planWizardChecklist.innerHTML = PLAN_WIZARD_STEPS.map((def) => {
+        const value = draft[def.flag];
+        let cls, mark;
+        if (value === true)       { cls = "included"; mark = "\u2713"; }
+        else if (value === false) { cls = "pending";  mark = "\u2014"; }
+        else                      { cls = "pending";  mark = "\u2022"; }
+        return `<li class="${cls}"><span class="pw-mark">${mark}</span><span>${esc(def.label)}</span></li>`;
+      }).join("");
+
+      // Footer button states
+      planWizardBack.disabled = step === 1;
+      const isLast = step === PLAN_WIZARD_TOTAL_STEPS;
+      planWizardNext.textContent = isLast ? "Save Plan" : "Next";
+      // Next is disabled on yes/no steps until an answer is picked, and on the name step until a non-empty name is entered.
+      if (step <= PLAN_WIZARD_STEPS.length) {
+        const def = PLAN_WIZARD_STEPS[step - 1];
+        planWizardNext.disabled = draft[def.flag] !== true && draft[def.flag] !== false;
+      } else {
+        planWizardNext.disabled = !(draft.name && draft.name.trim());
+      }
+    }
+
+    // Yes/No clicks inside the wizard question pane
+    planWizardQuestion.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-pw-answer]");
+      if (!btn || !planWizardState) return;
+      const { step } = planWizardState;
+      if (step < 1 || step > PLAN_WIZARD_STEPS.length) return;
+      const def = PLAN_WIZARD_STEPS[step - 1];
+      planWizardState.draft[def.flag] = btn.dataset.pwAnswer === "yes";
+      renderPlanWizard();
+    });
+
+    planWizardBack.addEventListener("click", () => {
+      if (!planWizardState) return;
+      if (planWizardState.step > 1) {
+        planWizardState.step -= 1;
+        renderPlanWizard();
+      }
+    });
+
+    planWizardNext.addEventListener("click", async () => {
+      if (!planWizardState) return;
+      const { step } = planWizardState;
+      if (step < PLAN_WIZARD_TOTAL_STEPS) {
+        planWizardState.step += 1;
+        renderPlanWizard();
+        return;
+      }
+      // Save
+      planWizardNext.disabled = true;
+      planWizardStatus.textContent = "Saving...";
+      try {
+        const draft = planWizardState.draft;
+        const row = {
+          name: (draft.name || "").trim(),
+          has_one_time: !!draft.has_one_time,
+          has_setup: !!draft.has_setup,
+          has_subscription: !!draft.has_subscription,
+          has_addons: !!draft.has_addons,
+        };
+        const { data: inserted, error } = await sb.from("plans").insert(row).select().single();
+        if (error) throw error;
+        plans = [inserted, ...plans];
+        activePlanId = inserted.id;
+        activePlanTab = null;
+        planWizardStatus.textContent = "Saved.";
+        closePlanWizard();
+        renderPlanBuilder();
+      } catch (err) {
+        console.error("save plan failed:", err);
+        planWizardStatus.textContent = "Save failed: " + (err.message || String(err));
+        alert("Save failed: " + (err.message || String(err)));
+      } finally {
+        planWizardNext.disabled = false;
+      }
+    });
+
     // ---- Plugin value resolution ----
     function countSignatureChips(html) {
       if (!html) return 0;
@@ -6876,6 +7231,28 @@
       }
     });
 
+    document.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-pb-action]");
+      if (!btn) return;
+      const action = btn.dataset.pbAction;
+      if (action === "create-plan") {
+        openPlanWizard();
+      } else if (action === "select-plan") {
+        const id = btn.dataset.id;
+        const row = plans.find((p) => String(p.id) === String(id));
+        if (!row) return;
+        activePlanId = row.id;
+        const tabs = activePlanTabsFor(row);
+        activePlanTab = tabs.length ? tabs[0].key : null;
+        renderPlanBuilder();
+      } else if (action === "select-plan-tab") {
+        const tab = btn.dataset.tab;
+        if (!tab) return;
+        activePlanTab = tab;
+        renderPBRight();
+      }
+    });
+
     // ---- Right panel event handling ----
     rightContent.addEventListener("click", async (e) => {
       const btn = e.target.closest("[data-action]");
@@ -7392,7 +7769,7 @@
         renderInvoiceBuilder();
       }
       if (name === "plan_builder") {
-        // placeholder -- contents TBD; future renderPlanBuilder() hook lands here
+        renderPlanBuilder();
       }
     }
 

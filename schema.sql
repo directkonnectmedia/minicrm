@@ -571,3 +571,38 @@ drop trigger if exists invoice_templates_set_updated_at on public.invoice_templa
 create trigger invoice_templates_set_updated_at
   before update on public.invoice_templates
   for each row execute function public.set_updated_at();
+
+-- =============================================================
+-- Plans (Plan Builder skeleton wizard)
+-- =============================================================
+-- A Plan is a reusable bundle the team sells. The wizard captures
+-- only the *skeleton* (which categories the plan includes via the
+-- has_* booleans). The matching jsonb columns are populated later
+-- by per-tab editors (TBD) -- they default to empty so the row is
+-- always valid even right after wizard save.
+create table if not exists public.plans (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  has_one_time     boolean not null default false,
+  has_setup        boolean not null default false,
+  has_subscription boolean not null default false,
+  has_addons       boolean not null default false,
+  one_time     jsonb not null default '{}'::jsonb,
+  setup        jsonb not null default '{}'::jsonb,
+  subscription jsonb not null default '{}'::jsonb,
+  addons       jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.plans enable row level security;
+drop policy if exists "team only plans" on public.plans;
+create policy "team only plans"
+  on public.plans for all to authenticated
+  using (public.is_team_member())
+  with check (public.is_team_member());
+
+drop trigger if exists plans_set_updated_at on public.plans;
+create trigger plans_set_updated_at
+  before update on public.plans
+  for each row execute function public.set_updated_at();
