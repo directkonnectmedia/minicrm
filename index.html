@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mini CRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Dancing+Script:wght@500;700&family=Great+Vibes&family=Sacramento&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; }
     body {
@@ -442,10 +445,12 @@
     }
     .sent-status-pending { background: #f3f4f6; color: #4b5563; }
     .sent-status-saved   { background: #e0e7ff; color: #3730a3; }
-    .sent-status-sent { background: #dbeafe; color: #1e40af; }
-    .sent-status-viewed { background: #fef3c7; color: #92400e; }
-    .sent-status-signed { background: #d1fae5; color: #065f46; }
-    .sent-status-voided { background: #fee2e2; color: #991b1b; }
+    .sent-status-provider_signed { background: #ccfbf1; color: #115e59; }
+    .sent-status-sent    { background: #dbeafe; color: #1e40af; }
+    .sent-status-received{ background: #fed7aa; color: #9a3412; }
+    .sent-status-viewed  { background: #fef3c7; color: #92400e; }
+    .sent-status-signed  { background: #d1fae5; color: #065f46; }
+    .sent-status-voided  { background: #fee2e2; color: #991b1b; }
 
     /* Contract lifecycle stepper (inside Contract Status cards) */
     .contract-stepper {
@@ -459,7 +464,7 @@
       flex-direction: column;
       align-items: center;
       flex-shrink: 0;
-      min-width: 64px;
+      min-width: 56px;
     }
     .contract-step-dot {
       width: 26px; height: 26px;
@@ -843,6 +848,108 @@
     .signature-caption {
       font-size: 12px; color: #6b7280;
       margin-top: 4px; text-align: center;
+    }
+    /* Sign-mode: clickable signature placeholder (looks like the line, but interactive) */
+    .signature-sign-btn {
+      display: block;
+      margin: 24px 0 12px;
+      width: 320px;
+      max-width: 100%;
+      padding: 0 0 4px;
+      background: #fffbe6;
+      border: 2px dashed #f59e0b;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 120ms, border-color 120ms;
+    }
+    .signature-sign-btn:hover { background: #fef3c7; border-color: #d97706; }
+    .signature-sign-line {
+      display: block;
+      border-bottom: 1px solid #111827;
+      height: 36px;
+      margin: 6px 12px 0;
+    }
+    .signature-sign-caption {
+      display: block;
+      font-size: 12px; font-weight: 600;
+      color: #92400e; text-transform: uppercase; letter-spacing: 0.04em;
+      margin-top: 4px; text-align: center;
+    }
+    /* Sign-mode: a signature has been placed at this spot */
+    .signature-placed {
+      display: block;
+      margin: 24px 0 12px;
+      max-width: 320px;
+    }
+    .signature-placed img {
+      display: block;
+      max-width: 100%;
+      max-height: 80px;
+      border-bottom: 1px solid #111827;
+    }
+    .signature-placed-caption {
+      font-size: 12px; color: #6b7280;
+      margin-top: 4px; text-align: center;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .signature-placed-resign {
+      background: transparent; border: none; color: #4f46e5;
+      font-size: 12px; cursor: pointer; text-decoration: underline; padding: 0;
+    }
+
+    /* Signature Picker modal */
+    .sig-picker-tabs {
+      display: flex; gap: 4px;
+      border-bottom: 1px solid #e5e7eb;
+      margin-bottom: 16px;
+    }
+    .sig-picker-tab {
+      background: transparent; border: none;
+      padding: 10px 16px; cursor: pointer;
+      font-size: 14px; font-weight: 600; color: #6b7280;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .sig-picker-tab.active { color: #1a1a1a; border-bottom-color: #4f46e5; }
+    .sig-picker-pane { display: none; }
+    .sig-picker-pane.active { display: block; }
+    .sig-style-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+    }
+    .sig-style-option {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 4px; padding: 14px 8px;
+      background: #fff; border: 2px solid #e5e7eb; border-radius: 8px;
+      cursor: pointer; transition: border-color 120ms, background 120ms;
+      min-height: 76px;
+    }
+    .sig-style-option:hover { border-color: #c7d2fe; }
+    .sig-style-option.active { border-color: #4f46e5; background: #eef2ff; }
+    .sig-style-name {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .sig-preview-box {
+      margin-top: 12px;
+      min-height: 80px;
+      border: 1px dashed #cbd5e1;
+      border-radius: 8px;
+      padding: 12px;
+      display: flex; align-items: center; justify-content: center;
+      background: #f8fafc;
+      font-size: 36px;
+      overflow: hidden;
+    }
+    .sig-draw-shell {
+      border: 2px dashed #cbd5e1; border-radius: 8px;
+      background: #fff;
+      width: 100%;
+      overflow: hidden;
+    }
+    #sigDrawCanvas {
+      display: block; width: 100%; height: 180px;
+      cursor: crosshair;
+      touch-action: none;
     }
 
     /* Schedule block */
@@ -1983,7 +2090,69 @@
         <div style="display:flex;gap:8px;">
           <button class="ghost" id="cbPreviewCloseBtn">Close</button>
           <button id="cbPreviewSaveBtn">Save to client profile</button>
+          <button id="cbPreviewSignBtn" style="display:none;" disabled>Save signature &amp; sign</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Signature Picker modal -->
+  <div class="overlay" id="sigPickerOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sigPickerTitle" style="max-width: 560px;">
+      <div class="modal-header">
+        <div class="modal-title" id="sigPickerTitle">Add your signature</div>
+        <button class="modal-close" id="sigPickerClose" aria-label="Close">×</button>
+      </div>
+      <div class="step-body">
+        <div class="sig-picker-tabs">
+          <button type="button" class="sig-picker-tab active" data-sig-tab="type">Type</button>
+          <button type="button" class="sig-picker-tab" data-sig-tab="draw">Draw</button>
+        </div>
+
+        <div class="sig-picker-pane active" data-sig-pane="type">
+          <div class="field">
+            <label for="sigTypeName">Your name</label>
+            <input type="text" id="sigTypeName" placeholder="e.g. Ivan Carrillo" autocomplete="off">
+          </div>
+          <div class="field">
+            <label>Style</label>
+            <div class="sig-style-grid" id="sigStyleGrid">
+              <button type="button" class="sig-style-option active" data-sig-font="'Caveat', cursive">
+                <span style="font-family: 'Caveat', cursive; font-size: 28px;">Signature</span>
+                <span class="sig-style-name">Caveat</span>
+              </button>
+              <button type="button" class="sig-style-option" data-sig-font="'Dancing Script', cursive">
+                <span style="font-family: 'Dancing Script', cursive; font-size: 28px;">Signature</span>
+                <span class="sig-style-name">Dancing Script</span>
+              </button>
+              <button type="button" class="sig-style-option" data-sig-font="'Great Vibes', cursive">
+                <span style="font-family: 'Great Vibes', cursive; font-size: 28px;">Signature</span>
+                <span class="sig-style-name">Great Vibes</span>
+              </button>
+              <button type="button" class="sig-style-option" data-sig-font="'Sacramento', cursive">
+                <span style="font-family: 'Sacramento', cursive; font-size: 28px;">Signature</span>
+                <span class="sig-style-name">Sacramento</span>
+              </button>
+            </div>
+          </div>
+          <div class="sig-preview-box" id="sigTypePreview">
+            <span class="muted">Type your name to preview</span>
+          </div>
+        </div>
+
+        <div class="sig-picker-pane" data-sig-pane="draw">
+          <div class="muted" style="font-size: 13px; margin-bottom: 8px;">Draw your signature in the box below.</div>
+          <div class="sig-draw-shell">
+            <canvas id="sigDrawCanvas" width="520" height="180"></canvas>
+          </div>
+          <div style="display:flex; justify-content:flex-end; margin-top: 8px;">
+            <button type="button" class="ghost" id="sigDrawClear">Clear</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" id="sigPickerCancel">Cancel</button>
+        <button id="sigPickerUse">Use this signature</button>
       </div>
     </div>
   </div>
@@ -3805,17 +3974,21 @@
     // current stage is highlighted indigo. Voided contracts skip the
     // stepper entirely and show a "cancelled" banner instead.
     const CONTRACT_LIFECYCLE_STAGES = [
-      { key: "saved",  label: "Saved",  dateField: "created_at" },
-      { key: "sent",   label: "Sent",   dateField: "sent_at" },
-      { key: "viewed", label: "Viewed", dateField: "viewed_at" },
-      { key: "signed", label: "Signed", dateField: "signed_at" },
+      { key: "saved",           label: "Saved",        dateField: "created_at" },
+      { key: "provider_signed", label: "Signed by us", dateField: "provider_signed_at" },
+      { key: "sent",            label: "Sent",         dateField: "sent_at" },
+      { key: "received",        label: "Received",     dateField: "received_at" },
+      { key: "viewed",          label: "Viewed",       dateField: "viewed_at" },
+      { key: "signed",          label: "Signed",       dateField: "signed_at" },
     ];
     const CONTRACT_STATUS_TO_STAGE_INDEX = {
-      saved:   0,
-      pending: 0,
-      sent:    1,
-      viewed:  2,
-      signed:  3,
+      saved:           0,
+      pending:         0,
+      provider_signed: 1,
+      sent:            2,
+      received:        3,
+      viewed:          4,
+      signed:          5,
     };
     function fmtStepDate(iso) {
       if (!iso) return "";
@@ -3876,30 +4049,47 @@
           <div class="field-block-title">Contract Status</div>
           ${rows.map((row) => {
             const status = row.status || "pending";
-            const isSaved = status === "saved";
+            const isSaved          = status === "saved";
+            const isProviderSigned = status === "provider_signed";
             const link = `${SIGNING_PAGE_URL}?t=${encodeURIComponent(row.token || "")}`;
             const recipientLine = isSaved
               ? `<div class="contract-status-meta">Saved as draft &mdash; not sent to a client.</div>`
-              : `<div class="contract-status-meta">Recipient: ${esc(row.recipient_email || "—")}</div>`;
+              : isProviderSigned
+                ? `<div class="contract-status-meta">Signed by us &mdash; ready to send to ${esc(row.recipient_email || "the client")}.</div>`
+                : `<div class="contract-status-meta">Recipient: ${esc(row.recipient_email || "—")}</div>`;
             const signed = status === "signed" && row.signer_name
               ? `<div class="contract-status-meta">Signed by ${esc(row.signer_name)}${row.signed_at ? ` on ${esc(formatDateTime(row.signed_at))}` : ""}</div>`
               : "";
-            const actions = isSaved
-              ? `
+            const providerSignedLine = (isProviderSigned || ["sent","received","viewed","signed"].includes(status)) && row.provider_signer_name
+              ? `<div class="contract-status-meta">Provider signed by ${esc(row.provider_signer_name)}${row.provider_signed_at ? ` on ${esc(formatDateTime(row.provider_signed_at))}` : ""}</div>`
+              : "";
+            let actions;
+            if (isSaved) {
+              actions = `
                 <button class="ghost" data-action="view-saved-contract" data-id="${esc(row.id)}">View contract</button>
+                <button data-action="sign-contract" data-id="${esc(row.id)}">Sign contract</button>
                 <button class="danger" data-action="delete-saved-contract" data-id="${esc(row.id)}" data-name="${esc(row.template_name || "Contract")}">Delete</button>
-              `
-              : `
+              `;
+            } else if (isProviderSigned) {
+              actions = `
+                <button class="ghost" data-action="view-saved-contract" data-id="${esc(row.id)}">View contract</button>
+                <button data-action="send-contract" data-id="${esc(row.id)}" data-name="${esc(row.template_name || "Contract")}" data-email="${esc(row.recipient_email || "")}">Send contract</button>
+              `;
+            } else {
+              actions = `
+                <button class="ghost" data-action="view-saved-contract" data-id="${esc(row.id)}">View contract</button>
                 <button class="ghost" data-action="copy" data-value="${esc(link)}">Copy signing link</button>
               `;
+            }
             return `
               <div class="contract-status-card">
                 <div class="contract-status-title">${esc(row.template_name || "Contract")}</div>
                 ${recipientLine}
                 ${renderContractStatusStepper(row)}
+                ${providerSignedLine}
                 ${signed}
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-                  <span class="sent-status-pill sent-status-${esc(status)}">${esc(status)}</span>
+                  <span class="sent-status-pill sent-status-${esc(status)}">${esc(status.replace("_", " "))}</span>
                   <div style="display:flex;gap:6px;flex-wrap:wrap;">${actions}</div>
                 </div>
               </div>`;
@@ -4118,21 +4308,323 @@
     const cbPreviewOverlay = document.getElementById("cbPreviewOverlay");
     dismissOnBackdropClick(cbPreviewOverlay, () => closeContractPreview());
 
-    // The preview modal is reused in two modes:
-    //   "preview" -- live render from the builder, shows the Save button
-    //   "view"    -- re-opening a contract already saved on the client
-    //                profile, hides the Save button + remembers the row
+    // The preview modal is reused in three modes:
+    //   "preview" -- live render from the builder, shows "Save to client profile"
+    //   "view"    -- re-opening a stored contract read-only, no save buttons
+    //   "sign"    -- provider signing flow on a saved row; signature
+    //                placeholders become clickable buttons and the footer
+    //                primary action is "Save signature & sign"
     let cbPreviewMode = "preview";
     let cbPreviewSavedRow = null;
+    let cbSignedSpotsCount = 0; // how many [signature] spots have been signed in this sign-mode session
 
     function setPreviewMode(mode, savedRow) {
       cbPreviewMode = mode;
       cbPreviewSavedRow = savedRow || null;
+      cbSignedSpotsCount = 0;
       const saveBtn  = document.getElementById("cbPreviewSaveBtn");
+      const signBtn  = document.getElementById("cbPreviewSignBtn");
       const status   = document.getElementById("cbPreviewSaveStatus");
       if (saveBtn) saveBtn.style.display = (mode === "preview") ? "" : "none";
+      if (signBtn) {
+        signBtn.style.display = (mode === "sign") ? "" : "none";
+        signBtn.disabled = true;
+        signBtn.textContent = "Save signature & sign";
+      }
       if (status)  { status.textContent = ""; status.className = "muted"; status.style.cssText = "font-size:13px;"; }
     }
+
+    // Update the sign-mode footer button state based on how many spots
+    // have been filled. Called every time a signature is placed.
+    function updateSignButtonState() {
+      const signBtn = document.getElementById("cbPreviewSignBtn");
+      if (!signBtn || cbPreviewMode !== "sign") return;
+      signBtn.disabled = cbSignedSpotsCount === 0;
+    }
+
+    // Open the preview modal in "sign" mode for a saved contract row.
+    // Re-uses the same modal as preview/view but rewrites the signature
+    // placeholders into clickable signing buttons.
+    function openSignContractFlow(row) {
+      const headerEl = document.getElementById("cbPreviewHeader");
+      const bodyEl   = document.getElementById("cbPreviewBody");
+      headerEl.textContent = `${row.template_name || "Contract"} - Sign as Direct Konnect`;
+      bodyEl.innerHTML = row.contract_html || "<em>This contract has no content.</em>";
+      setPreviewMode("sign", row);
+      // Walk the rendered body; turn every signature-block into a
+      // clickable signing button. Templates may render placeholders as
+      // either a .signature-block (post-render) or an unrendered
+      // [data-plugin="signature"] chip. Handle both.
+      bodyEl.querySelectorAll('.signature-block, [data-plugin="signature"]').forEach((node, idx) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "signature-sign-btn";
+        btn.dataset.sigSlot = String(idx);
+        btn.innerHTML = `
+          <span class="signature-sign-line"></span>
+          <span class="signature-sign-caption">Click to sign here</span>
+        `;
+        node.parentNode.replaceChild(btn, node);
+      });
+      cbPreviewOverlay.classList.add("open");
+    }
+
+    // ---- Signature picker modal ----
+    const sigPickerOverlay = document.getElementById("sigPickerOverlay");
+    dismissOnBackdropClick(sigPickerOverlay, () => closeSigPicker());
+
+    // Active picker target — the .signature-sign-btn (or .signature-placed) we
+    // are filling in. Set on open, cleared on close.
+    let sigTargetNode  = null;
+    let sigActiveTab   = "type";  // "type" | "draw"
+    let sigSelectedFont = "'Caveat', cursive";
+    let sigDrawHasInk   = false;
+
+    function openSigPicker(targetNode) {
+      sigTargetNode = targetNode;
+      sigActiveTab = "type";
+      sigSelectedFont = "'Caveat', cursive";
+      sigDrawHasInk = false;
+      // Reset inputs
+      const nameInput = document.getElementById("sigTypeName");
+      nameInput.value = "";
+      // Default the typed-name field to the saved row's recipient OR the
+      // service provider name so the user can just hit "Use this signature".
+      nameInput.value = SERVICE_PROVIDER_NAME || "";
+      // Reset the canvas
+      const canvas = document.getElementById("sigDrawCanvas");
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Reset font selection
+      document.querySelectorAll(".sig-style-option").forEach((b, i) => {
+        b.classList.toggle("active", i === 0);
+      });
+      // Reset tab UI
+      switchSigTab("type");
+      renderSigTypePreview();
+      sigPickerOverlay.classList.add("open");
+      setTimeout(() => nameInput.focus(), 50);
+    }
+
+    function closeSigPicker() {
+      sigPickerOverlay.classList.remove("open");
+      sigTargetNode = null;
+    }
+
+    function switchSigTab(tab) {
+      sigActiveTab = tab;
+      document.querySelectorAll(".sig-picker-tab").forEach((b) => {
+        b.classList.toggle("active", b.dataset.sigTab === tab);
+      });
+      document.querySelectorAll(".sig-picker-pane").forEach((p) => {
+        p.classList.toggle("active", p.dataset.sigPane === tab);
+      });
+    }
+
+    function renderSigTypePreview() {
+      const name = document.getElementById("sigTypeName").value.trim();
+      const preview = document.getElementById("sigTypePreview");
+      if (!name) {
+        preview.innerHTML = '<span class="muted" style="font-size:14px;">Type your name to preview</span>';
+        return;
+      }
+      preview.innerHTML = "";
+      const span = document.createElement("span");
+      span.style.fontFamily = sigSelectedFont;
+      span.style.fontSize = "44px";
+      span.style.color = "#111827";
+      span.textContent = name;
+      preview.appendChild(span);
+    }
+
+    // Render a typed-style signature into a canvas and return a PNG dataURL.
+    function renderTypedSignatureToDataUrl(name, fontStack) {
+      const w = 600, h = 160;
+      const c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#111827";
+      ctx.textBaseline = "middle";
+      // Pick a font size that roughly fits the name into the canvas width.
+      let size = 96;
+      ctx.font = `${size}px ${fontStack}`;
+      let measured = ctx.measureText(name).width;
+      const maxWidth = w - 40;
+      if (measured > maxWidth) {
+        size = Math.max(36, Math.floor(size * (maxWidth / measured)));
+        ctx.font = `${size}px ${fontStack}`;
+        measured = ctx.measureText(name).width;
+      }
+      ctx.textAlign = "center";
+      ctx.fillText(name, w / 2, h / 2 + 8);
+      return c.toDataURL("image/png");
+    }
+
+    // Trim a canvas down to just the inked pixels, return PNG dataURL.
+    function trimCanvasToDataUrl(canvas) {
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width, h = canvas.height;
+      const data = ctx.getImageData(0, 0, w, h).data;
+      let minX = w, minY = h, maxX = -1, maxY = -1;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const a = data[(y * w + x) * 4 + 3];
+          if (a > 0) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX < 0) return canvas.toDataURL("image/png"); // nothing drawn
+      const pad = 8;
+      minX = Math.max(0, minX - pad);
+      minY = Math.max(0, minY - pad);
+      maxX = Math.min(w - 1, maxX + pad);
+      maxY = Math.min(h - 1, maxY + pad);
+      const tw = maxX - minX + 1, th = maxY - minY + 1;
+      const out = document.createElement("canvas");
+      out.width = tw; out.height = th;
+      out.getContext("2d").drawImage(canvas, minX, minY, tw, th, 0, 0, tw, th);
+      return out.toDataURL("image/png");
+    }
+
+    // Replace the target placeholder/placed node with a "placed signature" node.
+    function placeSignatureAt(targetNode, dataUrl, signerName) {
+      const wrap = document.createElement("div");
+      wrap.className = "signature-placed";
+      wrap.dataset.sigSlot = targetNode.dataset.sigSlot || "";
+      wrap.dataset.signerName = signerName || "";
+      wrap.innerHTML = `
+        <img src="${dataUrl}" alt="Signature">
+        <div class="signature-placed-caption">
+          <span>${esc(signerName || "Signed")}</span>
+          <button type="button" class="signature-placed-resign" data-sig-action="resign">Resign</button>
+        </div>
+      `;
+      targetNode.parentNode.replaceChild(wrap, targetNode);
+      // Bump the signed-spots counter only if this is a fresh placement
+      // (not a re-sign of an already-placed slot). We just count the
+      // number of .signature-placed nodes currently in the body.
+      const bodyEl = document.getElementById("cbPreviewBody");
+      cbSignedSpotsCount = bodyEl.querySelectorAll(".signature-placed").length;
+      updateSignButtonState();
+    }
+
+    // ---- Picker event wiring ----
+    document.getElementById("sigPickerClose").addEventListener("click", () => closeSigPicker());
+    document.getElementById("sigPickerCancel").addEventListener("click", () => closeSigPicker());
+
+    document.querySelectorAll(".sig-picker-tab").forEach((tab) => {
+      tab.addEventListener("click", () => switchSigTab(tab.dataset.sigTab));
+    });
+
+    document.getElementById("sigTypeName").addEventListener("input", renderSigTypePreview);
+
+    document.querySelectorAll(".sig-style-option").forEach((opt) => {
+      opt.addEventListener("click", () => {
+        document.querySelectorAll(".sig-style-option").forEach((o) => o.classList.remove("active"));
+        opt.classList.add("active");
+        sigSelectedFont = opt.dataset.sigFont;
+        renderSigTypePreview();
+      });
+    });
+
+    // Canvas drawing
+    (function initSigCanvas() {
+      const canvas = document.getElementById("sigDrawCanvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "#111827";
+
+      let drawing = false;
+      let last = null;
+
+      function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        return {
+          x: (e.clientX - rect.left) * scaleX,
+          y: (e.clientY - rect.top)  * scaleY,
+        };
+      }
+
+      canvas.addEventListener("pointerdown", (e) => {
+        canvas.setPointerCapture(e.pointerId);
+        drawing = true;
+        last = getPos(e);
+        ctx.beginPath();
+        ctx.moveTo(last.x, last.y);
+        // Draw a small dot so single taps register
+        ctx.lineTo(last.x + 0.1, last.y + 0.1);
+        ctx.stroke();
+        sigDrawHasInk = true;
+      });
+      canvas.addEventListener("pointermove", (e) => {
+        if (!drawing) return;
+        const p = getPos(e);
+        ctx.beginPath();
+        ctx.moveTo(last.x, last.y);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        last = p;
+      });
+      function endStroke(e) {
+        if (!drawing) return;
+        drawing = false;
+        last = null;
+        try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+      }
+      canvas.addEventListener("pointerup",     endStroke);
+      canvas.addEventListener("pointercancel", endStroke);
+      canvas.addEventListener("pointerleave",  endStroke);
+
+      document.getElementById("sigDrawClear").addEventListener("click", () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        sigDrawHasInk = false;
+      });
+    })();
+
+    document.getElementById("sigPickerUse").addEventListener("click", () => {
+      if (!sigTargetNode) return;
+      let dataUrl, signerName;
+      if (sigActiveTab === "type") {
+        const name = document.getElementById("sigTypeName").value.trim();
+        if (!name) { alert("Please type your name first."); return; }
+        dataUrl = renderTypedSignatureToDataUrl(name, sigSelectedFont);
+        signerName = name;
+      } else {
+        if (!sigDrawHasInk) { alert("Please draw your signature first."); return; }
+        const canvas = document.getElementById("sigDrawCanvas");
+        dataUrl = trimCanvasToDataUrl(canvas);
+        // For drawn signatures, we still capture a name. Reuse what they typed
+        // earlier (if anything), otherwise fall back to the service-provider name.
+        const typed = document.getElementById("sigTypeName").value.trim();
+        signerName = typed || SERVICE_PROVIDER_NAME || "Signer";
+      }
+      placeSignatureAt(sigTargetNode, dataUrl, signerName);
+      closeSigPicker();
+    });
+
+    // Click-to-sign + click-to-resign on the preview body (delegated)
+    document.getElementById("cbPreviewBody").addEventListener("click", (e) => {
+      if (cbPreviewMode !== "sign") return;
+      const signBtn = e.target.closest(".signature-sign-btn");
+      if (signBtn) {
+        openSigPicker(signBtn);
+        return;
+      }
+      const resignBtn = e.target.closest(".signature-placed-resign");
+      if (resignBtn) {
+        const placed = resignBtn.closest(".signature-placed");
+        if (placed) openSigPicker(placed);
+      }
+    });
 
     function openContractPreview() {
       const c = getBuilderClient();
@@ -4151,8 +4643,10 @@
     function openSavedContractView(row) {
       const headerEl = document.getElementById("cbPreviewHeader");
       const bodyEl   = document.getElementById("cbPreviewBody");
-      headerEl.textContent = `${row.template_name || "Contract"} — saved ${row.created_at ? formatDateTime(row.created_at) : ""}`.trim();
-      bodyEl.innerHTML = row.contract_html || "<em>This saved contract has no content.</em>";
+      const stamp = row.created_at ? formatDateTime(row.created_at) : "";
+      const statusLabel = (row.status || "saved").replace("_", " ");
+      headerEl.textContent = `${row.template_name || "Contract"} — ${statusLabel}${stamp ? " · " + stamp : ""}`;
+      bodyEl.innerHTML = row.contract_html || "<em>This contract has no content.</em>";
       setPreviewMode("view", row);
       cbPreviewOverlay.classList.add("open");
     }
@@ -4213,6 +4707,125 @@
         saveBtn.textContent = originalLabel;
         status.style.color = "#991b1b";
         status.textContent = "Save failed: " + (err && err.message ? err.message : String(err));
+      }
+    }
+
+    // Commit the in-modal signed HTML back to the database, transitioning
+    // the contract from `saved` -> `provider_signed`.
+    async function handleProviderSignContract() {
+      const row = cbPreviewSavedRow;
+      const signBtn = document.getElementById("cbPreviewSignBtn");
+      const status  = document.getElementById("cbPreviewSaveStatus");
+      const bodyEl  = document.getElementById("cbPreviewBody");
+      if (!row || !bodyEl) return;
+      if (cbSignedSpotsCount === 0) {
+        status.style.color = "#991b1b";
+        status.textContent = "Add at least one signature before saving.";
+        return;
+      }
+
+      // Pick the signer name from the first .signature-placed node.
+      const firstPlaced = bodyEl.querySelector(".signature-placed");
+      const signerName  = (firstPlaced && firstPlaced.dataset.signerName) || SERVICE_PROVIDER_NAME || "Signer";
+
+      const newHtml = bodyEl.innerHTML;
+      const nowIso  = new Date().toISOString();
+
+      const originalLabel = signBtn.textContent;
+      signBtn.disabled = true;
+      signBtn.textContent = "Saving...";
+      status.className = "muted";
+      status.textContent = "";
+
+      try {
+        const { error } = await sb.from("signed_contracts")
+          .update({
+            contract_html: newHtml,
+            status: "provider_signed",
+            provider_signed_at: nowIso,
+            provider_signer_name: signerName,
+          })
+          .eq("id", row.id);
+        if (error) throw error;
+
+        // Mirror the change locally so we don't have to wait on a refetch.
+        const local = signedContracts.find((r) => r.id === row.id);
+        if (local) {
+          local.contract_html = newHtml;
+          local.status = "provider_signed";
+          local.provider_signed_at = nowIso;
+          local.provider_signer_name = signerName;
+        }
+        // Best-effort fresh fetch (in case other updates landed too).
+        await refreshSignedContracts();
+
+        const c = signedContractClient(row);
+        if (c) await addSystemNote(c, "client", `Contract "${row.template_name || "Contract"}" signed by ${signerName}.`);
+
+        status.style.color = "#065f46";
+        status.textContent = "Signed and saved.";
+        signBtn.textContent = "✓ Signed";
+
+        // Re-render the Contract Status tab in the open client detail
+        // (if any) so the card updates immediately.
+        renderProfile();
+
+        setTimeout(() => {
+          closeContractPreview();
+          signBtn.disabled = false;
+          signBtn.textContent = originalLabel;
+        }, 900);
+      } catch (err) {
+        signBtn.disabled = false;
+        signBtn.textContent = originalLabel;
+        status.style.color = "#991b1b";
+        status.textContent = "Save failed: " + (err && err.message ? err.message : String(err));
+      }
+    }
+
+    // Look up the client record a contract row belongs to. Used when we
+    // need to add a system note tied to the client.
+    function signedContractClient(row) {
+      if (!row || !row.client_id) return null;
+      return clients.find((c) => c.id === row.client_id) || null;
+    }
+
+    // Transition a `provider_signed` contract to `sent`, recording sent_at.
+    async function handleSendContract(btn) {
+      const id = btn.dataset.id;
+      const name = btn.dataset.name || "this contract";
+      if (!id) return;
+      const row = signedContracts.find((r) => String(r.id) === String(id));
+      if (!row) return;
+      if (row.status !== "provider_signed") {
+        alert("This contract isn't ready to send yet.");
+        return;
+      }
+      if (!confirm(`Mark "${name}" as sent to ${row.recipient_email || "the client"}?\n\n(This won't email the client yet — that piece is coming later.)`)) return;
+
+      const originalLabel = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Sending...";
+
+      const nowIso = new Date().toISOString();
+      try {
+        const { error } = await sb.from("signed_contracts")
+          .update({ status: "sent", sent_at: nowIso })
+          .eq("id", id);
+        if (error) throw error;
+
+        const local = signedContracts.find((r) => r.id === row.id);
+        if (local) { local.status = "sent"; local.sent_at = nowIso; }
+        await refreshSignedContracts();
+
+        const c = signedContractClient(row);
+        if (c) await addSystemNote(c, "client", `Contract "${name}" marked as sent.`);
+
+        renderProfile();
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+        alert("Send failed: " + (err && err.message ? err.message : String(err)));
       }
     }
 
@@ -4322,6 +4935,7 @@
     document.getElementById("cbPreviewClose").addEventListener("click", () => closeContractPreview());
     document.getElementById("cbPreviewCloseBtn").addEventListener("click", () => closeContractPreview());
     document.getElementById("cbPreviewSaveBtn").addEventListener("click", () => handleSaveContractToProfile());
+    document.getElementById("cbPreviewSignBtn").addEventListener("click", () => handleProviderSignContract());
 
     document.getElementById("cbEditorContinue").addEventListener("click", () => {
       builderEditorDraftHTML = cbEditor.innerHTML;
@@ -4512,6 +5126,17 @@
         if (row) openSavedContractView(row);
       } else if (action === "delete-saved-contract") {
         await handleDeleteSavedContract(btn);
+      } else if (action === "sign-contract") {
+        const id = btn.dataset.id;
+        const row = signedContracts.find((r) => String(r.id) === String(id));
+        if (!row) return;
+        if (row.status !== "saved") {
+          alert("Only saved drafts can be signed from here.");
+          return;
+        }
+        openSignContractFlow(row);
+      } else if (action === "send-contract") {
+        await handleSendContract(btn);
       }
     });
 

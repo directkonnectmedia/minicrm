@@ -321,11 +321,12 @@
       letter-spacing: 0.01em;
       white-space: nowrap;
     }
-    .cstatus-pending { background: #f3f4f6; color: #4b5563; }
-    .cstatus-sent    { background: #dbeafe; color: #1e40af; }
-    .cstatus-viewed  { background: #ede9fe; color: #5b21b6; }
-    .cstatus-signed  { background: #d1fae5; color: #065f46; }
-    .cstatus-voided  { background: #fee2e2; color: #991b1b; }
+    .cstatus-pending  { background: #f3f4f6; color: #4b5563; }
+    .cstatus-sent     { background: #fed7aa; color: #9a3412; }
+    .cstatus-received { background: #fed7aa; color: #9a3412; }
+    .cstatus-viewed   { background: #ede9fe; color: #5b21b6; }
+    .cstatus-signed   { background: #d1fae5; color: #065f46; }
+    .cstatus-voided   { background: #fee2e2; color: #991b1b; }
 
     .empty-state {
       background: #fff;
@@ -431,6 +432,15 @@
     .contract-body h1, .contract-body h2, .contract-body h3 {
       color: #111827;
     }
+    /* Mirror the CRM's signature display so embedded signatures render
+       cleanly when the client opens a contract their provider has signed. */
+    .contract-body .signature-block { margin: 24px 0 12px; max-width: 320px; }
+    .contract-body .signature-line  { border-bottom: 1px solid #111827; height: 36px; }
+    .contract-body .signature-caption { font-size: 12px; color: #6b7280; margin-top: 4px; text-align: center; }
+    .contract-body .signature-placed { display: block; margin: 24px 0 12px; max-width: 320px; }
+    .contract-body .signature-placed img { display: block; max-width: 100%; max-height: 80px; border-bottom: 1px solid #111827; }
+    .contract-body .signature-placed-caption { font-size: 12px; color: #6b7280; margin-top: 4px; text-align: center; }
+    .contract-body .signature-placed-resign { display: none; } /* clients can't re-sign provider sigs */
 
     .modal-footer {
       padding: 14px 20px;
@@ -714,11 +724,12 @@
     }
 
     const STATUS_LABELS = {
-      pending: "Pending",
-      sent:    "Sent",
-      viewed:  "Viewed",
-      signed:  "Signed",
-      voided:  "Voided",
+      pending:  "Pending",
+      sent:     "Received",   // first hop on the client side: sent -> received auto-bumps
+      received: "Received",
+      viewed:   "Viewed",
+      signed:   "Signed",
+      voided:   "Voided",
     };
 
     function statusBadge(status) {
@@ -823,15 +834,31 @@
     const contractModalMeta   = document.getElementById("contractModalMeta");
 
     function openContractModal(contract) {
+      // Bump status received -> viewed the first time the client opens
+      // a contract. Same fire-and-forget pattern as fetchContractsForClient.
+      // The RPC is server-side gated to status='received' so re-opens are
+      // no-ops.
+      if (contract.status === "received") {
+        contract.status = "viewed";
+        contract.viewed_at = new Date().toISOString();
+        sb.rpc("mark_contract_viewed", { contract_id: contract.id }).then(({ error }) => {
+          if (error) console.warn("mark_contract_viewed failed:", error);
+        });
+        // Repaint the row in the contract list so the badge behind the
+        // modal updates too.
+        renderContractList(currentContracts);
+      }
+
       contractModalTitle.textContent = contract.template_name || "Contract";
       paintBadge(contractModalBadge, contract.status);
 
       contractModalBody.innerHTML = contract.contract_html || "<em>Contract content unavailable.</em>";
 
       const metaParts = [];
-      if (contract.sent_at)   metaParts.push(`Sent ${fmtDate(contract.sent_at)}`);
-      if (contract.viewed_at) metaParts.push(`Viewed ${fmtDate(contract.viewed_at)}`);
-      if (contract.signed_at) metaParts.push(`Signed ${fmtDate(contract.signed_at)}${contract.signer_name ? " by " + contract.signer_name : ""}`);
+      if (contract.sent_at)     metaParts.push(`Sent ${fmtDate(contract.sent_at)}`);
+      if (contract.received_at) metaParts.push(`Received ${fmtDate(contract.received_at)}`);
+      if (contract.viewed_at)   metaParts.push(`Viewed ${fmtDate(contract.viewed_at)}`);
+      if (contract.signed_at)   metaParts.push(`Signed ${fmtDate(contract.signed_at)}${contract.signer_name ? " by " + contract.signer_name : ""}`);
       contractModalMeta.textContent = metaParts.length ? metaParts.join("  \u00B7  ") : "";
 
       contractOverlay.classList.add("open");
@@ -877,20 +904,37 @@
     }
 
     // Pull every signed_contracts row for a given client_id, newest first.
+    // Hides anything still in our internal pipeline (saved drafts, contracts
+    // signed by us but not yet sent). The client only sees rows that have
+    // actually been pushed out.
     async function fetchContractsForClient(clientId) {
       const { data, error } = await sb
         .from("signed_contracts")
-        .select("id, template_name, status, sent_at, viewed_at, signed_at, signer_name, contract_html")
+        .select("id, template_name, status, sent_at, received_at, viewed_at, signed_at, signer_name, contract_html")
         .eq("client_id", clientId)
-        // Exclude internal-only "saved" drafts -- those are CRM snapshots
-        // the team uses for reference and the client should never see them.
-        .neq("status", "saved")
+        .in("status", ["sent", "received", "viewed", "signed", "voided"])
         .order("created_at", { ascending: false });
       if (error) {
         console.warn("Contract fetch failed:", error);
         return [];
       }
-      return data || [];
+      const rows = data || [];
+
+      // Bump status sent -> received for any rows the client is seeing for
+      // the first time. Fire-and-forget RPCs so the UI doesn't wait on a
+      // round-trip; we mutate the local copy immediately so the UI reflects
+      // the new state. The RPC is idempotent on the server (only updates
+      // when status='sent') so duplicate calls are safe.
+      rows.forEach((row) => {
+        if (row.status === "sent") {
+          row.status = "received";
+          row.received_at = new Date().toISOString();
+          sb.rpc("mark_contract_received", { contract_id: row.id }).then(({ error }) => {
+            if (error) console.warn("mark_contract_received failed:", error);
+          });
+        }
+      });
+      return rows;
     }
 
     // Open modal when a contract row's button is clicked

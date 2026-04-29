@@ -348,3 +348,73 @@ create policy "team only templates"
   on public.contract_text_templates for all to authenticated
   using (public.is_team_member())
   with check (public.is_team_member());
+
+-- =============================================================
+-- PROVIDER SIGNATURE + DELIVERY TRACKING
+-- =============================================================
+-- Adds two new lifecycle stages to signed_contracts:
+--   provider_signed -- the team has signed; not yet sent to client
+--   received        -- the client's portal has fetched the row; this is
+--                      a delivery confirmation distinct from "sent"
+-- Plus columns to record when the provider signed and who, and when
+-- the contract was first received in the client portal. Re-running
+-- this block is safe (idempotent drop + add).
+
+alter table public.signed_contracts
+  drop constraint if exists signed_contracts_status_check;
+alter table public.signed_contracts
+  add constraint signed_contracts_status_check
+  check (status in ('pending', 'saved', 'provider_signed', 'sent', 'received', 'viewed', 'signed', 'voided'));
+
+alter table public.signed_contracts
+  add column if not exists provider_signed_at  timestamptz;
+alter table public.signed_contracts
+  add column if not exists provider_signer_name text;
+alter table public.signed_contracts
+  add column if not exists received_at         timestamptz;
+
+-- Client-portal status bumps. Run as SECURITY DEFINER so portal clients
+-- (who only have SELECT under "team or own contracts") can still
+-- progress the lifecycle on their own contracts. Each function
+-- enforces that the row belongs to the calling user (matched by email)
+-- AND that the source status is exactly the expected one, so a client
+-- can never skip stages or touch someone else's contract.
+
+create or replace function public.mark_contract_received(p_contract_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.signed_contracts
+     set status      = 'received',
+         received_at = coalesce(received_at, now())
+   where id = p_contract_id
+     and status = 'sent'
+     and client_id in (
+       select id from public.clients where lower(email) = lower(auth.email())
+     );
+end;
+$$;
+
+create or replace function public.mark_contract_viewed(p_contract_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.signed_contracts
+     set status    = 'viewed',
+         viewed_at = coalesce(viewed_at, now())
+   where id = p_contract_id
+     and status in ('sent', 'received')
+     and client_id in (
+       select id from public.clients where lower(email) = lower(auth.email())
+     );
+end;
+$$;
+
+grant execute on function public.mark_contract_received(uuid) to authenticated;
+grant execute on function public.mark_contract_viewed(uuid)   to authenticated;
