@@ -451,3 +451,21 @@ end;
 $$;
 
 grant execute on function public.mark_contract_signed(uuid, text, text) to authenticated;
+
+-- =============================================================
+-- REALTIME
+-- =============================================================
+-- Enable postgres_changes streaming on signed_contracts so the CRM
+-- can subscribe and re-render the Contract Status tab live as the
+-- portal bumps statuses (sent -> received -> viewed -> signed).
+-- The table is added to the supabase_realtime publication; running
+-- this twice will error harmlessly ("already member"), so wrap in a
+-- DO block to keep the migration idempotent.
+
+do $$
+begin
+  alter publication supabase_realtime add table public.signed_contracts;
+exception when duplicate_object then
+  -- already published, nothing to do
+  null;
+end $$;

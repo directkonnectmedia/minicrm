@@ -480,6 +480,10 @@
     }
 
     /* ---------- Signature Picker modal ---------- */
+    /* Picker stacks above the contract overlay (both default to z-index:1000),
+       otherwise the contract modal can paint on top depending on the
+       browser's stacking-context resolution. */
+    #sigPickerOverlay { z-index: 1100; }
     .sig-picker-modal {
       max-width: 560px; width: calc(100vw - 32px);
       background: #fff; border-radius: 14px; overflow: hidden;
@@ -1204,28 +1208,34 @@
     }
 
     function openSigPicker(targetNode) {
-      sigTargetNode = targetNode;
-      sigActiveTab = "type";
-      sigSelectedFont = "'Caveat', cursive";
-      sigDrawHasInk = false;
+      try {
+        sigTargetNode = targetNode;
+        sigActiveTab = "type";
+        sigSelectedFont = "'Caveat', cursive";
+        sigDrawHasInk = false;
 
-      const nameInput = document.getElementById("sigTypeName");
-      // Default the typed-name field to the company name on file (the
-      // client portal has currentClient already loaded by this point).
-      nameInput.value = (currentClient && currentClient.company_name) ? currentClient.company_name : "";
+        const nameInput = document.getElementById("sigTypeName");
+        if (!nameInput) throw new Error("Picker name input is missing from the page.");
+        nameInput.value = (currentClient && currentClient.company_name) ? currentClient.company_name : "";
 
-      const canvas = document.getElementById("sigDrawCanvas");
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const canvas = document.getElementById("sigDrawCanvas");
+        if (canvas) {
+          const ctx = canvas.getContext("2d");
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
 
-      document.querySelectorAll(".sig-style-option").forEach((b, i) => {
-        b.classList.toggle("active", i === 0);
-      });
+        document.querySelectorAll(".sig-style-option").forEach((b, i) => {
+          b.classList.toggle("active", i === 0);
+        });
 
-      switchSigTab("type");
-      renderSigTypePreview();
-      sigPickerOverlay.classList.add("open");
-      setTimeout(() => nameInput.focus(), 50);
+        switchSigTab("type");
+        renderSigTypePreview();
+        sigPickerOverlay.classList.add("open");
+        setTimeout(() => nameInput.focus(), 50);
+      } catch (err) {
+        console.error("openSigPicker failed:", err);
+        alert("Couldn't open the signature picker: " + (err && err.message ? err.message : String(err)));
+      }
     }
 
     function closeSigPicker() {

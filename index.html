@@ -3322,6 +3322,33 @@
       populateFilterModalOptions();
       render();
       refreshCalendar();
+      subscribeToContractChanges();
+    }
+
+    // Live updates: any time the signed_contracts table changes (status
+    // bumps from the portal, sigs saved, new rows, etc.) we refetch and
+    // re-render. Debounced so a burst of changes coalesces into one
+    // re-render. Re-renders the open client detail too so the Contract
+    // Status tab stays current without a manual refresh.
+    let contractChannel = null;
+    let contractRefreshTimer = null;
+    function subscribeToContractChanges() {
+      if (contractChannel) return; // idempotent on re-load
+      contractChannel = sb
+        .channel("crm-signed-contracts")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "signed_contracts" },
+          () => {
+            clearTimeout(contractRefreshTimer);
+            contractRefreshTimer = setTimeout(async () => {
+              await refreshSignedContracts();
+              try { renderProfile(); } catch (_) {}
+              try { render(); } catch (_) {}
+            }, 250);
+          }
+        )
+        .subscribe();
     }
 
     tbody.addEventListener("click", async (e) => {
