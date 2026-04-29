@@ -4606,6 +4606,14 @@
     }
 
     async function updateClientField(updates) {
+      // Guard against a stale/missing detailId. Without this, a leaked
+      // bad value (e.g. the string "null" from a half-loaded UI state)
+      // gets sent to PostgREST as .eq("id", "null") and surfaces to the
+      // user as "Update failed: invalid input syntax for type uuid".
+      if (!detailId || typeof detailId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(detailId)) {
+        console.warn("updateClientField skipped: invalid detailId", detailId);
+        return;
+      }
       // Optimistic local update
       const c = getCurrentClient();
       if (c) Object.assign(c, updates);
