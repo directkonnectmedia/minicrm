@@ -4443,12 +4443,20 @@
               `).join("")}
         </div>`;
 
+      const invoicesSection = `
+        <div class="cb-tmpl-section">
+          <div class="cb-tmpl-section-title">Invoices</div>
+          <div class="cb-tmpl-empty">No invoices yet.</div>
+        </div>`;
+
       el.innerHTML = `
         ${clientCard}
         <button class="cb-new-tmpl-btn" data-cb-action="new-template">+ New Template</button>
+        <button class="cb-new-tmpl-btn" data-cb-action="new-invoice">+ New Invoice</button>
         <div class="cb-tmpl-list">
           ${customSection}
           ${universalSection}
+          ${invoicesSection}
         </div>
       `;
     }
@@ -5381,6 +5389,12 @@
         builderEditorDraftHTML = "";
         cbSaveName.value = "";
         openCBEditor();
+      } else if (action === "new-invoice") {
+        // Scaffold only: the editor is intentionally not wired up yet.
+        // Once you've described the invoice shape (line items, totals,
+        // due date, etc.) we'll replace this placeholder with the real
+        // editor and a saved-invoices list inside the Invoices section.
+        alert("Invoice editor coming soon. We'll wire this up once we've nailed down the invoice shape (line items, totals, etc.).");
       }
     });
 
