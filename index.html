@@ -3007,20 +3007,6 @@
       teamList.innerHTML = '<div class="team-loading">Loading team members…</div>';
       try {
         const payload = await adminFetch("GET");
-        // #region agent log
-        try {
-          const members = (payload && payload.members) || [];
-          const summary = members.map((m) => ({
-            id: m.id,
-            email: m.email,
-            name: m.name,
-            roles: m.roles || [],
-            roleCount: Array.isArray(m.roles) ? m.roles.length : 0,
-            banned_until: m.banned_until,
-          }));
-          fetch('http://127.0.0.1:7768/ingest/b05ac367-fd07-46f7-9edf-ac7f4dd59b58',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fd5efa'},body:JSON.stringify({sessionId:'fd5efa',hypothesisId:'H-A',location:'index.html:loadTeamMembers',message:'team list payload received',data:{total:members.length,withRoles:summary.filter(m=>m.roleCount>0).length,withoutRoles:summary.filter(m=>m.roleCount===0).length,members:summary},timestamp:Date.now()})}).catch(()=>{});
-        } catch (_) {}
-        // #endregion
         renderTeamMembers(payload && payload.members);
       } catch (err) {
         teamList.innerHTML = "";
@@ -3032,18 +3018,9 @@
       const verb = banned ? "deactivate" : "reactivate";
       if (!confirm(`${verb[0].toUpperCase() + verb.slice(1)} ${member.name || member.email}?`)) return;
       try {
-        // #region agent log
-        fetch('http://127.0.0.1:7768/ingest/b05ac367-fd07-46f7-9edf-ac7f4dd59b58',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fd5efa'},body:JSON.stringify({sessionId:'fd5efa',hypothesisId:'H-B',location:'index.html:toggleMemberBanned:request',message:'PATCH banned about to fire',data:{id:member.id,email:member.email,roles:member.roles||[],banned},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-        const resp = await adminFetch("PATCH", { id: member.id, banned });
-        // #region agent log
-        fetch('http://127.0.0.1:7768/ingest/b05ac367-fd07-46f7-9edf-ac7f4dd59b58',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fd5efa'},body:JSON.stringify({sessionId:'fd5efa',hypothesisId:'H-B',location:'index.html:toggleMemberBanned:response',message:'PATCH banned response',data:{id:member.id,banned,resp},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
+        await adminFetch("PATCH", { id: member.id, banned });
         await loadTeamMembers();
       } catch (err) {
-        // #region agent log
-        fetch('http://127.0.0.1:7768/ingest/b05ac367-fd07-46f7-9edf-ac7f4dd59b58',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fd5efa'},body:JSON.stringify({sessionId:'fd5efa',hypothesisId:'H-B',location:'index.html:toggleMemberBanned:error',message:'PATCH banned threw',data:{id:member.id,banned,err:String(err)},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         setTeamError(`Could not ${verb}: ${err.message}`);
       }
     }
