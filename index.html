@@ -717,6 +717,89 @@
       content: "Start writing your contract here. Use the plugins on the right to insert dynamic fields...";
       color: #9ca3af;
     }
+
+    /* ---------- Invoice Editor ---------- */
+    .invoice-editor-shell {
+      padding: 16px 20px;
+      overflow-y: auto;
+      max-height: 70vh;
+      background: #fff;
+    }
+    .invoice-editor-shell .inv-row {
+      display: flex; gap: 12px; flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .invoice-editor-shell .inv-row-totals { align-items: flex-end; }
+    .invoice-editor-shell .inv-field { display: flex; flex-direction: column; gap: 4px; min-width: 200px; }
+    .invoice-editor-shell .inv-field-grow { flex: 1; }
+    .invoice-editor-shell .inv-field label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #6b7280;
+    }
+    .invoice-editor-shell .inv-field input,
+    .invoice-editor-shell .inv-field select {
+      padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px;
+      font-size: 14px; color: #111827; background: #fff;
+    }
+    .invoice-editor-shell .inv-field input:disabled { background: #f9fafb; color: #6b7280; }
+    .invoice-editor-shell .inv-status-toggle { display: flex; gap: 12px; padding-top: 8px; }
+    .invoice-editor-shell .inv-status-toggle label {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; color: #111827; cursor: pointer;
+    }
+    .invoice-editor-shell .inv-section-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #0B5394;
+      margin: 18px 0 8px;
+    }
+    .invoice-editor-shell table {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+    }
+    .invoice-editor-shell table th {
+      text-align: left; padding: 6px 8px;
+      background: #f3f4f6; color: #374151; font-weight: 600;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .invoice-editor-shell table td {
+      padding: 6px 8px; border-bottom: 1px solid #f3f4f6; vertical-align: top;
+    }
+    .invoice-editor-shell table input,
+    .invoice-editor-shell table select {
+      width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 4px;
+      font-size: 13px; background: #fff;
+    }
+    .invoice-editor-shell .inv-add-row {
+      margin: 8px 0 4px;
+      padding: 6px 12px; font-size: 12px;
+    }
+    .invoice-editor-shell .inv-row-remove {
+      background: transparent; border: none; color: #b91c1c; cursor: pointer;
+      font-size: 16px; line-height: 1; padding: 4px;
+    }
+    .invoice-editor-shell .inv-row-remove:hover { color: #7f1d1d; }
+    .invoice-editor-shell .inv-totals-display {
+      flex: 1; min-width: 240px;
+      display: flex; flex-direction: column; gap: 4px;
+      font-size: 14px; padding: 8px 12px;
+      background: #f9fafb; border-radius: 6px;
+    }
+    .invoice-editor-shell .inv-totals-display > div {
+      display: flex; justify-content: space-between;
+    }
+    .invoice-editor-shell .inv-terms {
+      width: 100%; padding: 10px 12px;
+      border: 1px solid #d1d5db; border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px; line-height: 1.5;
+      resize: vertical;
+    }
+
+    /* ---------- Invoice Preview ---------- */
+    .invoice-preview {
+      max-width: 820px; margin: 0 auto; padding: 32px 36px;
+      background: #fff; color: #222222;
+      font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+    }
     .cb-plugins-pane {
       width: 280px;
       flex-shrink: 0;
@@ -2127,6 +2210,114 @@
     </div>
   </div>
 
+  <!-- Invoice Editor modal -->
+  <div class="overlay" id="invoiceEditorOverlay">
+    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="invoiceEditorTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="invoiceEditorTitle">New Invoice</div>
+        <button class="modal-close" id="invoiceEditorClose" aria-label="Close">×</button>
+      </div>
+      <div class="invoice-editor-shell">
+        <div class="inv-row">
+          <div class="inv-field">
+            <label>Receipt #</label>
+            <input type="text" id="invReceiptNo" value="auto on save" disabled>
+          </div>
+          <div class="inv-field">
+            <label>Date issued</label>
+            <input type="date" id="invIssuedAt">
+          </div>
+          <div class="inv-field">
+            <label>Status</label>
+            <div class="inv-status-toggle">
+              <label><input type="radio" name="invStatus" value="due" checked> Due (renders as INVOICE)</label>
+              <label><input type="radio" name="invStatus" value="paid"> Paid (renders as RECEIPT)</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="inv-row">
+          <div class="inv-field inv-field-grow">
+            <label>Billed to</label>
+            <input type="text" id="invBilledTo" placeholder="Client name">
+          </div>
+          <div class="inv-field inv-field-grow">
+            <label>From</label>
+            <input type="text" value="Direct Konnect LLC — Web Design &amp; Development Services" disabled>
+          </div>
+        </div>
+
+        <div class="inv-section-title">Project charges</div>
+        <table class="inv-line-items">
+          <thead>
+            <tr>
+              <th style="width: 42%;">Description</th>
+              <th style="width: 28%;">Subtitle</th>
+              <th style="width: 16%;">Status pill</th>
+              <th style="width: 10%;">Amount</th>
+              <th style="width: 4%;"></th>
+            </tr>
+          </thead>
+          <tbody id="invLineItemsBody"></tbody>
+        </table>
+        <button type="button" class="ghost inv-add-row" id="invAddLineItem">+ Add line item</button>
+
+        <div class="inv-row inv-row-totals">
+          <div class="inv-field">
+            <label>Amount paid (so far)</label>
+            <input type="number" step="0.01" min="0" id="invAmountPaid" value="0">
+          </div>
+          <div class="inv-totals-display">
+            <div><span>Subtotal:</span> <strong id="invSubtotalDisplay">$0.00</strong></div>
+            <div><span>Balance due:</span> <strong id="invBalanceDueDisplay">$0.00</strong></div>
+            <div class="muted"><span>Balance after this payment:</span> <strong id="invBalanceAfterDisplay">$0.00</strong></div>
+          </div>
+        </div>
+
+        <div class="inv-section-title">Payment methods</div>
+        <table class="inv-payment-methods">
+          <thead>
+            <tr>
+              <th style="width: 30%;">Label</th>
+              <th>Value</th>
+              <th style="width: 4%;"></th>
+            </tr>
+          </thead>
+          <tbody id="invPaymentMethodsBody"></tbody>
+        </table>
+        <button type="button" class="ghost inv-add-row" id="invAddPaymentMethod">+ Add payment method</button>
+
+        <div class="inv-section-title">Additional terms &amp; ongoing services</div>
+        <textarea id="invTermsHtml" rows="10" class="inv-terms" placeholder="HTML allowed (use &lt;ul&gt;/&lt;li&gt; for bullets)"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" id="invEditorCancel">Cancel</button>
+        <button id="invEditorGenerate">Generate Invoice</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invoice Preview modal -->
+  <div class="overlay" id="invoicePreviewOverlay">
+    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="invoicePreviewHeader">
+      <div class="modal-header">
+        <div class="modal-title" id="invoicePreviewHeader">Invoice Preview</div>
+        <button class="modal-close" id="invoicePreviewClose" aria-label="Close">×</button>
+      </div>
+      <div class="contract-preview-shell">
+        <div id="invoicePreviewBody" class="invoice-preview"></div>
+      </div>
+      <div class="modal-footer">
+        <span class="muted" id="invoicePreviewStatus" style="font-size:13px;"></span>
+        <div style="display:flex;gap:8px;">
+          <button class="ghost" id="invoicePreviewBack">Back to edit</button>
+          <button class="ghost" id="invoicePreviewToggleStatus" style="display:none;">Mark as Paid</button>
+          <button id="invoicePreviewSave">Save invoice to client profile</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Signature Picker modal -->
   <div class="overlay" id="sigPickerOverlay">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sigPickerTitle" style="max-width: 560px;">
@@ -3287,6 +3478,45 @@
     ];
     const CONTRACT_TEMPLATE_BY_ID = Object.fromEntries(CONTRACT_TEMPLATES.map((t) => [t.id, t]));
 
+    // ---------- Invoice defaults ----------
+    // Build a 50/50 deposit + final-balance line item pair from the
+    // currently-selected contract tier. If the client has no tier set
+    // we still return both rows with $0 amounts so the editor has rows
+    // to populate -- the user can edit them or add their own.
+    function buildDefaultInvoiceLineItems(tierId) {
+      const tpl = CONTRACT_TEMPLATE_BY_ID[tierId];
+      const setupTotal = tpl ? tpl.setup.reduce((a, l) => a + (l.amount || 0), 0) : 0;
+      const half = setupTotal / 2;
+      return [
+        { description: "Website Design & Development \u2013 Deposit",       subtitle: "Initial 50% payment to begin project.",                  status_pill: "DUE TODAY",   amount: half },
+        { description: "Website Design & Development \u2013 Final Balance", subtitle: "Remaining 50% due upon project completion / launch.", status_pill: "BALANCE DUE", amount: half },
+      ];
+    }
+
+    const INVOICE_DEFAULTS = {
+      payment_methods: [
+        { label: "ZELLE",     value: "directkonnectmedia@gmail.com" },
+        { label: "APPLE PAY", value: "(480) 577-2655" },
+      ],
+      terms_html: `<ul>
+        <li><strong>Retention / Hosting Fee: $100.00 per month.</strong> Covers ongoing website hosting, domain management, security monitoring, and account retention.</li>
+        <li><strong>Lifetime Support &amp; Updates.</strong> Direct Konnect LLC will provide continued technical support and standard updates to the website for the lifetime of the active hosting/retention agreement.</li>
+        <li><strong>Monthly Content Updates.</strong> Includes one (1) to two (2) content updates per month at no additional charge, for the purpose of adding or replacing pictures and/or videos supplied by the client.</li>
+        <li><strong>Client-Supplied Content.</strong> Client is responsible for providing all images, videos, and content to be uploaded. Major redesigns, new pages, or custom development beyond the original scope may be quoted separately.</li>
+        <li><strong>Active Account Required.</strong> Retention / hosting fee is billed monthly and must remain current in order for lifetime support, updates, and monthly content updates to remain active.</li>
+      </ul>`,
+    };
+
+    // Status pill -> colour mapping. Used by both the editor preview and
+    // the saved rendered HTML. amber = unpaid/due; green = paid.
+    const INVOICE_PILL_COLORS = {
+      "DUE TODAY":   "#B45309",
+      "BALANCE DUE": "#B45309",
+      "OVERDUE":     "#B45309",
+      "PAID":        "#15803D",
+    };
+    const INVOICE_PILL_OPTIONS = ["DUE TODAY", "BALANCE DUE", "OVERDUE", "PAID"];
+
     // ---- Helpers ----
     const esc = (s) => (s ?? "").toString().replace(/[&<>"']/g, (c) => (
       { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
@@ -4392,6 +4622,12 @@
       if (!universalLoaded) {
         loadUniversalTemplates().then(() => renderContractBuilder());
       }
+      // Lazy-load the current client's invoices so the sidebar list
+      // populates without us having to wire it into every entry point
+      // (open from CRM tab, refresh, etc.). Re-renders once loaded.
+      if (contractBuilderClientId && invoicesLoadedForClientId !== contractBuilderClientId) {
+        loadClientInvoices(contractBuilderClientId).then(() => renderContractBuilder());
+      }
       renderCBLeft();
       renderCBMiddle();
       renderCBRight();
@@ -4446,7 +4682,17 @@
       const invoicesSection = `
         <div class="cb-tmpl-section">
           <div class="cb-tmpl-section-title">Invoices</div>
-          <div class="cb-tmpl-empty">No invoices yet.</div>
+          ${(!c || clientInvoices.length === 0)
+            ? `<div class="cb-tmpl-empty">No invoices yet.</div>`
+            : clientInvoices.map((iv) => {
+                const total = (iv.line_items || []).reduce((a, l) => a + (Number(l.amount) || 0), 0);
+                const paidLabel = iv.status === "paid" ? "Paid" : "Due";
+                return `
+                  <button class="cb-tmpl-item" data-cb-action="open-invoice" data-id="${esc(iv.id)}">
+                    <div class="cb-tmpl-name">${esc(iv.receipt_no)} \u00b7 ${fmtMoney(total)}</div>
+                    <div class="cb-tmpl-meta">${paidLabel} \u00b7 ${esc(iv.issued_at || "")}</div>
+                  </button>`;
+              }).join("")}
         </div>`;
 
       el.innerHTML = `
@@ -5368,6 +5614,504 @@
       renderContractBuilder();
     });
 
+    // ============================================================
+    // INVOICES
+    // ============================================================
+    let clientInvoices = [];        // invoices for the current Contract Builder client
+    let invoicesLoadedForClientId = null;
+    let invoiceEditorState = null;  // working copy used by the editor + preview
+    let invoicePreviewMode = null;  // 'new' | 'saved'
+    let invoicePreviewSavedId = null;
+
+    const invoiceEditorOverlay      = document.getElementById("invoiceEditorOverlay");
+    const invIssuedAt               = document.getElementById("invIssuedAt");
+    const invBilledTo               = document.getElementById("invBilledTo");
+    const invLineItemsBody          = document.getElementById("invLineItemsBody");
+    const invAddLineItem            = document.getElementById("invAddLineItem");
+    const invAmountPaid             = document.getElementById("invAmountPaid");
+    const invSubtotalDisplay        = document.getElementById("invSubtotalDisplay");
+    const invBalanceDueDisplay      = document.getElementById("invBalanceDueDisplay");
+    const invBalanceAfterDisplay    = document.getElementById("invBalanceAfterDisplay");
+    const invPaymentMethodsBody     = document.getElementById("invPaymentMethodsBody");
+    const invAddPaymentMethod       = document.getElementById("invAddPaymentMethod");
+    const invTermsHtml              = document.getElementById("invTermsHtml");
+    const invEditorCancel           = document.getElementById("invEditorCancel");
+    const invEditorGenerate         = document.getElementById("invEditorGenerate");
+    const invoiceEditorClose        = document.getElementById("invoiceEditorClose");
+
+    const invoicePreviewOverlay     = document.getElementById("invoicePreviewOverlay");
+    const invoicePreviewBody        = document.getElementById("invoicePreviewBody");
+    const invoicePreviewClose       = document.getElementById("invoicePreviewClose");
+    const invoicePreviewBack        = document.getElementById("invoicePreviewBack");
+    const invoicePreviewSave        = document.getElementById("invoicePreviewSave");
+    const invoicePreviewToggleStatus= document.getElementById("invoicePreviewToggleStatus");
+    const invoicePreviewStatus      = document.getElementById("invoicePreviewStatus");
+
+    function fmtMoney(n) {
+      const v = Number(n) || 0;
+      return "$" + v.toFixed(2);
+    }
+
+    // Generate the next sequential receipt number for today.
+    // Format: DCL-YYYYMMDD-NNN. Generated at save time so abandoned
+    // drafts don't burn numbers. The unique index on receipt_no
+    // protects against the rare double-save race.
+    async function nextReceiptNo() {
+      const today = new Date().toISOString().slice(0, 10);
+      const stamp = today.replace(/-/g, "");
+      const { count, error } = await sb.from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("issued_at", today);
+      if (error) {
+        console.warn("nextReceiptNo count failed:", error);
+      }
+      const seq = String((count || 0) + 1).padStart(3, "0");
+      return `DCL-${stamp}-${seq}`;
+    }
+
+    async function loadClientInvoices(clientId) {
+      if (!clientId) { clientInvoices = []; invoicesLoadedForClientId = null; return; }
+      const { data, error } = await sb.from("invoices")
+        .select("*")
+        .eq("client_id", clientId)
+        .order("issued_at", { ascending: false })
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.warn("loadClientInvoices failed:", error);
+        clientInvoices = [];
+      } else {
+        clientInvoices = data || [];
+      }
+      invoicesLoadedForClientId = clientId;
+    }
+
+    // ---- Editor ----
+    function openInvoiceEditor() {
+      const c = getBuilderClient();
+      if (!c) {
+        alert("Open a client profile first and use 'Save & go to Contract Builder', then try again.");
+        return;
+      }
+      const lineItems = buildDefaultInvoiceLineItems(c.contract_template);
+      invoiceEditorState = {
+        client_id: c.id,
+        billed_to_name: c.client_name || c.company_name || "",
+        issued_at: new Date().toISOString().slice(0, 10),
+        status: "due",
+        amount_paid: 0,
+        line_items: lineItems,
+        payment_methods: INVOICE_DEFAULTS.payment_methods.map((p) => ({ ...p })),
+        terms_html: INVOICE_DEFAULTS.terms_html,
+      };
+      hydrateInvoiceEditor();
+      invoiceEditorOverlay.classList.add("open");
+    }
+    function closeInvoiceEditor() {
+      invoiceEditorOverlay.classList.remove("open");
+    }
+
+    function hydrateInvoiceEditor() {
+      const s = invoiceEditorState;
+      invIssuedAt.value = s.issued_at;
+      invBilledTo.value = s.billed_to_name || "";
+      invAmountPaid.value = s.amount_paid;
+      invTermsHtml.value = s.terms_html || "";
+      const radios = invoiceEditorOverlay.querySelectorAll('input[name="invStatus"]');
+      radios.forEach((r) => { r.checked = (r.value === s.status); });
+      renderInvLineItemsRows();
+      renderInvPaymentMethodsRows();
+      recomputeInvoiceTotals();
+    }
+
+    function renderInvLineItemsRows() {
+      invLineItemsBody.innerHTML = invoiceEditorState.line_items.map((li, idx) => `
+        <tr data-li-idx="${idx}">
+          <td><input type="text" data-li-field="description" value="${esc(li.description || "")}"></td>
+          <td><input type="text" data-li-field="subtitle" value="${esc(li.subtitle || "")}"></td>
+          <td>
+            <select data-li-field="status_pill">
+              ${INVOICE_PILL_OPTIONS.map((opt) => `<option value="${esc(opt)}" ${opt === li.status_pill ? "selected" : ""}>${esc(opt)}</option>`).join("")}
+            </select>
+          </td>
+          <td><input type="number" step="0.01" min="0" data-li-field="amount" value="${Number(li.amount || 0)}"></td>
+          <td><button type="button" class="inv-row-remove" data-li-remove="${idx}" aria-label="Remove">×</button></td>
+        </tr>
+      `).join("");
+    }
+
+    function renderInvPaymentMethodsRows() {
+      invPaymentMethodsBody.innerHTML = invoiceEditorState.payment_methods.map((pm, idx) => `
+        <tr data-pm-idx="${idx}">
+          <td><input type="text" data-pm-field="label" value="${esc(pm.label || "")}"></td>
+          <td><input type="text" data-pm-field="value" value="${esc(pm.value || "")}"></td>
+          <td><button type="button" class="inv-row-remove" data-pm-remove="${idx}" aria-label="Remove">×</button></td>
+        </tr>
+      `).join("");
+    }
+
+    function recomputeInvoiceTotals() {
+      const subtotal = invoiceEditorState.line_items.reduce((a, l) => a + (Number(l.amount) || 0), 0);
+      const paid = Number(invoiceEditorState.amount_paid) || 0;
+      const balanceDue = Math.max(0, subtotal - paid);
+      const balanceAfter = Math.max(0, balanceDue - paid);
+      invSubtotalDisplay.textContent = fmtMoney(subtotal);
+      invBalanceDueDisplay.textContent = fmtMoney(balanceDue);
+      invBalanceAfterDisplay.textContent = fmtMoney(balanceAfter);
+    }
+
+    // Editor input wiring (delegated)
+    invoiceEditorOverlay.addEventListener("input", (e) => {
+      if (!invoiceEditorState) return;
+      const t = e.target;
+      if (t === invIssuedAt) { invoiceEditorState.issued_at = t.value; return; }
+      if (t === invBilledTo) { invoiceEditorState.billed_to_name = t.value; return; }
+      if (t === invAmountPaid) {
+        invoiceEditorState.amount_paid = Number(t.value) || 0;
+        recomputeInvoiceTotals();
+        return;
+      }
+      if (t === invTermsHtml) { invoiceEditorState.terms_html = t.value; return; }
+      const liRow = t.closest("[data-li-idx]");
+      if (liRow && t.dataset.liField) {
+        const idx = Number(liRow.dataset.liIdx);
+        const field = t.dataset.liField;
+        const val = field === "amount" ? (Number(t.value) || 0) : t.value;
+        invoiceEditorState.line_items[idx][field] = val;
+        if (field === "amount") recomputeInvoiceTotals();
+        return;
+      }
+      const pmRow = t.closest("[data-pm-idx]");
+      if (pmRow && t.dataset.pmField) {
+        const idx = Number(pmRow.dataset.pmIdx);
+        invoiceEditorState.payment_methods[idx][t.dataset.pmField] = t.value;
+        return;
+      }
+    });
+    invoiceEditorOverlay.addEventListener("change", (e) => {
+      if (!invoiceEditorState) return;
+      const t = e.target;
+      if (t.name === "invStatus") {
+        invoiceEditorState.status = t.value;
+        return;
+      }
+      const liRow = t.closest("[data-li-idx]");
+      if (liRow && t.dataset.liField === "status_pill") {
+        const idx = Number(liRow.dataset.liIdx);
+        invoiceEditorState.line_items[idx].status_pill = t.value;
+        return;
+      }
+    });
+    invoiceEditorOverlay.addEventListener("click", (e) => {
+      const t = e.target;
+      const liRem = t.closest("[data-li-remove]");
+      if (liRem) {
+        const idx = Number(liRem.dataset.liRemove);
+        invoiceEditorState.line_items.splice(idx, 1);
+        renderInvLineItemsRows();
+        recomputeInvoiceTotals();
+        return;
+      }
+      const pmRem = t.closest("[data-pm-remove]");
+      if (pmRem) {
+        const idx = Number(pmRem.dataset.pmRemove);
+        invoiceEditorState.payment_methods.splice(idx, 1);
+        renderInvPaymentMethodsRows();
+        return;
+      }
+    });
+    invAddLineItem.addEventListener("click", () => {
+      invoiceEditorState.line_items.push({ description: "", subtitle: "", status_pill: "DUE TODAY", amount: 0 });
+      renderInvLineItemsRows();
+    });
+    invAddPaymentMethod.addEventListener("click", () => {
+      invoiceEditorState.payment_methods.push({ label: "", value: "" });
+      renderInvPaymentMethodsRows();
+    });
+    invEditorCancel.addEventListener("click", closeInvoiceEditor);
+    invoiceEditorClose.addEventListener("click", closeInvoiceEditor);
+    invEditorGenerate.addEventListener("click", () => {
+      if (!invoiceEditorState) return;
+      invoicePreviewMode = "new";
+      invoicePreviewSavedId = null;
+      // For preview-of-new, receipt # not yet known; we pass a placeholder
+      // that gets replaced at save time. Same for the html stored in DB.
+      const previewData = invoicePreviewDataFromState({ receipt_no: "DCL-pending" });
+      invoicePreviewBody.innerHTML = renderInvoiceHTML(previewData);
+      invoicePreviewToggleStatus.style.display = "none";
+      invoicePreviewSave.style.display = "";
+      invoicePreviewBack.style.display = "";
+      invoicePreviewStatus.textContent = "";
+      invoiceEditorOverlay.classList.remove("open");
+      invoicePreviewOverlay.classList.add("open");
+    });
+
+    function invoicePreviewDataFromState(extra) {
+      const s = invoiceEditorState;
+      const subtotal = s.line_items.reduce((a, l) => a + (Number(l.amount) || 0), 0);
+      const paid = s.status === "paid" ? subtotal : (Number(s.amount_paid) || 0);
+      const balanceDue = Math.max(0, subtotal - paid);
+      const balanceAfter = Math.max(0, balanceDue - paid);
+      return Object.assign({
+        receipt_no: extra && extra.receipt_no || "DCL-pending",
+        issued_at: s.issued_at,
+        billed_to_name: s.billed_to_name,
+        from_company: "Direct Konnect LLC",
+        from_subtitle: "Web Design & Development Services",
+        line_items: s.line_items.map((l) => ({ ...l })),
+        payment_methods: s.payment_methods.map((p) => ({ ...p })),
+        terms_html: s.terms_html,
+        amount_paid: paid,
+        subtotal,
+        balance_due: balanceDue,
+        balance_after: balanceAfter,
+        status: s.status,
+      }, extra || {});
+    }
+
+    // ---- Renderer (inline-styled HTML, status-aware title + pill colors) ----
+    function renderInvoiceHTML(d) {
+      const isPaid = d.status === "paid";
+      const titleText = isPaid ? "RECEIPT" : "INVOICE";
+      const issuedLabel = (() => {
+        try {
+          const dt = new Date((d.issued_at || "") + "T00:00:00");
+          return dt.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+        } catch { return d.issued_at || ""; }
+      })();
+      const blue = "#0B5394";
+      const lightBlue = "#E8F0FB";
+      const dark = "#222222";
+      const muted = "#555555";
+
+      const linesHtml = d.line_items.map((li, i) => {
+        const stripeBg = i % 2 === 1 ? lightBlue : "#ffffff";
+        const pillColor = isPaid ? "#15803D" : (INVOICE_PILL_COLORS[li.status_pill] || "#B45309");
+        const pillText = isPaid ? "PAID" : (li.status_pill || "");
+        return `
+          <tr style="background:${stripeBg};">
+            <td style="padding:10px 14px;border:1px solid #cccccc;vertical-align:top;">
+              <div style="font-weight:700;color:${dark};font-size:15px;">${esc(li.description || "")}</div>
+              <div style="font-style:italic;color:${muted};font-size:12px;margin-top:2px;">${esc(li.subtitle || "")}</div>
+            </td>
+            <td style="padding:10px 14px;border:1px solid #cccccc;text-align:center;vertical-align:middle;font-weight:700;color:${pillColor};font-size:13px;letter-spacing:0.04em;">${esc(pillText)}</td>
+            <td style="padding:10px 14px;border:1px solid #cccccc;text-align:right;vertical-align:middle;color:${dark};font-size:15px;">${fmtMoney(li.amount)}</td>
+          </tr>`;
+      }).join("");
+
+      const paymentsHtml = d.payment_methods.map((pm) => `
+        <div style="padding:14px 16px;background:${lightBlue};border-bottom:1px solid #d1d5db;text-align:center;">
+          <div style="font-weight:700;color:${blue};font-size:14px;letter-spacing:0.05em;">${esc(pm.label || "")}</div>
+          <div style="font-weight:700;color:${dark};font-size:18px;margin-top:4px;">${esc(pm.value || "")}</div>
+        </div>`).join("");
+
+      // Header row: black logo box on the left (initials placeholder) + company info on the right.
+      // No external image dependency to keep the saved HTML self-contained.
+      const logoBox = `
+        <td style="width:140px;background:#000000;text-align:center;vertical-align:middle;padding:14px;border-radius:6px;">
+          <div style="color:#ffffff;font-weight:800;font-size:36px;letter-spacing:0.04em;font-family:'Calibri','Segoe UI',Arial,sans-serif;">DK</div>
+        </td>`;
+
+      return `
+<div style="font-family:'Calibri','Segoe UI',Arial,sans-serif;color:${dark};">
+  <table style="width:100%;border-collapse:collapse;">
+    <tr>
+      ${logoBox}
+      <td style="padding-left:20px;vertical-align:middle;">
+        <div style="text-align:right;font-weight:700;color:${blue};font-size:24px;">${esc(d.from_company || "")}</div>
+        <div style="text-align:right;font-style:italic;color:${muted};font-size:13px;margin-top:2px;">${esc(d.from_subtitle || "")}</div>
+        <div style="text-align:right;font-weight:800;color:${blue};font-size:32px;margin-top:6px;letter-spacing:0.02em;">${esc(titleText)}</div>
+        <div style="text-align:right;color:${dark};font-size:13px;margin-top:6px;">Receipt #: ${esc(d.receipt_no || "")}</div>
+        <div style="text-align:right;color:${dark};font-size:13px;">Date Issued: ${esc(issuedLabel)}</div>
+      </td>
+    </tr>
+  </table>
+
+  <hr style="border:0;border-bottom:2px solid ${blue};margin:14px 0;">
+
+  <table style="width:100%;border-collapse:collapse;">
+    <tr>
+      <td style="width:50%;vertical-align:top;padding-right:16px;">
+        <div style="font-weight:700;color:${blue};font-size:13px;letter-spacing:0.05em;margin-bottom:4px;">BILLED TO</div>
+        <div style="font-weight:700;color:${dark};font-size:18px;">${esc(d.billed_to_name || "")}</div>
+        <div style="font-style:italic;color:${muted};font-size:12px;">Client</div>
+      </td>
+      <td style="width:50%;vertical-align:top;">
+        <div style="font-weight:700;color:${blue};font-size:13px;letter-spacing:0.05em;margin-bottom:4px;">FROM</div>
+        <div style="font-weight:700;color:${dark};font-size:18px;">${esc(d.from_company || "")}</div>
+        <div style="font-style:italic;color:${muted};font-size:12px;">Website Design &amp; Hosting</div>
+      </td>
+    </tr>
+  </table>
+
+  <div style="font-weight:700;color:${blue};font-size:13px;letter-spacing:0.05em;margin:18px 0 6px;">PROJECT CHARGES</div>
+  <table style="width:100%;border-collapse:collapse;border:1px solid #cccccc;">
+    <thead>
+      <tr style="background:${blue};color:#ffffff;">
+        <th style="padding:10px 14px;text-align:left;font-weight:700;font-size:13px;border:1px solid ${blue};">Description</th>
+        <th style="padding:10px 14px;text-align:center;font-weight:700;font-size:13px;border:1px solid ${blue};">Status</th>
+        <th style="padding:10px 14px;text-align:right;font-weight:700;font-size:13px;border:1px solid ${blue};">Amount</th>
+      </tr>
+    </thead>
+    <tbody>${linesHtml}</tbody>
+  </table>
+
+  <table style="width:100%;border-collapse:collapse;margin-top:18px;">
+    <tr>
+      <td style="width:55%;vertical-align:top;padding-right:16px;">
+        <div style="border:2px solid ${blue};border-radius:4px;overflow:hidden;">
+          <div style="background:${blue};color:#ffffff;padding:10px 16px;text-align:center;font-weight:700;font-size:15px;letter-spacing:0.04em;">PAYMENT METHODS</div>
+          ${paymentsHtml || `<div style="padding:14px;color:${muted};text-align:center;">No payment methods set.</div>`}
+        </div>
+      </td>
+      <td style="width:45%;vertical-align:top;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr><td style="padding:6px 0;color:${dark};font-size:14px;">Subtotal</td><td style="padding:6px 0;text-align:right;color:${dark};font-size:14px;">${fmtMoney(d.subtotal)}</td></tr>
+          <tr><td style="padding:6px 0;color:${dark};font-size:14px;">Amount Paid</td><td style="padding:6px 0;text-align:right;color:${dark};font-size:14px;">${fmtMoney(d.amount_paid)}</td></tr>
+          <tr><td style="padding:10px 0 6px;border-top:2px solid ${blue};font-weight:700;color:${blue};font-size:18px;">${isPaid ? "Total Paid" : "Balance Due"}</td><td style="padding:10px 0 6px;border-top:2px solid ${blue};text-align:right;font-weight:700;color:${blue};font-size:18px;">${fmtMoney(isPaid ? d.subtotal : d.balance_due)}</td></tr>
+          ${isPaid ? "" : `<tr><td style="padding:6px 0;color:${dark};font-size:13px;">Balance After This Payment</td><td style="padding:6px 0;text-align:right;color:${dark};font-size:13px;">${fmtMoney(d.balance_after)}</td></tr>`}
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <div style="font-weight:700;color:${blue};font-size:13px;letter-spacing:0.05em;margin:22px 0 6px;">ADDITIONAL TERMS &amp; ONGOING SERVICES</div>
+  <div style="color:${dark};font-size:13px;line-height:1.6;">${d.terms_html || ""}</div>
+
+  <div style="text-align:center;font-weight:700;color:${blue};font-size:15px;margin:20px 0 28px;">Thank you for your business!</div>
+
+  <table style="width:100%;border-collapse:collapse;">
+    <tr>
+      <td style="width:50%;border-bottom:1px solid #222222;height:36px;"></td>
+      <td style="width:24px;"></td>
+      <td style="width:50%;border-bottom:1px solid #222222;height:36px;"></td>
+    </tr>
+    <tr>
+      <td style="font-style:italic;color:${muted};font-size:11px;padding-top:4px;">Client Signature${d.billed_to_name ? " (" + esc(d.billed_to_name) + ")" : ""}</td>
+      <td></td>
+      <td style="font-style:italic;color:${muted};font-size:11px;padding-top:4px;">Direct Konnect LLC \u2014 Authorized Representative</td>
+    </tr>
+  </table>
+</div>`;
+    }
+
+    // ---- Preview wiring ----
+    function closeInvoicePreview() {
+      invoicePreviewOverlay.classList.remove("open");
+      invoicePreviewMode = null;
+      invoicePreviewSavedId = null;
+    }
+    invoicePreviewClose.addEventListener("click", closeInvoicePreview);
+    invoicePreviewBack.addEventListener("click", () => {
+      // Only meaningful in 'new' mode -- go back to the editor
+      if (invoicePreviewMode === "new") {
+        invoicePreviewOverlay.classList.remove("open");
+        invoiceEditorOverlay.classList.add("open");
+      } else {
+        closeInvoicePreview();
+      }
+    });
+
+    async function handleSaveInvoice() {
+      if (invoicePreviewMode !== "new" || !invoiceEditorState) return;
+      const c = getBuilderClient();
+      if (!c) { alert("Lost track of the client; please re-open the Contract Builder."); return; }
+      invoicePreviewSave.disabled = true;
+      invoicePreviewStatus.textContent = "Saving...";
+      try {
+        const receiptNo = await nextReceiptNo();
+        const data = invoicePreviewDataFromState({ receipt_no: receiptNo });
+        const renderedHtml = renderInvoiceHTML(data);
+        const row = {
+          client_id: c.id,
+          receipt_no: receiptNo,
+          issued_at: data.issued_at,
+          billed_to_name: data.billed_to_name,
+          from_company: data.from_company,
+          from_subtitle: data.from_subtitle,
+          line_items: data.line_items,
+          payment_methods: data.payment_methods,
+          terms_html: data.terms_html,
+          amount_paid: data.amount_paid,
+          status: data.status,
+          rendered_html: renderedHtml,
+        };
+        const { data: inserted, error } = await sb.from("invoices").insert(row).select().single();
+        if (error) throw error;
+        clientInvoices.unshift(inserted);
+        invoicePreviewStatus.textContent = "Saved.";
+        closeInvoicePreview();
+        renderContractBuilder();
+      } catch (err) {
+        console.error("save invoice failed:", err);
+        invoicePreviewStatus.textContent = "Save failed: " + (err.message || String(err));
+        alert("Save failed: " + (err.message || String(err)));
+      } finally {
+        invoicePreviewSave.disabled = false;
+      }
+    }
+    invoicePreviewSave.addEventListener("click", handleSaveInvoice);
+
+    // ---- Open existing saved invoice + Mark as Paid / Due toggle ----
+    function openSavedInvoice(invoiceRow) {
+      invoicePreviewMode = "saved";
+      invoicePreviewSavedId = invoiceRow.id;
+      invoicePreviewBody.innerHTML = invoiceRow.rendered_html || "";
+      invoicePreviewSave.style.display = "none";
+      invoicePreviewBack.style.display = "none";
+      invoicePreviewToggleStatus.style.display = "";
+      invoicePreviewToggleStatus.textContent = invoiceRow.status === "paid" ? "Mark as Due" : "Mark as Paid";
+      invoicePreviewStatus.textContent = "";
+      invoicePreviewOverlay.classList.add("open");
+    }
+    async function toggleSavedInvoiceStatus() {
+      if (!invoicePreviewSavedId) return;
+      const row = clientInvoices.find((r) => r.id === invoicePreviewSavedId);
+      if (!row) return;
+      const newStatus = row.status === "paid" ? "due" : "paid";
+      invoicePreviewToggleStatus.disabled = true;
+      invoicePreviewStatus.textContent = "Updating...";
+      try {
+        // Re-render with the new status so the saved HTML reflects PAID vs DUE.
+        const subtotal = (row.line_items || []).reduce((a, l) => a + (Number(l.amount) || 0), 0);
+        const paid = newStatus === "paid" ? subtotal : 0;
+        const renderData = {
+          receipt_no: row.receipt_no,
+          issued_at: row.issued_at,
+          billed_to_name: row.billed_to_name,
+          from_company: row.from_company,
+          from_subtitle: row.from_subtitle,
+          line_items: row.line_items || [],
+          payment_methods: row.payment_methods || [],
+          terms_html: row.terms_html,
+          amount_paid: paid,
+          subtotal,
+          balance_due: Math.max(0, subtotal - paid),
+          balance_after: 0,
+          status: newStatus,
+        };
+        const newHtml = renderInvoiceHTML(renderData);
+        const { data: updated, error } = await sb.from("invoices")
+          .update({ status: newStatus, amount_paid: paid, rendered_html: newHtml })
+          .eq("id", row.id)
+          .select()
+          .single();
+        if (error) throw error;
+        const idx = clientInvoices.findIndex((r) => r.id === row.id);
+        if (idx >= 0) clientInvoices[idx] = updated;
+        invoicePreviewBody.innerHTML = newHtml;
+        invoicePreviewToggleStatus.textContent = newStatus === "paid" ? "Mark as Due" : "Mark as Paid";
+        invoicePreviewStatus.textContent = newStatus === "paid" ? "Marked paid." : "Marked due.";
+        renderContractBuilder();
+      } catch (err) {
+        console.error("toggle invoice status failed:", err);
+        invoicePreviewStatus.textContent = "Update failed: " + (err.message || String(err));
+        alert("Update failed: " + (err.message || String(err)));
+      } finally {
+        invoicePreviewToggleStatus.disabled = false;
+      }
+    }
+    invoicePreviewToggleStatus.addEventListener("click", toggleSavedInvoiceStatus);
+
     // Click handler for the contract builder card
     document.addEventListener("click", async (e) => {
       const btn = e.target.closest("[data-cb-action]");
@@ -5390,11 +6134,11 @@
         cbSaveName.value = "";
         openCBEditor();
       } else if (action === "new-invoice") {
-        // Scaffold only: the editor is intentionally not wired up yet.
-        // Once you've described the invoice shape (line items, totals,
-        // due date, etc.) we'll replace this placeholder with the real
-        // editor and a saved-invoices list inside the Invoices section.
-        alert("Invoice editor coming soon. We'll wire this up once we've nailed down the invoice shape (line items, totals, etc.).");
+        openInvoiceEditor();
+      } else if (action === "open-invoice") {
+        const id = btn.dataset.id;
+        const row = clientInvoices.find((r) => String(r.id) === String(id));
+        if (row) openSavedInvoice(row);
       }
     });
 

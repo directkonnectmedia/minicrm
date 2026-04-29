@@ -469,3 +469,54 @@ exception when duplicate_object then
   -- already published, nothing to do
   null;
 end $$;
+
+-- =============================================================
+-- INVOICES
+-- =============================================================
+-- Standalone invoice/receipt documents generated from the Contract
+-- Builder. Same row represents both faces of the document:
+--   status = 'due'  -> renders as INVOICE  (amber DUE TODAY pills)
+--   status = 'paid' -> renders as RECEIPT (green PAID pills)
+-- The fully styled HTML is generated client-side and stored in
+-- rendered_html so listing/viewing requires no re-render and a
+-- future PDF export has a stable artifact.
+
+create table if not exists public.invoices (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references public.clients(id) on delete set null,
+  receipt_no text not null,
+  issued_at date not null default current_date,
+  billed_to_name text,
+  from_company text not null default 'Direct Konnect LLC',
+  from_subtitle text not null default 'Web Design & Development Services',
+  line_items jsonb not null default '[]'::jsonb,
+  payment_methods jsonb not null default '[]'::jsonb,
+  terms_html text,
+  amount_paid numeric not null default 0,
+  status text not null default 'due'
+    check (status in ('due', 'paid')),
+  rendered_html text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists invoices_receipt_no_idx on public.invoices (receipt_no);
+create index if not exists invoices_client_id_idx on public.invoices (client_id);
+
+alter table public.invoices enable row level security;
+
+-- RLS mirrors signed_contracts: team members get full access, portal
+-- clients can only read invoices attached to their own client row.
+drop policy if exists "team or own invoices" on public.invoices;
+create policy "team or own invoices"
+  on public.invoices for all to authenticated
+  using (
+    public.is_team_member()
+    or client_id in (select id from public.clients where lower(email) = lower(auth.email()))
+  )
+  with check (public.is_team_member());
+
+drop trigger if exists invoices_set_updated_at on public.invoices;
+create trigger invoices_set_updated_at
+  before update on public.invoices
+  for each row execute function public.set_updated_at();
