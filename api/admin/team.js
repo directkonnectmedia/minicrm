@@ -16,7 +16,7 @@
  *
  * Methods:
  *   GET    /api/admin/team
- *     -> { members: [{ id, email, name, roles, banned_until, created_at,
+ *     -> { members: [{ id, email, name, roles, created_at,
  *                      last_sign_in_at }] }
  *
  *   POST   /api/admin/team
@@ -24,7 +24,7 @@
  *     -> { ok: true, id }
  *
  *   PATCH  /api/admin/team
- *     body: { id, banned?: boolean, roles?: string[], pin?, name? }
+ *     body: { id, roles?: string[], pin?, name? }
  *     -> { ok: true }
  *
  *   DELETE /api/admin/team
@@ -102,7 +102,6 @@ function slimUser(u) {
     email: u.email,
     name: (u.user_metadata && u.user_metadata.display_name) || u.email,
     roles: readRoles(u),
-    banned_until: u.banned_until || null,
     created_at: u.created_at,
     last_sign_in_at: u.last_sign_in_at || null,
   };
@@ -165,14 +164,10 @@ async function createMember(req, res) {
 }
 
 async function updateMember(req, res) {
-  const { id, banned, roles, pin, name } = req.body || {};
+  const { id, roles, pin, name } = req.body || {};
   if (!id) return res.status(400).json({ error: "id required" });
 
   const body = {};
-
-  if (typeof banned === "boolean") {
-    body.ban_duration = banned ? "876000h" : "none";
-  }
 
   if (roles !== undefined || name !== undefined) {
     let dedupedRoles;

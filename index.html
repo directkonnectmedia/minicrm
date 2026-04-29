@@ -1685,8 +1685,9 @@
     .team-row-email { font-size: 12px; color: #6b7280; margin-top: 2px; word-break: break-all; }
     .team-row-meta { font-size: 11px; color: #9ca3af; margin-top: 4px; }
     .team-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
-    .team-row.team-row-banned .team-row-name { color: #6b7280; text-decoration: line-through; }
     .team-row.team-row-self  { background: #f9fafb; }
+    .team-row-delete { color: #b91c1c; border-color: #fecaca; }
+    .team-row-delete:hover { background: #fef2f2; border-color: #fca5a5; }
 
     .team-add-card {
       margin: 12px 14px 14px;
@@ -2892,7 +2893,7 @@
     const teamAddResetBtn    = document.getElementById("teamAddResetBtn");
     const closeTeamBtn       = document.getElementById("closeTeam");
 
-    async function adminFetch(method, body) {
+    async function adminFetch(method, body, path = "/api/admin/team") {
       const { data: sessionData } = await sb.auth.getSession();
       const session = sessionData && sessionData.session;
       if (!session) throw new Error("not signed in");
@@ -2904,7 +2905,7 @@
         },
       };
       if (body !== undefined) opts.body = JSON.stringify(body);
-      const res = await fetch("/api/admin/team", opts);
+      const res = await fetch(path, opts);
       let payload = null;
       try { payload = await res.json(); } catch {}
       if (!res.ok) {
@@ -2932,12 +2933,6 @@
       try { return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }); }
       catch { return iso; }
     }
-    function isMemberBanned(m) {
-      if (!m.banned_until) return false;
-      const t = Date.parse(m.banned_until);
-      return Number.isFinite(t) && t > Date.now();
-    }
-
     function renderTeamMembers(members) {
       teamList.innerHTML = "";
       if (!members || members.length === 0) {
@@ -2949,10 +2944,9 @@
         .slice()
         .sort((a, b) => (a.name || a.email || "").localeCompare(b.name || b.email || ""))
         .forEach((m) => {
-          const banned = isMemberBanned(m);
           const isSelf = myEmail && m.email && myEmail.toLowerCase() === m.email.toLowerCase();
           const row = document.createElement("div");
-          row.className = "team-row" + (banned ? " team-row-banned" : "") + (isSelf ? " team-row-self" : "");
+          row.className = "team-row" + (isSelf ? " team-row-self" : "");
 
           const main = document.createElement("div");
           main.className = "team-row-main";
@@ -2964,12 +2958,6 @@
             youTag.className = "role-badge role-unknown";
             youTag.textContent = "You";
             nameEl.appendChild(youTag);
-          }
-          if (banned) {
-            const bannedTag = document.createElement("span");
-            bannedTag.className = "role-badge role-unknown";
-            bannedTag.textContent = "Deactivated";
-            nameEl.appendChild(bannedTag);
           }
           const rolesEl = document.createElement("span");
           rolesEl.className = "profile-pill-roles";
@@ -2990,11 +2978,11 @@
           const actions = document.createElement("div");
           actions.className = "team-row-actions";
           if (!isSelf) {
-            const toggleBtn = document.createElement("button");
-            toggleBtn.className = "ghost";
-            toggleBtn.textContent = banned ? "Activate" : "Deactivate";
-            toggleBtn.addEventListener("click", () => toggleMemberBanned(m, !banned));
-            actions.appendChild(toggleBtn);
+            const deleteBtn = document.createElement("button");
+            deleteBtn.className = "ghost team-row-delete";
+            deleteBtn.textContent = "Delete";
+            deleteBtn.addEventListener("click", () => deleteTeamMember(m));
+            actions.appendChild(deleteBtn);
           }
           row.appendChild(main);
           row.appendChild(actions);
@@ -3014,14 +3002,14 @@
       }
     }
 
-    async function toggleMemberBanned(member, banned) {
-      const verb = banned ? "deactivate" : "reactivate";
-      if (!confirm(`${verb[0].toUpperCase() + verb.slice(1)} ${member.name || member.email}?`)) return;
+    async function deleteTeamMember(member) {
+      const label = member.name || member.email;
+      if (!confirm(`Delete ${label}? This permanently removes their account and they will no longer be able to sign in.`)) return;
       try {
-        await adminFetch("PATCH", { id: member.id, banned });
+        await adminFetch("DELETE", { id: member.id });
         await loadTeamMembers();
       } catch (err) {
-        setTeamError(`Could not ${verb}: ${err.message}`);
+        setTeamError(`Could not delete: ${err.message}`);
       }
     }
 
@@ -3263,7 +3251,6 @@
         name:            m.name || "",
         email:           m.email || "",
         roles:           Array.isArray(m.roles) ? m.roles.join(", ") : (m.roles || ""),
-        banned_until:    m.banned_until || "",
         created_at:      m.created_at || "",
         last_sign_in_at: m.last_sign_in_at || "",
       }));
@@ -3593,8 +3580,26 @@
 
       if (noLink && noLink.dataset.action === "delete") {
         if (!confirm("Delete this entry?")) return;
+        // Capture the email BEFORE the row is gone so we can also wipe
+        // the matching portal auth account in a follow-up call. Without
+        // this cascade, the auth.users row sticks around (banned or not)
+        // and the next time the same email is added as a client the
+        // portal sign-in would either work against the stale account or,
+        // if previously banned, refuse to sign them in entirely.
+        const clientRow = allClients.find((c) => c && c.id === id);
+        const email = clientRow && typeof clientRow.email === "string"
+          ? clientRow.email.trim()
+          : "";
         const { error } = await sb.from("clients").delete().eq("id", id);
         if (error) { alert("Delete failed: " + error.message); return; }
+        if (email && isAdmin()) {
+          // Fire-and-forget: a transient failure here just leaves an
+          // orphan auth row that the role filter already hides. The
+          // admin doesn't need to wait on it or see an error toast.
+          adminFetch("DELETE", { email }, "/api/admin/auth-user").catch((err) => {
+            console.warn("Could not clean up portal auth account for", email, err);
+          });
+        }
         load();
         return;
       }
