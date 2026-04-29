@@ -2056,6 +2056,7 @@
     <button class="tab" data-view="sekretary">🤖 Sekretary</button>
     <button class="tab" data-view="contract_builder">📝 Contract Builder</button>
     <button class="tab" data-view="invoice_builder">🧾 Invoice Builder</button>
+    <button class="tab" data-view="plan_builder">🧩 Plan Builder</button>
   </div>
 
   <div id="filterChips" class="filter-chips"></div>
@@ -2147,6 +2148,15 @@
         <div class="builder-panel" id="ibLeft"></div>
         <div class="builder-panel" id="ibMiddle"></div>
         <div class="builder-panel" id="ibRight"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" data-view="plan_builder">
+    <div class="card builder-card">
+      <div class="cb-middle-empty" style="padding:60px 20px;">
+        <div class="cb-middle-empty-title">Plan Builder</div>
+        <div class="cb-middle-empty-sub">Coming soon. The wizard for creating Plans (services, fees, setup / monthly / financing) will live here.</div>
       </div>
     </div>
   </div>
@@ -7380,6 +7390,9 @@
       }
       if (name === "invoice_builder") {
         renderInvoiceBuilder();
+      }
+      if (name === "plan_builder") {
+        // placeholder -- contents TBD; future renderPlanBuilder() hook lands here
       }
     }
 
