@@ -122,7 +122,14 @@ async function listMembers(req, res) {
   const users = (data && Array.isArray(data.users) ? data.users : []).map(
     slimUser
   );
-  return res.status(200).json({ members: users });
+  // Only surface real team members: an auth user is considered a team member
+  // when at least one of its roles is in ALLOWED_ROLES. Auth users with no
+  // roles (e.g. clients who magic-linked into the portal) are hidden here so
+  // they never appear in Manage Team.
+  const teamMembers = users.filter(
+    (u) => Array.isArray(u.roles) && u.roles.some((r) => ALLOWED_ROLES.has(r))
+  );
+  return res.status(200).json({ members: teamMembers });
 }
 
 async function createMember(req, res) {

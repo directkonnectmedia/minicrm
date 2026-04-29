@@ -22,10 +22,27 @@ const SUPABASE_URL =
   process.env.SUPABASE_URL || "https://ljghuyeugzmduzzvngkc.supabase.co";
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+const ALLOWED_ROLES = new Set(["admin", "sales", "web_designer"]);
+
 function isBanned(u) {
   if (!u || !u.banned_until) return false;
   const t = Date.parse(u.banned_until);
   return Number.isFinite(t) && t > Date.now();
+}
+
+// Mirrors api/admin/team.js readRoles: tolerate legacy single-role users.
+function readRoles(u) {
+  if (!u || !u.user_metadata) return [];
+  const meta = u.user_metadata;
+  if (Array.isArray(meta.roles)) {
+    return meta.roles.filter((r) => typeof r === "string");
+  }
+  if (typeof meta.role === "string" && meta.role) return [meta.role];
+  return [];
+}
+
+function hasTeamRole(u) {
+  return readRoles(u).some((r) => ALLOWED_ROLES.has(r));
 }
 
 function pickerEntry(u) {
@@ -73,6 +90,7 @@ export default async function handler(req, res) {
     const members = users
       .filter((u) => u && u.email && !isBanned(u))
       .filter((u) => u.user_metadata && typeof u.user_metadata.display_name === "string" && u.user_metadata.display_name.trim() !== "")
+      .filter(hasTeamRole)
       .map(pickerEntry)
       .sort((a, b) => a.name.localeCompare(b.name));
 
