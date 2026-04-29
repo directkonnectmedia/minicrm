@@ -447,6 +447,77 @@
     .sent-status-signed { background: #d1fae5; color: #065f46; }
     .sent-status-voided { background: #fee2e2; color: #991b1b; }
 
+    /* Contract lifecycle stepper (inside Contract Status cards) */
+    .contract-stepper {
+      display: flex;
+      align-items: flex-start;
+      margin: 14px 0 10px;
+      padding: 0;
+    }
+    .contract-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-shrink: 0;
+      min-width: 64px;
+    }
+    .contract-step-dot {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      background: #e5e7eb;
+      color: #9ca3af;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      transition: all 200ms ease;
+    }
+    .contract-step.completed .contract-step-dot { background: #10b981; color: #fff; }
+    .contract-step.current   .contract-step-dot { background: #4f46e5; color: #fff; box-shadow: 0 0 0 4px rgba(79,70,229,0.18); }
+    .contract-step-label {
+      margin-top: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      text-align: center;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    .contract-step.completed .contract-step-label,
+    .contract-step.current   .contract-step-label { color: #111827; }
+    .contract-step-date {
+      margin-top: 2px;
+      font-size: 10px;
+      color: #6b7280;
+      text-align: center;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    .contract-step-line {
+      flex: 1;
+      height: 2px;
+      background: #e5e7eb;
+      margin-top: 13px;
+      min-width: 12px;
+      transition: background 200ms ease;
+    }
+    .contract-step-line.completed { background: #10b981; }
+    .contract-stepper-voided {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 14px 0 10px;
+      padding: 10px 12px;
+      background: #fef2f2;
+      border: 1px dashed #fecaca;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #7f1d1d;
+    }
+
     /* Contract Builder CTA from profile */
     .contract-builder-cta { padding: 0; }
     .cta-builder-btn {
@@ -3728,6 +3799,64 @@
       `;
     }
 
+    // ---- Contract lifecycle stepper ----
+    // Visualises where a contract sits in its journey: Saved -> Sent ->
+    // Viewed -> Signed. Each completed stage gets a green check, the
+    // current stage is highlighted indigo. Voided contracts skip the
+    // stepper entirely and show a "cancelled" banner instead.
+    const CONTRACT_LIFECYCLE_STAGES = [
+      { key: "saved",  label: "Saved",  dateField: "created_at" },
+      { key: "sent",   label: "Sent",   dateField: "sent_at" },
+      { key: "viewed", label: "Viewed", dateField: "viewed_at" },
+      { key: "signed", label: "Signed", dateField: "signed_at" },
+    ];
+    const CONTRACT_STATUS_TO_STAGE_INDEX = {
+      saved:   0,
+      pending: 0,
+      sent:    1,
+      viewed:  2,
+      signed:  3,
+    };
+    function fmtStepDate(iso) {
+      if (!iso) return "";
+      try { return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
+      catch { return ""; }
+    }
+    function renderContractStatusStepper(row) {
+      const status = row.status || "pending";
+      if (status === "voided") {
+        return `
+          <div class="contract-stepper-voided">
+            <span class="badge sent-status-voided">Voided</span>
+            <span>This contract was cancelled.</span>
+          </div>
+        `;
+      }
+      const currentIndex = CONTRACT_STATUS_TO_STAGE_INDEX[status] ?? 0;
+      return `
+        <div class="contract-stepper">
+          ${CONTRACT_LIFECYCLE_STAGES.map((stage, i) => {
+            const isCompleted = i < currentIndex;
+            const isCurrent   = i === currentIndex;
+            const stepClass   = isCompleted ? "completed" : (isCurrent ? "current" : "");
+            const dateStr     = isCompleted || isCurrent ? fmtStepDate(row[stage.dateField]) : "";
+            const dotContent  = isCompleted ? "&#10003;" : (i + 1);
+            const linePart    = i < CONTRACT_LIFECYCLE_STAGES.length - 1
+              ? `<div class="contract-step-line${isCompleted ? " completed" : ""}"></div>`
+              : "";
+            return `
+              <div class="contract-step ${stepClass}">
+                <div class="contract-step-dot">${dotContent}</div>
+                <div class="contract-step-label">${stage.label}</div>
+                ${dateStr ? `<div class="contract-step-date">${dateStr}</div>` : ""}
+              </div>
+              ${linePart}
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
     // ---- Contract Status tab ----
     function renderContractStatusTab(c) {
       const rows = signedContracts.filter((r) => r.client_id === c.id);
@@ -3767,7 +3896,7 @@
               <div class="contract-status-card">
                 <div class="contract-status-title">${esc(row.template_name || "Contract")}</div>
                 ${recipientLine}
-                <div class="contract-status-meta">Created: ${row.created_at ? esc(formatDateTime(row.created_at)) : "—"}</div>
+                ${renderContractStatusStepper(row)}
                 ${signed}
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
                   <span class="sent-status-pill sent-status-${esc(status)}">${esc(status)}</span>
