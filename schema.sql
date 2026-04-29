@@ -520,3 +520,17 @@ drop trigger if exists invoices_set_updated_at on public.invoices;
 create trigger invoices_set_updated_at
   before update on public.invoices
   for each row execute function public.set_updated_at();
+
+-- =============================================================
+-- INVOICES: STRIPE-READY SCAFFOLDING (Phase 1)
+-- =============================================================
+-- Phase 1 stores the columns Stripe will populate later but does
+-- not call Stripe yet. The wizard exposes a single text input for
+-- a manually-generated Stripe Checkout link; the other columns
+-- stay null until Phase 2 wires up the Stripe API + webhook.
+-- All columns are nullable; safe to re-run.
+
+alter table public.invoices add column if not exists stripe_payment_link text;
+alter table public.invoices add column if not exists stripe_payment_intent_id text;
+alter table public.invoices add column if not exists stripe_status text;
+alter table public.invoices add column if not exists paid_at timestamptz;
