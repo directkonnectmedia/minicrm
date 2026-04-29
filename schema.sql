@@ -587,10 +587,12 @@ create table if not exists public.plans (
   has_setup        boolean not null default false,
   has_subscription boolean not null default false,
   has_addons       boolean not null default false,
+  has_financing    boolean not null default false,
   one_time     jsonb not null default '{}'::jsonb,
   setup        jsonb not null default '{}'::jsonb,
   subscription jsonb not null default '{}'::jsonb,
   addons       jsonb not null default '[]'::jsonb,
+  financing    jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -606,3 +608,9 @@ drop trigger if exists plans_set_updated_at on public.plans;
 create trigger plans_set_updated_at
   before update on public.plans
   for each row execute function public.set_updated_at();
+
+-- Idempotent migration for environments that already ran the
+-- previous public.plans create-table block (which didn't include
+-- the financing columns).
+alter table public.plans add column if not exists has_financing boolean not null default false;
+alter table public.plans add column if not exists financing jsonb not null default '{}'::jsonb;

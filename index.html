@@ -5312,6 +5312,7 @@
       { key: "setup",        flag: "has_setup",        label: "Setup Fee" },
       { key: "subscription", flag: "has_subscription", label: "Subscription" },
       { key: "addons",       flag: "has_addons",       label: "Add-ons" },
+      { key: "financing",    flag: "has_financing",    label: "Financing" },
     ];
 
     function activePlanTabsFor(plan) {
@@ -5418,6 +5419,7 @@
       { flag: "has_setup",        label: "Setup fee",        prompt: "Does this plan include a setup fee?" },
       { flag: "has_subscription", label: "Subscription",     prompt: "Does this plan include a subscription?" },
       { flag: "has_addons",       label: "Add-ons",          prompt: "Does this plan include add-ons?" },
+      { flag: "has_financing",    label: "Financing",        prompt: "Does this plan include financing?" },
     ];
     const PLAN_WIZARD_TOTAL_STEPS = PLAN_WIZARD_STEPS.length + 1; // + name step
 
@@ -5440,6 +5442,7 @@
           has_setup: false,
           has_subscription: false,
           has_addons: false,
+          has_financing: false,
           name: "",
         },
       };
@@ -5544,6 +5547,7 @@
           has_setup: !!draft.has_setup,
           has_subscription: !!draft.has_subscription,
           has_addons: !!draft.has_addons,
+          has_financing: !!draft.has_financing,
         };
         const { data: inserted, error } = await sb.from("plans").insert(row).select().single();
         if (error) throw error;
