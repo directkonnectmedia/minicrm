@@ -4825,7 +4825,7 @@
         alert("This client has no email on file. Add an email on the Info tab first.");
         return;
       }
-      if (!confirm(`Send "${name}" to ${email}?\n\nThe contract will be visible in their Client Portal and they'll get a sign-in link by email.`)) return;
+      if (!confirm(`Send "${name}" to ${email}?\n\nThe contract will be visible in their Client Portal as Received and they'll get a sign-in link by email.`)) return;
 
       const originalLabel = btn.textContent;
       btn.disabled = true;
@@ -4833,19 +4833,22 @@
 
       const nowIso = new Date().toISOString();
       try {
-        // Step 1: flip the contract status. This is the source of truth --
-        // once status >= 'sent' the row is visible to the client through RLS.
+        // Step 1: flip the contract status. We jump straight to 'received'
+        // because at this moment the row is already visible to the client
+        // through RLS -- there is no separate "in transit" state worth
+        // tracking. sent_at and received_at get the same stamp so the
+        // 6-stage stepper reads cleanly from end to end.
         const { error: upErr } = await sb.from("signed_contracts")
-          .update({ status: "sent", sent_at: nowIso })
+          .update({ status: "received", sent_at: nowIso, received_at: nowIso })
           .eq("id", id);
         if (upErr) throw upErr;
 
         const local = signedContracts.find((r) => r.id === row.id);
-        if (local) { local.status = "sent"; local.sent_at = nowIso; }
+        if (local) { local.status = "received"; local.sent_at = nowIso; local.received_at = nowIso; }
         await refreshSignedContracts();
 
         const c = signedContractClient(row);
-        if (c) await addSystemNote(c, "client", `Contract "${name}" marked as sent.`);
+        if (c) await addSystemNote(c, "client", `Contract "${name}" sent to ${email} and now visible in their portal.`);
 
         // Step 2: email the portal magic-link. We do this AFTER the status
         // change so a flaky email step never leaves the contract in a

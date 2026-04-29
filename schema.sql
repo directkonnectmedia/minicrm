@@ -418,3 +418,36 @@ $$;
 
 grant execute on function public.mark_contract_received(uuid) to authenticated;
 grant execute on function public.mark_contract_viewed(uuid)   to authenticated;
+
+-- Client-side signing. The client portal calls this with the freshly
+-- stamped HTML (provider sigs preserved, client sig images embedded as
+-- data URLs) so the row reflects exactly what the client saw on screen
+-- when they signed. Same ownership + status guard as the other RPCs:
+-- only the client whose email matches can sign, and only while the row
+-- is in 'received' or 'viewed'. Already-signed rows are immutable here.
+
+create or replace function public.mark_contract_signed(
+  p_contract_id  uuid,
+  p_html         text,
+  p_signer_name  text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.signed_contracts
+     set status        = 'signed',
+         signed_at     = coalesce(signed_at, now()),
+         signer_name   = p_signer_name,
+         contract_html = p_html
+   where id = p_contract_id
+     and status in ('received', 'viewed')
+     and client_id in (
+       select id from public.clients where lower(email) = lower(auth.email())
+     );
+end;
+$$;
+
+grant execute on function public.mark_contract_signed(uuid, text, text) to authenticated;
