@@ -534,3 +534,40 @@ alter table public.invoices add column if not exists stripe_payment_link text;
 alter table public.invoices add column if not exists stripe_payment_intent_id text;
 alter table public.invoices add column if not exists stripe_status text;
 alter table public.invoices add column if not exists paid_at timestamptz;
+
+-- =============================================================
+-- INVOICE TEMPLATES
+-- =============================================================
+-- Reusable invoice line-item structures, mirroring the contract
+-- template pattern:
+--   - Universal templates -> public.invoice_templates table
+--     (shared library, e.g. "Website Deposit + Final Balance")
+--   - Custom per-client    -> clients.invoice jsonb column,
+--     accessed under .custom { name, line_items, terms_html, saved_at }
+-- Templates intentionally store ONLY structure (line items + terms),
+-- never per-invoice fields like billed_to_name, issued_at, status,
+-- or stripe_payment_link -- those are populated when the template
+-- is "generated" into an actual invoice via the wizard.
+
+alter table public.clients add column if not exists invoice jsonb not null default '{}'::jsonb;
+
+create table if not exists public.invoice_templates (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  line_items jsonb not null default '[]'::jsonb,
+  terms_html text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.invoice_templates enable row level security;
+drop policy if exists "team only invoice templates" on public.invoice_templates;
+create policy "team only invoice templates"
+  on public.invoice_templates for all to authenticated
+  using (public.is_team_member())
+  with check (public.is_team_member());
+
+drop trigger if exists invoice_templates_set_updated_at on public.invoice_templates;
+create trigger invoice_templates_set_updated_at
+  before update on public.invoice_templates
+  for each row execute function public.set_updated_at();

@@ -636,6 +636,7 @@
     }
     .cb-badge-custom { background: #eef2ff; color: #4338ca; }
     .cb-badge-universal { background: #ecfdf5; color: #047857; }
+    .cb-badge-invoice-template { background: #fef3c7; color: #92400e; }
 
     /* Shared contract document styling for previews */
     .contract-doc {
@@ -2449,6 +2450,81 @@
           <button id="invWizardNext">Next: Billing details</button>
           <button id="invWizardSave" style="display:none;">Save invoice</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invoice Template Editor modal (single-pane; templates have no per-client data) -->
+  <div class="overlay" id="invoiceTemplateEditorOverlay">
+    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="invoiceTemplateEditorTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="invoiceTemplateEditorTitle">New Invoice Template</div>
+        <button class="modal-close" id="invoiceTemplateEditorClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="invoice-wizard-shell">
+        <div class="invoice-wiz-pane">
+          <div class="inv-row">
+            <div class="inv-field inv-field-grow">
+              <label>Template name</label>
+              <input type="text" id="invTplName" placeholder="e.g. Website Deposit + Final Balance">
+            </div>
+          </div>
+
+          <div class="inv-section-title">Line items</div>
+          <p class="invoice-wiz-hint">Define the standard rows for this invoice template. Amounts can be left as 0 and filled in when generating an invoice for a specific client.</p>
+
+          <table class="inv-line-items">
+            <thead>
+              <tr>
+                <th style="width: 38%;">Description</th>
+                <th style="width: 30%;">Subtitle</th>
+                <th style="width: 16%;">Status pill</th>
+                <th style="width: 12%;">Amount</th>
+                <th style="width: 4%;"></th>
+              </tr>
+            </thead>
+            <tbody id="invTplLineItemsBody"></tbody>
+          </table>
+          <button type="button" class="ghost inv-add-row" id="invTplAddLineItem">+ Add line item</button>
+
+          <div class="inv-section-title">Additional terms &amp; ongoing services</div>
+          <p class="invoice-wiz-hint">Pre-filled with the standard hosting / retention terms. HTML allowed (e.g. <code>&lt;ul&gt;&lt;li&gt;...&lt;/li&gt;&lt;/ul&gt;</code>).</p>
+          <textarea id="invTplTermsHtml" rows="10" class="inv-terms"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <span class="muted" id="invTplStatus" style="font-size:13px;"></span>
+        <div style="display:flex;gap:8px;">
+          <button class="ghost" id="invTplCancel">Cancel</button>
+          <button id="invTplSave">Save invoice template</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invoice Template Save Choice modal (Custom this client vs Universal) -->
+  <div class="overlay" id="invTplSaveOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="invTplSaveTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="invTplSaveTitle">Save Invoice Template</div>
+        <button class="modal-close" id="invTplSaveClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="step-body">
+        <div class="cb-save-choice">
+          <button type="button" class="cb-save-choice-btn" id="invTplSaveCustom">
+            <div class="cb-save-choice-title">Custom Template</div>
+            <div class="cb-save-choice-sub">Save for the currently loaded client only.</div>
+          </button>
+          <button type="button" class="cb-save-choice-btn" id="invTplSaveUniversal">
+            <div class="cb-save-choice-title">Universal Template</div>
+            <div class="cb-save-choice-sub">Save to the shared library, reusable for any client.</div>
+          </button>
+        </div>
+        <div id="invTplSaveError" class="cb-save-error"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" id="invTplSaveBack">Back to editor</button>
+        <span></span>
       </div>
     </div>
   </div>
@@ -4757,6 +4833,16 @@
     let universalLoaded = false;
     let builderActiveTemplate = null;      // { source: "custom"|"universal", id, name, body_html }
 
+    // Invoice templates (mirror of contract templates):
+    //   - universalInvoiceTemplates -> public.invoice_templates rows
+    //   - per-client custom -> stored on clients.invoice.custom (jsonb)
+    //   - activeInvoiceTemplate is the currently-selected one for "Generate Invoice"
+    // Mutually exclusive with builderActiveTemplate (contract); selecting one
+    // clears the other so the middle/right panes always render unambiguously.
+    let universalInvoiceTemplates = [];
+    let universalInvoiceTemplatesLoaded = false;
+    let activeInvoiceTemplate = null;     // { source, id, name, line_items, terms_html }
+
     function getBuilderClient() {
       return contractBuilderClientId ? allClients.find((c) => c.id === contractBuilderClientId) : null;
     }
@@ -4772,9 +4858,23 @@
       universalLoaded = true;
     }
 
+    async function loadUniversalInvoiceTemplates() {
+      const { data, error } = await sb.from("invoice_templates").select("*").order("name", { ascending: true });
+      if (error) {
+        console.warn("Universal invoice templates unavailable:", error.message);
+        universalInvoiceTemplates = [];
+      } else {
+        universalInvoiceTemplates = data || [];
+      }
+      universalInvoiceTemplatesLoaded = true;
+    }
+
     function renderContractBuilder() {
       if (!universalLoaded) {
         loadUniversalTemplates().then(() => renderContractBuilder());
+      }
+      if (!universalInvoiceTemplatesLoaded) {
+        loadUniversalInvoiceTemplates().then(() => renderContractBuilder());
       }
       // Lazy-load the current client's invoices so the sidebar list
       // populates without us having to wire it into every entry point
@@ -4793,6 +4893,7 @@
       const c = getBuilderClient();
       const tierLabel = c ? contractTemplateLabel(c.contract_template) : "";
       const customTpl = c && c.contract && c.contract.custom ? c.contract.custom : null;
+      const customInvoiceTpl = c && c.invoice && c.invoice.custom ? c.invoice.custom : null;
 
       const clientCard = c
         ? `<div class="cb-client-card">
@@ -4805,37 +4906,67 @@
             <div class="cb-client-name muted">Open a client profile and use "Save &amp; go to Contract Builder".</div>
           </div>`;
 
-      const isActive = (source, id) =>
+      const isContractActive = (source, id) =>
         builderActiveTemplate && builderActiveTemplate.source === source && builderActiveTemplate.id === id;
+      const isInvoiceTplActive = (source, id) =>
+        activeInvoiceTemplate && activeInvoiceTemplate.source === source && activeInvoiceTemplate.id === id;
 
-      const customSection = c
+      // ----- Contract templates -----
+      const contractCustomSection = c
         ? `<div class="cb-tmpl-section">
-            <div class="cb-tmpl-section-title">Custom (this client)</div>
+            <div class="cb-tmpl-section-title">Contract: Custom (this client)</div>
             ${customTpl
-              ? `<button class="cb-tmpl-item ${isActive("custom", "custom") ? "active" : ""}" data-cb-action="select-custom">
+              ? `<button class="cb-tmpl-item ${isContractActive("custom", "custom") ? "active" : ""}" data-cb-action="select-custom">
                    <div class="cb-tmpl-name">${esc(customTpl.name || "Custom template")}</div>
                    <div class="cb-tmpl-meta">Saved ${customTpl.saved_at ? esc(formatDateTime(customTpl.saved_at)) : ""}</div>
                  </button>`
-              : `<div class="cb-tmpl-empty">No custom template yet.</div>`}
+              : `<div class="cb-tmpl-empty">No custom contract template yet.</div>`}
           </div>`
         : "";
 
-      const universalSection = `
+      const contractUniversalSection = `
         <div class="cb-tmpl-section">
-          <div class="cb-tmpl-section-title">Universal</div>
+          <div class="cb-tmpl-section-title">Contract: Universal</div>
           ${universalTemplates.length === 0
-            ? `<div class="cb-tmpl-empty">No universal templates yet.</div>`
+            ? `<div class="cb-tmpl-empty">No universal contract templates yet.</div>`
             : universalTemplates.map((t) => `
-                <button class="cb-tmpl-item ${isActive("universal", t.id) ? "active" : ""}" data-cb-action="select-universal" data-id="${esc(t.id)}">
+                <button class="cb-tmpl-item ${isContractActive("universal", t.id) ? "active" : ""}" data-cb-action="select-universal" data-id="${esc(t.id)}">
                   <div class="cb-tmpl-name">${esc(t.name || "(untitled)")}</div>
                   <div class="cb-tmpl-meta">Saved ${t.created_at ? esc(formatDateTime(t.created_at)) : ""}</div>
                 </button>
               `).join("")}
         </div>`;
 
+      // ----- Invoice templates -----
+      const invoiceCustomSection = c
+        ? `<div class="cb-tmpl-section">
+            <div class="cb-tmpl-section-title">Invoice: Custom (this client)</div>
+            ${customInvoiceTpl
+              ? `<button class="cb-tmpl-item ${isInvoiceTplActive("custom", "custom") ? "active" : ""}" data-cb-action="select-invoice-template-custom">
+                   <div class="cb-tmpl-name">${esc(customInvoiceTpl.name || "Custom invoice template")}</div>
+                   <div class="cb-tmpl-meta">Saved ${customInvoiceTpl.saved_at ? esc(formatDateTime(customInvoiceTpl.saved_at)) : ""}</div>
+                 </button>`
+              : `<div class="cb-tmpl-empty">No custom invoice template yet.</div>`}
+          </div>`
+        : "";
+
+      const invoiceUniversalSection = `
+        <div class="cb-tmpl-section">
+          <div class="cb-tmpl-section-title">Invoice: Universal</div>
+          ${universalInvoiceTemplates.length === 0
+            ? `<div class="cb-tmpl-empty">No universal invoice templates yet.</div>`
+            : universalInvoiceTemplates.map((t) => `
+                <button class="cb-tmpl-item ${isInvoiceTplActive("universal", t.id) ? "active" : ""}" data-cb-action="select-invoice-template-universal" data-id="${esc(t.id)}">
+                  <div class="cb-tmpl-name">${esc(t.name || "(untitled)")}</div>
+                  <div class="cb-tmpl-meta">Saved ${t.created_at ? esc(formatDateTime(t.created_at)) : ""}</div>
+                </button>
+              `).join("")}
+        </div>`;
+
+      // ----- Saved invoices (actual generated invoices) -----
       const invoicesSection = `
         <div class="cb-tmpl-section">
-          <div class="cb-tmpl-section-title">Invoices</div>
+          <div class="cb-tmpl-section-title">Saved Invoices</div>
           ${(!c || clientInvoices.length === 0)
             ? `<div class="cb-tmpl-empty">No invoices yet.</div>`
             : clientInvoices.map((iv) => {
@@ -4851,11 +4982,14 @@
 
       el.innerHTML = `
         ${clientCard}
-        <button class="cb-new-tmpl-btn" data-cb-action="new-template">+ New Template</button>
-        <button class="cb-new-tmpl-btn" data-cb-action="new-invoice">+ New Invoice</button>
+        <button class="cb-new-tmpl-btn" data-cb-action="new-contract-template">+ New Contract Template</button>
+        <button class="cb-new-tmpl-btn" data-cb-action="new-invoice-template">+ New Invoice Template</button>
+        <button class="cb-new-tmpl-btn" data-cb-action="new-quick-invoice">+ Quick Invoice (no template)</button>
         <div class="cb-tmpl-list">
-          ${customSection}
-          ${universalSection}
+          ${contractCustomSection}
+          ${contractUniversalSection}
+          ${invoiceCustomSection}
+          ${invoiceUniversalSection}
           ${invoicesSection}
         </div>
       `;
@@ -4864,12 +4998,56 @@
     function renderCBMiddle() {
       const el = document.getElementById("cbMiddle");
       if (!el) return;
+
+      // Invoice template selected -> show structural summary
+      if (activeInvoiceTemplate) {
+        const it = activeInvoiceTemplate;
+        const badge = it.source === "custom" ? "Custom" : "Universal";
+        const lineRows = (it.line_items || []).map((li) => `
+          <tr>
+            <td style="padding:8px 10px;border-bottom:1px solid #f3f4f6;vertical-align:top;">
+              <div style="font-weight:600;color:#111827;">${esc(li.description || "(no description)")}</div>
+              <div style="font-style:italic;color:#6b7280;font-size:12px;">${esc(li.subtitle || "")}</div>
+            </td>
+            <td style="padding:8px 10px;border-bottom:1px solid #f3f4f6;text-align:center;font-weight:700;color:#B45309;font-size:12px;letter-spacing:0.04em;">${esc(li.status_pill || "")}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid #f3f4f6;text-align:right;color:#111827;">${fmtMoney(li.amount || 0)}</td>
+          </tr>
+        `).join("");
+        const total = (it.line_items || []).reduce((a, l) => a + (Number(l.amount) || 0), 0);
+        el.innerHTML = `
+          <div class="cb-middle-header">
+            <div class="cb-middle-name">${esc(it.name || "(untitled)")}</div>
+            <span class="cb-tmpl-badge cb-badge-invoice-template">Invoice Template - ${esc(badge)}</span>
+          </div>
+          <div style="padding:16px 20px;">
+            <div class="inv-section-title" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#0B5394;margin-bottom:8px;">Line items</div>
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <thead>
+                <tr style="background:#f3f4f6;">
+                  <th style="padding:8px 10px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;">Description</th>
+                  <th style="padding:8px 10px;text-align:center;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;width:120px;">Status pill</th>
+                  <th style="padding:8px 10px;text-align:right;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;width:100px;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>${lineRows || `<tr><td colspan="3" style="padding:12px;color:#6b7280;text-align:center;">(empty template)</td></tr>`}</tbody>
+              <tfoot>
+                <tr><td colspan="2" style="padding:10px;text-align:right;font-weight:700;color:#0B5394;">Subtotal</td><td style="padding:10px;text-align:right;font-weight:700;color:#0B5394;">${fmtMoney(total)}</td></tr>
+              </tfoot>
+            </table>
+            <div class="inv-section-title" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#0B5394;margin:18px 0 8px;">Terms</div>
+            <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px 14px;font-size:13px;line-height:1.5;color:#374151;">${it.terms_html || "<em style='color:#9ca3af;'>(no additional terms)</em>"}</div>
+          </div>
+        `;
+        return;
+      }
+
+      // Contract template selected -> show contract preview (existing behavior)
       const t = builderActiveTemplate;
       if (!t) {
         el.innerHTML = `
           <div class="cb-middle-empty">
-            <div class="cb-middle-empty-title">No template selected</div>
-            <div class="cb-middle-empty-sub">Pick a template from the left, or click "+ New Template" to start one.</div>
+            <div class="cb-middle-empty-title">Nothing selected</div>
+            <div class="cb-middle-empty-sub">Pick a contract or invoice template from the left, or click "+ New ..." to start one.</div>
           </div>`;
         return;
       }
@@ -4887,11 +5065,46 @@
       const el = document.getElementById("cbRight");
       if (!el) return;
       const c = getBuilderClient();
-      const t = builderActiveTemplate;
-      const canGenerate = !!c && !!t;
+      const ct = builderActiveTemplate;
+      const it = activeInvoiceTemplate;
+
+      // Invoice template selected -> show Generate Invoice button (no plugin map)
+      if (it) {
+        const canGenerate = !!c;
+        const hint = !c ? "Pick a client first." : "";
+        el.innerHTML = `
+          <button class="builder-generate-btn" id="cbGenerateInvoiceBtn" ${canGenerate ? "" : "disabled"}>
+            Generate Invoice
+          </button>
+          ${hint ? `<div class="builder-generate-hint">${esc(hint)}</div>` : ""}
+          <div class="builder-mapping-title">From template</div>
+          <div class="builder-mapping">
+            <div class="builder-mapping-row">
+              <div class="builder-mapping-key" style="font-weight:600;color:#374151;">Name</div>
+              <div class="builder-mapping-value">${esc(it.name || "(untitled)")}</div>
+            </div>
+            <div class="builder-mapping-row">
+              <div class="builder-mapping-key" style="font-weight:600;color:#374151;">Line items</div>
+              <div class="builder-mapping-value">${(it.line_items || []).length} row(s)</div>
+            </div>
+            <div class="builder-mapping-row">
+              <div class="builder-mapping-key" style="font-weight:600;color:#374151;">Source</div>
+              <div class="builder-mapping-value">${it.source === "custom" ? "Custom (this client)" : "Universal"}</div>
+            </div>
+          </div>
+        `;
+        const genBtn = document.getElementById("cbGenerateInvoiceBtn");
+        if (genBtn && canGenerate) {
+          genBtn.addEventListener("click", () => openInvoiceEditor({ template: it }));
+        }
+        return;
+      }
+
+      // Contract template selected (or nothing) -> existing Generate Contract UI
+      const canGenerate = !!c && !!ct;
       const hint = !c
         ? "Pick a client first."
-        : !t
+        : !ct
           ? "Pick a template first."
           : "";
 
@@ -5854,20 +6067,36 @@
     }
 
     // ---- Wizard editor ----
-    function openInvoiceEditor() {
+    // opts.template -> { source, id, name, line_items, terms_html }
+    //   when provided, line items + terms are seeded from the template
+    //   instead of from the client's tier defaults. This is how
+    //   "Generate Invoice" from an Invoice Template feeds the wizard.
+    function openInvoiceEditor(opts = {}) {
       const c = getBuilderClient();
       if (!c) {
         alert("Open a client profile first and use 'Save & go to Contract Builder', then try again.");
         return;
       }
-      const lineItems = buildDefaultInvoiceLineItems(c.contract_template);
+      const tpl = opts.template || null;
+      const lineItems = tpl
+        ? (tpl.line_items || []).map((l) => ({
+            description: l.description || "",
+            subtitle: l.subtitle || "",
+            status_pill: l.status_pill || "DUE TODAY",
+            amount: Number(l.amount) || 0,
+          }))
+        : buildDefaultInvoiceLineItems(c.contract_template);
+      const terms = tpl
+        ? (tpl.terms_html || INVOICE_DEFAULTS.terms_html)
+        : INVOICE_DEFAULTS.terms_html;
       invoiceEditorState = {
         client_id: c.id,
         billed_to_name: c.client_name || c.company_name || "",
         issued_at: new Date().toISOString().slice(0, 10),
         line_items: lineItems,
-        terms_html: INVOICE_DEFAULTS.terms_html,
+        terms_html: terms,
         stripe_payment_link: "",
+        source_template: tpl ? { source: tpl.source, id: tpl.id, name: tpl.name } : null,
       };
       wizardStep = 1;
       hydrateInvoiceEditor();
@@ -6261,6 +6490,182 @@
     }
     invWizardSave.addEventListener("click", handleSaveInvoice);
 
+    // ============================================================
+    // INVOICE TEMPLATE EDITOR
+    // ============================================================
+    // Single-pane editor for reusable invoice templates. Saves to
+    // either clients.invoice.custom (Custom) or public.invoice_templates
+    // (Universal). Mirrors the contract template Custom/Universal split.
+    let invoiceTemplateEditorState = null; // working draft
+
+    const invoiceTemplateEditorOverlay = document.getElementById("invoiceTemplateEditorOverlay");
+    const invoiceTemplateEditorClose   = document.getElementById("invoiceTemplateEditorClose");
+    const invTplName        = document.getElementById("invTplName");
+    const invTplLineItemsBody = document.getElementById("invTplLineItemsBody");
+    const invTplAddLineItem = document.getElementById("invTplAddLineItem");
+    const invTplTermsHtml   = document.getElementById("invTplTermsHtml");
+    const invTplCancel      = document.getElementById("invTplCancel");
+    const invTplSave        = document.getElementById("invTplSave");
+    const invTplStatus      = document.getElementById("invTplStatus");
+
+    const invTplSaveOverlay  = document.getElementById("invTplSaveOverlay");
+    const invTplSaveClose    = document.getElementById("invTplSaveClose");
+    const invTplSaveBack     = document.getElementById("invTplSaveBack");
+    const invTplSaveCustom   = document.getElementById("invTplSaveCustom");
+    const invTplSaveUniversal= document.getElementById("invTplSaveUniversal");
+    const invTplSaveError    = document.getElementById("invTplSaveError");
+
+    function openInvoiceTemplateEditor() {
+      // Templates do NOT require a client (universal templates are global),
+      // but if a client is loaded the Custom save option becomes available.
+      invoiceTemplateEditorState = {
+        name: "",
+        line_items: [
+          { description: "Website Design & Development \u2013 Deposit",       subtitle: "Initial 50% payment to begin project.",                  status_pill: "DUE TODAY",   amount: 0 },
+          { description: "Website Design & Development \u2013 Final Balance", subtitle: "Remaining 50% due upon project completion / launch.", status_pill: "BALANCE DUE", amount: 0 },
+        ],
+        terms_html: INVOICE_DEFAULTS.terms_html,
+      };
+      hydrateInvoiceTemplateEditor();
+      invTplStatus.textContent = "";
+      invoiceTemplateEditorOverlay.classList.add("open");
+    }
+    function closeInvoiceTemplateEditor() {
+      invoiceTemplateEditorOverlay.classList.remove("open");
+      invTplStatus.textContent = "";
+    }
+
+    function hydrateInvoiceTemplateEditor() {
+      const s = invoiceTemplateEditorState;
+      invTplName.value = s.name || "";
+      invTplTermsHtml.value = s.terms_html || "";
+      renderInvTplLineItemsRows();
+    }
+
+    function renderInvTplLineItemsRows() {
+      invTplLineItemsBody.innerHTML = invoiceTemplateEditorState.line_items.map((li, idx) => `
+        <tr data-tpl-li-idx="${idx}">
+          <td><input type="text" data-tpl-li-field="description" value="${esc(li.description || "")}"></td>
+          <td><input type="text" data-tpl-li-field="subtitle" value="${esc(li.subtitle || "")}"></td>
+          <td>
+            <select data-tpl-li-field="status_pill">
+              ${INVOICE_PILL_OPTIONS.map((opt) => `<option value="${esc(opt)}" ${opt === li.status_pill ? "selected" : ""}>${esc(opt)}</option>`).join("")}
+            </select>
+          </td>
+          <td><input type="number" step="0.01" min="0" data-tpl-li-field="amount" value="${Number(li.amount || 0)}"></td>
+          <td><button type="button" class="inv-row-remove" data-tpl-li-remove="${idx}" aria-label="Remove">&times;</button></td>
+        </tr>
+      `).join("");
+    }
+
+    invoiceTemplateEditorOverlay.addEventListener("input", (e) => {
+      if (!invoiceTemplateEditorState) return;
+      const t = e.target;
+      if (t === invTplName)      { invoiceTemplateEditorState.name = t.value; return; }
+      if (t === invTplTermsHtml) { invoiceTemplateEditorState.terms_html = t.value; return; }
+      const liRow = t.closest("[data-tpl-li-idx]");
+      if (liRow && t.dataset.tplLiField) {
+        const idx = Number(liRow.dataset.tplLiIdx);
+        const field = t.dataset.tplLiField;
+        const val = field === "amount" ? (Number(t.value) || 0) : t.value;
+        invoiceTemplateEditorState.line_items[idx][field] = val;
+      }
+    });
+    invoiceTemplateEditorOverlay.addEventListener("change", (e) => {
+      if (!invoiceTemplateEditorState) return;
+      const t = e.target;
+      const liRow = t.closest("[data-tpl-li-idx]");
+      if (liRow && t.dataset.tplLiField === "status_pill") {
+        const idx = Number(liRow.dataset.tplLiIdx);
+        invoiceTemplateEditorState.line_items[idx].status_pill = t.value;
+      }
+    });
+    invoiceTemplateEditorOverlay.addEventListener("click", (e) => {
+      const t = e.target;
+      const rem = t.closest("[data-tpl-li-remove]");
+      if (rem) {
+        const idx = Number(rem.dataset.tplLiRemove);
+        invoiceTemplateEditorState.line_items.splice(idx, 1);
+        renderInvTplLineItemsRows();
+      }
+    });
+    invTplAddLineItem.addEventListener("click", () => {
+      invoiceTemplateEditorState.line_items.push({ description: "", subtitle: "", status_pill: "DUE TODAY", amount: 0 });
+      renderInvTplLineItemsRows();
+    });
+    invTplCancel.addEventListener("click", closeInvoiceTemplateEditor);
+    invoiceTemplateEditorClose.addEventListener("click", closeInvoiceTemplateEditor);
+
+    // Save button -> open the Custom/Universal save-choice modal
+    invTplSave.addEventListener("click", () => {
+      if (!invoiceTemplateEditorState) return;
+      if (invoiceTemplateEditorState.line_items.length === 0) {
+        alert("Add at least one line item before saving the template.");
+        return;
+      }
+      invTplSaveError.textContent = "";
+      invoiceTemplateEditorOverlay.classList.remove("open");
+      invTplSaveOverlay.classList.add("open");
+    });
+
+    function closeInvTplSave() {
+      invTplSaveOverlay.classList.remove("open");
+      invTplSaveError.textContent = "";
+    }
+    invTplSaveClose.addEventListener("click", closeInvTplSave);
+    invTplSaveBack.addEventListener("click", () => {
+      invTplSaveOverlay.classList.remove("open");
+      invoiceTemplateEditorOverlay.classList.add("open");
+    });
+
+    // Save as Custom -> writes to clients.invoice.custom jsonb on the
+    // currently-loaded client. Requires a client to be loaded.
+    invTplSaveCustom.addEventListener("click", async () => {
+      invTplSaveError.textContent = "";
+      const c = getBuilderClient();
+      if (!c) { invTplSaveError.textContent = "No client loaded. Open a client first or save as Universal."; return; }
+      const s = invoiceTemplateEditorState;
+      const name = (s.name || "").trim() || "Custom Invoice Template";
+      const customPayload = {
+        name,
+        line_items: s.line_items,
+        terms_html: s.terms_html,
+        saved_at: new Date().toISOString(),
+      };
+      const newInvoiceField = { ...(c.invoice || {}), custom: customPayload };
+      const { error } = await sb.from("clients").update({ invoice: newInvoiceField }).eq("id", c.id);
+      if (error) { invTplSaveError.textContent = "Save failed: " + error.message; return; }
+      const idx = allClients.findIndex((x) => x.id === c.id);
+      if (idx >= 0) allClients[idx] = { ...allClients[idx], invoice: newInvoiceField };
+      try { await addSystemNote(allClients[idx], "client", `Custom invoice template saved: ${name}`); } catch {}
+      // Set this freshly-saved template as the active selection so the
+      // user can immediately click "Generate Invoice" on the right pane.
+      activeInvoiceTemplate = { source: "custom", id: "custom", name, line_items: customPayload.line_items, terms_html: customPayload.terms_html };
+      builderActiveTemplate = null; // mutual exclusivity
+      invoiceTemplateEditorState = null;
+      closeInvTplSave();
+      renderContractBuilder();
+    });
+
+    // Save as Universal -> inserts a new row into public.invoice_templates.
+    invTplSaveUniversal.addEventListener("click", async () => {
+      invTplSaveError.textContent = "";
+      const s = invoiceTemplateEditorState;
+      const name = (s.name || "").trim();
+      if (!name) { invTplSaveError.textContent = "Universal templates require a name."; return; }
+      const { data, error } = await sb.from("invoice_templates")
+        .insert({ name, line_items: s.line_items, terms_html: s.terms_html })
+        .select()
+        .single();
+      if (error) { invTplSaveError.textContent = "Save failed: " + error.message; return; }
+      universalInvoiceTemplates = [...universalInvoiceTemplates, data].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      activeInvoiceTemplate = { source: "universal", id: data.id, name: data.name, line_items: data.line_items, terms_html: data.terms_html };
+      builderActiveTemplate = null;
+      invoiceTemplateEditorState = null;
+      closeInvTplSave();
+      renderContractBuilder();
+    });
+
     // ---- Saved invoice preview (view + manual mark-as-paid escape hatch) ----
     function closeInvoicePreview() {
       invoicePreviewOverlay.classList.remove("open");
@@ -6338,6 +6743,8 @@
     invoicePreviewToggleStatus.addEventListener("click", toggleSavedInvoiceStatus);
 
     // Click handler for the contract builder card
+    // Selecting a contract template clears any active invoice template
+    // (and vice versa) so the middle/right panes always render unambiguously.
     document.addEventListener("click", async (e) => {
       const btn = e.target.closest("[data-cb-action]");
       if (!btn) return;
@@ -6347,18 +6754,48 @@
         const customTpl = c && c.contract && c.contract.custom ? c.contract.custom : null;
         if (!customTpl) return;
         builderActiveTemplate = { source: "custom", id: "custom", name: customTpl.name || "Custom", body_html: customTpl.body_html || "" };
+        activeInvoiceTemplate = null;
         renderContractBuilder();
       } else if (action === "select-universal") {
         const id = btn.dataset.id;
         const row = universalTemplates.find((r) => r.id === id);
         if (!row) return;
         builderActiveTemplate = { source: "universal", id: row.id, name: row.name || "(untitled)", body_html: row.body_html || "" };
+        activeInvoiceTemplate = null;
         renderContractBuilder();
-      } else if (action === "new-template") {
+      } else if (action === "select-invoice-template-custom") {
+        const c = getBuilderClient();
+        const tpl = c && c.invoice && c.invoice.custom ? c.invoice.custom : null;
+        if (!tpl) return;
+        activeInvoiceTemplate = {
+          source: "custom",
+          id: "custom",
+          name: tpl.name || "Custom Invoice Template",
+          line_items: tpl.line_items || [],
+          terms_html: tpl.terms_html || "",
+        };
+        builderActiveTemplate = null;
+        renderContractBuilder();
+      } else if (action === "select-invoice-template-universal") {
+        const id = btn.dataset.id;
+        const row = universalInvoiceTemplates.find((r) => r.id === id);
+        if (!row) return;
+        activeInvoiceTemplate = {
+          source: "universal",
+          id: row.id,
+          name: row.name || "(untitled)",
+          line_items: row.line_items || [],
+          terms_html: row.terms_html || "",
+        };
+        builderActiveTemplate = null;
+        renderContractBuilder();
+      } else if (action === "new-contract-template") {
         builderEditorDraftHTML = "";
         cbSaveName.value = "";
         openCBEditor();
-      } else if (action === "new-invoice") {
+      } else if (action === "new-invoice-template") {
+        openInvoiceTemplateEditor();
+      } else if (action === "new-quick-invoice") {
         openInvoiceEditor();
       } else if (action === "open-invoice") {
         const id = btn.dataset.id;
