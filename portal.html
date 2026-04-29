@@ -463,8 +463,16 @@
       border: 2px dashed #f59e0b;
       border-radius: 6px;
       cursor: pointer;
+      pointer-events: auto;
+      position: relative;
+      z-index: 1;
       transition: background 120ms, border-color 120ms;
     }
+    /* Children of the button never intercept the click on their own.
+       Without this a child <span> can be the click target, and any
+       hypothetical sibling stylesheet that disabled events on spans
+       would silently swallow the click. */
+    .contract-body .signature-sign-btn * { pointer-events: none; }
     .contract-body .signature-sign-btn:hover { background: #fef3c7; border-color: #d97706; }
     .contract-body .signature-sign-line {
       display: block;
@@ -484,6 +492,39 @@
        otherwise the contract modal can paint on top depending on the
        browser's stacking-context resolution. */
     #sigPickerOverlay { z-index: 1100; }
+
+    /* Sign-mode helper UI: a sticky banner inside the contract modal so
+       the client knows they're being asked to sign, and a small toast
+       that flashes when a click on a signature box registers (purely a
+       diagnostic signal so we can tell click vs. picker problems apart). */
+    .sign-mode-banner {
+      background: #fef3c7;
+      border-left: 4px solid #d97706;
+      color: #92400e;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      border-radius: 6px;
+    }
+    .sign-mode-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #111827;
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+      z-index: 1200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms;
+    }
+    .sign-mode-toast.show { opacity: 1; }
     .sig-picker-modal {
       max-width: 560px; width: calc(100vw - 32px);
       background: #fff; border-radius: 14px; overflow: hidden;
@@ -754,6 +795,10 @@
       </div>
     </div>
   </div>
+
+  <!-- Diagnostic toast for the signing flow (fires on each click so the
+       client and the team can both confirm clicks are reaching JS). -->
+  <div id="signModeToast" class="sign-mode-toast"></div>
 
   <!-- Signature picker modal (mirror of the CRM provider flow) -->
   <div class="overlay" id="sigPickerOverlay">
@@ -1060,6 +1105,14 @@
 
       if (isSignable && blanks.length > 0) {
         contractModalBody.classList.add("sign-mode");
+        // Pin a banner to the very top of the modal body so the client
+        // is immediately told what to do. Not just decorative -- it also
+        // proves to us in support that sign mode actually engaged.
+        const banner = document.createElement("div");
+        banner.className = "sign-mode-banner";
+        banner.id = "signModeBanner";
+        banner.textContent = `Sign mode is active. Tap each yellow box below to add your signature (${blanks.length} spot${blanks.length === 1 ? "" : "s"} left).`;
+        contractModalBody.insertBefore(banner, contractModalBody.firstChild);
         // Convert each blank signature line into a yellow clickable
         // sign-here button (mirror of the CRM provider flow).
         blanks.forEach((node, idx) => {
@@ -1444,19 +1497,41 @@
       closeSigPicker();
     });
 
-    // Click-to-sign + click-to-resign on the contract body (delegated)
+    // Briefly flash a toast to confirm a click reached JS. Used to
+    // distinguish "click handler never fired" from "picker is opening
+    // but not visible" when debugging on someone else's machine.
+    let signToastTimer = null;
+    function flashSignToast(text) {
+      const t = document.getElementById("signModeToast");
+      if (!t) return;
+      t.textContent = text;
+      t.classList.add("show");
+      clearTimeout(signToastTimer);
+      signToastTimer = setTimeout(() => t.classList.remove("show"), 1400);
+    }
+
+    // Click-to-sign + click-to-resign on the contract body (delegated).
+    // Logs to console too so the team can paste the trail into a
+    // support thread if anything weird shows up.
     contractModalBody.addEventListener("click", (e) => {
-      // Sign mode is active iff the body has the .sign-mode class.
-      if (!contractModalBody.classList.contains("sign-mode")) return;
+      const inSignMode = contractModalBody.classList.contains("sign-mode");
       const signBtn = e.target.closest(".signature-sign-btn");
+      const resignBtn = e.target.closest(".signature-placed-resign");
+      if (signBtn || resignBtn) {
+        console.log("[portal] signature click", { inSignMode, signBtn: !!signBtn, resignBtn: !!resignBtn });
+      }
+      if (!inSignMode) return;
       if (signBtn) {
+        flashSignToast("Opening signature picker...");
         openSigPicker(signBtn);
         return;
       }
-      const resignBtn = e.target.closest(".signature-placed-resign");
       if (resignBtn) {
         const placed = resignBtn.closest(".signature-placed");
-        if (placed) openSigPicker(placed);
+        if (placed) {
+          flashSignToast("Re-signing this spot...");
+          openSigPicker(placed);
+        }
       }
     });
 
