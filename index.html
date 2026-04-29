@@ -5482,7 +5482,12 @@
           <input type="text" id="planWizardNameInput" class="plan-wizard-name-input" placeholder="e.g. Premium Website Bundle" value="${esc(draft.name)}">
         `;
         const nameInput = document.getElementById("planWizardNameInput");
-        nameInput.addEventListener("input", (e) => { planWizardState.draft.name = e.target.value; });
+        nameInput.addEventListener("input", (e) => {
+          planWizardState.draft.name = e.target.value;
+          // Live-toggle the Save Plan button so the user can submit as soon
+          // as they've typed at least one non-whitespace character.
+          planWizardNext.disabled = !(planWizardState.draft.name && planWizardState.draft.name.trim());
+        });
         setTimeout(() => nameInput.focus(), 0);
       }
 
