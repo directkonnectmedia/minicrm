@@ -569,7 +569,7 @@
       grid-template-columns: 20% 50% 30%;
       min-height: 70vh;
     }
-    .builder-grid.plan-grid { grid-template-columns: 20% 80%; }
+    .builder-grid.plan-grid { grid-template-columns: 20% 60% 20%; }
     .builder-panel {
       padding: 16px;
       border-right: 1px solid #e5e7eb;
@@ -2219,6 +2219,7 @@
       <div class="builder-grid plan-grid">
         <div class="builder-panel" id="pbLeft"></div>
         <div class="builder-panel" id="pbRight"></div>
+        <div class="builder-panel" id="pbServices"></div>
       </div>
     </div>
   </div>
@@ -2652,6 +2653,29 @@
         <div style="display:flex;gap:8px;">
           <button class="ghost" id="planWizardBack">Back</button>
           <button id="planWizardNext">Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Service wizard modal (single-step: name your service) -->
+  <div class="overlay" id="serviceWizardOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="serviceWizardTitle" style="max-width: 460px;">
+      <div class="modal-header">
+        <div class="modal-title" id="serviceWizardTitle">Create Service</div>
+        <button class="modal-close" id="serviceWizardClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="step-body">
+        <div class="plan-wizard-question">
+          <div class="plan-wizard-prompt">Name your service.</div>
+          <input type="text" id="serviceWizardNameInput" class="plan-wizard-name-input" placeholder="e.g. Website Creation">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <span class="muted" id="serviceWizardStatus" style="font-size:13px;"></span>
+        <div style="display:flex;gap:8px;">
+          <button class="ghost" id="serviceWizardCancel">Cancel</button>
+          <button id="serviceWizardSave" disabled>Save Service</button>
         </div>
       </div>
     </div>
@@ -5307,6 +5331,13 @@
     let activePlanId = null;
     let activePlanTab = null;
 
+    // Reusable Services library (v1: name only). Lives in the
+    // rightmost 20% panel of the Plan Builder. Future passes will
+    // pull these into Plan tab editors and invoice line items.
+    let services = [];
+    let servicesLoaded = false;
+    let activeServiceId = null;
+
     const PLAN_TAB_DEFS = [
       { key: "one_time",     flag: "has_one_time",     label: "One-time" },
       { key: "setup",        flag: "has_setup",        label: "Setup Fee" },
@@ -5331,6 +5362,17 @@
       plansLoaded = true;
     }
 
+    async function loadServices() {
+      const { data, error } = await sb.from("services").select("*").order("created_at", { ascending: false });
+      if (error) {
+        console.warn("Services unavailable:", error.message);
+        services = [];
+      } else {
+        services = data || [];
+      }
+      servicesLoaded = true;
+    }
+
     function getActivePlan() {
       return activePlanId ? plans.find((p) => p.id === activePlanId) : null;
     }
@@ -5339,8 +5381,12 @@
       if (!plansLoaded) {
         loadPlans().then(() => renderPlanBuilder());
       }
+      if (!servicesLoaded) {
+        loadServices().then(() => renderPlanBuilder());
+      }
       renderPBLeft();
       renderPBRight();
+      renderPBServices();
     }
 
     function renderPBLeft() {
@@ -5405,6 +5451,30 @@
         <div style="padding:16px 20px;">
           ${tabBar}
           ${tabBody}
+        </div>
+      `;
+    }
+
+    function renderPBServices() {
+      const el = document.getElementById("pbServices");
+      if (!el) return;
+      const list = services.length === 0
+        ? `<div class="cb-tmpl-empty">No services yet. Click "+ Create Service" to start.</div>`
+        : services.map((s) => {
+            const isActive = s.id === activeServiceId;
+            return `
+              <button class="cb-tmpl-item ${isActive ? "active" : ""}" data-pb-action="select-service" data-id="${esc(s.id)}">
+                <div class="cb-tmpl-name">${esc(s.name || "(untitled)")}</div>
+                <div class="cb-tmpl-meta">Saved ${s.created_at ? esc(formatDateTime(s.created_at)) : ""}</div>
+              </button>`;
+          }).join("");
+      el.innerHTML = `
+        <button class="cb-new-tmpl-btn" data-pb-action="create-service">+ Create Service</button>
+        <div class="cb-tmpl-list">
+          <div class="cb-tmpl-section">
+            <div class="cb-tmpl-section-title">Saved Services</div>
+            ${list}
+          </div>
         </div>
       `;
     }
@@ -5568,6 +5638,58 @@
         alert("Save failed: " + (err.message || String(err)));
       } finally {
         planWizardNext.disabled = false;
+      }
+    });
+
+    // ---- Service wizard ----
+    // Single-step modal that just asks for a service name and
+    // saves to public.services. Auto-selects the new row in the
+    // right-panel services list.
+    const serviceWizardOverlay   = document.getElementById("serviceWizardOverlay");
+    const serviceWizardClose     = document.getElementById("serviceWizardClose");
+    const serviceWizardCancel    = document.getElementById("serviceWizardCancel");
+    const serviceWizardSave      = document.getElementById("serviceWizardSave");
+    const serviceWizardNameInput = document.getElementById("serviceWizardNameInput");
+    const serviceWizardStatus    = document.getElementById("serviceWizardStatus");
+
+    function openServiceWizard() {
+      serviceWizardNameInput.value = "";
+      serviceWizardSave.disabled = true;
+      serviceWizardStatus.textContent = "";
+      serviceWizardOverlay.classList.add("open");
+      setTimeout(() => serviceWizardNameInput.focus(), 0);
+    }
+
+    function closeServiceWizard() {
+      serviceWizardOverlay.classList.remove("open");
+    }
+    serviceWizardClose.addEventListener("click", closeServiceWizard);
+    serviceWizardCancel.addEventListener("click", closeServiceWizard);
+
+    // Live-toggle Save button as the user types (same pattern as plan wizard).
+    serviceWizardNameInput.addEventListener("input", () => {
+      serviceWizardSave.disabled = !(serviceWizardNameInput.value && serviceWizardNameInput.value.trim());
+    });
+
+    serviceWizardSave.addEventListener("click", async () => {
+      const name = (serviceWizardNameInput.value || "").trim();
+      if (!name) return;
+      serviceWizardSave.disabled = true;
+      serviceWizardStatus.textContent = "Saving...";
+      try {
+        const { data: inserted, error } = await sb.from("services").insert({ name }).select().single();
+        if (error) throw error;
+        services = [inserted, ...services];
+        activeServiceId = inserted.id;
+        serviceWizardStatus.textContent = "Saved.";
+        closeServiceWizard();
+        renderPBServices();
+      } catch (err) {
+        console.error("save service failed:", err);
+        serviceWizardStatus.textContent = "Save failed: " + (err.message || String(err));
+        alert("Save failed: " + (err.message || String(err)));
+      } finally {
+        serviceWizardSave.disabled = false;
       }
     });
 
@@ -7259,6 +7381,11 @@
         if (!tab) return;
         activePlanTab = tab;
         renderPBRight();
+      } else if (action === "create-service") {
+        openServiceWizard();
+      } else if (action === "select-service") {
+        activeServiceId = btn.dataset.id || null;
+        renderPBServices();
       }
     });
 

@@ -614,3 +614,29 @@ create trigger plans_set_updated_at
 -- the financing columns).
 alter table public.plans add column if not exists has_financing boolean not null default false;
 alter table public.plans add column if not exists financing jsonb not null default '{}'::jsonb;
+
+-- =============================================================
+-- Services (Plan Builder reusable services library)
+-- =============================================================
+-- A Service is a named, reusable unit the team can pull into a
+-- Plan / Invoice later. v1 captures only the name; richer fields
+-- (default fees, default amount, category) come in a later pass
+-- when we wire services into plan tabs and invoice line items.
+create table if not exists public.services (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.services enable row level security;
+drop policy if exists "team only services" on public.services;
+create policy "team only services"
+  on public.services for all to authenticated
+  using (public.is_team_member())
+  with check (public.is_team_member());
+
+drop trigger if exists services_set_updated_at on public.services;
+create trigger services_set_updated_at
+  before update on public.services
+  for each row execute function public.set_updated_at();
