@@ -1083,9 +1083,80 @@
       box-sizing: border-box;
     }
     .plan-row select { cursor: pointer; }
-    .plan-row input[data-pb-action="row-price"] { text-align: right; }
+    .plan-row input[data-te-action="price"] { text-align: right; }
     .plan-row .price-stub { font-size: 12px; color: #9ca3af; text-align: right; padding-right: 4px; }
     .plan-row-empty { padding: 24px; text-align: center; color: #6b7280; font-size: 13px; border: 1px dashed #e5e7eb; border-radius: 10px; background: #fafafa; }
+
+    /* Plan/Service list-panel footer (delete buttons) */
+    .pb-panel-footer {
+      position: sticky;
+      bottom: -16px;
+      margin: 16px -16px -16px -16px;
+      padding: 12px 16px;
+      background: #fff;
+      border-top: 1px solid #e5e7eb;
+    }
+    .danger {
+      width: 100%;
+      background: #dc2626; color: #fff;
+      border: none; border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      transition: background 100ms;
+    }
+    .danger:hover:not(:disabled) { background: #b91c1c; }
+    .danger:disabled { background: #fca5a5; opacity: 0.6; cursor: not-allowed; }
+
+    /* Tab body: Configure CTA + read-only results */
+    .tab-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #4f46e5; color: #fff;
+      border: none; border-radius: 8px;
+      padding: 9px 16px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 14px;
+      transition: background 100ms;
+    }
+    .tab-cta:hover { background: #4338ca; }
+    .tab-results { display: flex; flex-direction: column; gap: 6px; }
+    .tab-result-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .tab-result-label { color: #111827; font-weight: 500; }
+    .tab-result-value { color: #4f46e5; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .tab-result-value.muted-pill { color: #15803d; }
+    .tab-result-empty {
+      padding: 18px;
+      text-align: center;
+      color: #6b7280;
+      font-size: 13px;
+      border: 1px dashed #e5e7eb;
+      border-radius: 10px;
+      background: #fafafa;
+    }
+
+    /* Tab editor modal body */
+    .tab-editor-rows { display: flex; flex-direction: column; gap: 8px; max-height: 50vh; overflow-y: auto; padding: 4px; }
+    .tab-editor-soon {
+      padding: 30px 20px;
+      text-align: center;
+      color: #6b7280;
+      font-size: 14px;
+      background: #f9fafb;
+      border: 1px dashed #e5e7eb;
+      border-radius: 10px;
+    }
 
     /* Plan Builder right-panel mini tabs */
     .plan-tabs { display: flex; gap: 6px; border-bottom: 1px solid #e5e7eb; margin-bottom: 14px; }
@@ -2733,6 +2804,23 @@
           <button class="ghost" id="serviceWizardCancel">Cancel</button>
           <button id="serviceWizardSave" disabled>Save Service</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Plan tab editor modal (per-tab "Configure" wizard) -->
+  <div class="overlay" id="planTabEditorOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="planTabEditorTitle" style="max-width: 720px;">
+      <div class="modal-header">
+        <div class="modal-title" id="planTabEditorTitle">Configure</div>
+        <button class="modal-close" id="planTabEditorClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="step-body">
+        <div id="planTabEditorBody"></div>
+      </div>
+      <div class="modal-footer">
+        <span class="muted" id="planTabEditorStatus" style="font-size:13px;"></span>
+        <div style="display:flex;gap:8px;" id="planTabEditorActions"></div>
       </div>
     </div>
   </div>
@@ -5402,6 +5490,20 @@
       { key: "financing",    flag: "has_financing",    label: "Financing" },
     ];
 
+    // ---- Per-tab editor registry ----
+    // Each tab gets its own modal "Configure ..." wizard. Only Setup
+    // Fee is fully wired this round; the other 4 tabs render a
+    // "Coming soon" placeholder so the UI shape is consistent and
+    // we can promote them by flipping `placeholder: false` and
+    // adding their per-tab field schema later.
+    const PLAN_TAB_EDITORS = {
+      one_time:     { title: "One-Time Payment", ctaLabel: "Configure One-Time",     placeholder: true },
+      setup:        { title: "Setup Fee",        ctaLabel: "Configure Setup Fee",    placeholder: false },
+      subscription: { title: "Subscription",     ctaLabel: "Configure Subscription", placeholder: true },
+      addons:       { title: "Add-Ons",          ctaLabel: "Configure Add-Ons",      placeholder: true },
+      financing:    { title: "Financing",        ctaLabel: "Configure Financing",   placeholder: true },
+    };
+
     function activePlanTabsFor(plan) {
       if (!plan) return [];
       return PLAN_TAB_DEFS.filter((t) => plan[t.flag] === true);
@@ -5459,6 +5561,7 @@
                 <div class="cb-tmpl-meta">${esc(summary)}</div>
               </button>`;
           }).join("");
+      const canDelete = !!activePlanId;
       el.innerHTML = `
         <button class="cb-new-tmpl-btn" data-pb-action="create-plan">+ Create Plan</button>
         <div class="cb-tmpl-list">
@@ -5466,6 +5569,9 @@
             <div class="cb-tmpl-section-title">Saved Plans</div>
             ${list}
           </div>
+        </div>
+        <div class="pb-panel-footer">
+          <button class="danger" data-pb-action="delete-plan" ${canDelete ? "" : "disabled"}>Delete Plan</button>
         </div>
       `;
     }
@@ -5496,7 +5602,7 @@
           </div>`;
       const activeTabDef = tabs.find((t) => t.key === activePlanTab);
       const tabBody = activeTabDef
-        ? `<div class="plan-tab-body">${renderPlanTabRows(plan, activeTabDef)}</div>`
+        ? `<div class="plan-tab-body">${renderPlanTabBody(plan, activeTabDef)}</div>`
         : "";
       el.innerHTML = `
         <div class="cb-middle-header">
@@ -5524,30 +5630,40 @@
       };
     }
 
-    function renderPlanTabRows(plan, tabDef) {
+    // Read-only results list rendered under the "Configure" CTA in
+    // each plan tab body. Skips services whose row state is "hidden",
+    // and renders Included as a green pill or Priced as a money value.
+    function renderPlanTabBody(plan, tabDef) {
+      const editor = PLAN_TAB_EDITORS[tabDef.key] || { ctaLabel: "Configure", placeholder: true };
+      const cta = `<button class="tab-cta" data-pb-action="open-tab-editor" data-tab="${esc(tabDef.key)}">${esc(editor.ctaLabel)}</button>`;
+
+      // Placeholder tabs always show a stubbed line under the CTA.
+      if (editor.placeholder) {
+        return `${cta}<div class="tab-result-empty">Click the button above to configure this section. (Coming soon.)</div>`;
+      }
+
+      // Real tabs (currently just Setup Fee) show the read-only results list.
       const ids = Array.isArray(plan.services) ? plan.services : [];
       if (ids.length === 0) {
-        return `<div class="plan-row-empty">No services selected for this plan. Re-create the plan and check at least one service in step 1 to use the per-service editor.</div>`;
+        return `${cta}<div class="tab-result-empty">No services selected for this plan. Re-create the plan and check at least one service in step 1 to populate this section.</div>`;
       }
-      const rows = ids.map((id) => {
-        const cfg = getPlanRowConfig(plan, tabDef.key, id);
-        const isHidden = cfg.state === "hidden";
-        const showPrice = cfg.state === "priced";
-        const priceCell = showPrice
-          ? `<input type="number" min="0" step="0.01" inputmode="decimal" data-pb-action="row-price" data-tab="${esc(tabDef.key)}" data-service-id="${esc(id)}" value="${esc(String(cfg.price ?? 0))}" placeholder="0.00">`
-          : `<div class="price-stub">&mdash;</div>`;
+      const visible = ids
+        .map((id) => ({ id, cfg: getPlanRowConfig(plan, tabDef.key, id) }))
+        .filter(({ cfg }) => cfg.state !== "hidden");
+      if (visible.length === 0) {
+        return `${cta}<div class="tab-result-empty">Nothing configured yet. Open the editor and switch a service to "Included" or "Priced".</div>`;
+      }
+      const rows = visible.map(({ cfg }) => {
+        const valueHtml = cfg.state === "priced"
+          ? `<span class="tab-result-value">${esc(fmtMoney(cfg.price))}</span>`
+          : `<span class="tab-result-value muted-pill">Included</span>`;
         return `
-          <div class="plan-row ${isHidden ? "is-hidden" : ""}" data-row-service-id="${esc(id)}">
-            <input type="text" data-pb-action="row-label" data-tab="${esc(tabDef.key)}" data-service-id="${esc(id)}" value="${esc(cfg.label)}" placeholder="Display label">
-            <select data-pb-action="row-state" data-tab="${esc(tabDef.key)}" data-service-id="${esc(id)}">
-              <option value="hidden"   ${cfg.state === "hidden"   ? "selected" : ""}>Don't display</option>
-              <option value="included" ${cfg.state === "included" ? "selected" : ""}>Included</option>
-              <option value="priced"   ${cfg.state === "priced"   ? "selected" : ""}>Priced</option>
-            </select>
-            ${priceCell}
+          <div class="tab-result-row">
+            <span class="tab-result-label">${esc(cfg.label || "(unnamed)")}</span>
+            ${valueHtml}
           </div>`;
       }).join("");
-      return `<div class="plan-rows">${rows}</div>`;
+      return `${cta}<div class="tab-results">${rows}</div>`;
     }
 
     function renderPBServices() {
@@ -5563,6 +5679,7 @@
                 <div class="cb-tmpl-meta">Saved ${s.created_at ? esc(formatDateTime(s.created_at)) : ""}</div>
               </button>`;
           }).join("");
+      const canDelete = !!activeServiceId;
       el.innerHTML = `
         <button class="cb-new-tmpl-btn" data-pb-action="create-service">+ Create Service</button>
         <div class="cb-tmpl-list">
@@ -5571,7 +5688,157 @@
             ${list}
           </div>
         </div>
+        <div class="pb-panel-footer">
+          <button class="danger" data-pb-action="delete-service" ${canDelete ? "" : "disabled"}>Delete Service</button>
+        </div>
       `;
+    }
+
+    // ---- Per-tab editor modal (Setup Fee + placeholders) ----
+    // tabEditorState.draft is a clone of plan[tabKey] keyed by
+    // service id. Edits stay local until Save commits the whole
+    // jsonb to public.plans in one update.
+    let tabEditorState = null;
+    const planTabEditorOverlay  = document.getElementById("planTabEditorOverlay");
+    const planTabEditorTitle    = document.getElementById("planTabEditorTitle");
+    const planTabEditorClose    = document.getElementById("planTabEditorClose");
+    const planTabEditorBody     = document.getElementById("planTabEditorBody");
+    const planTabEditorActions  = document.getElementById("planTabEditorActions");
+    const planTabEditorStatus   = document.getElementById("planTabEditorStatus");
+
+    function openTabEditor(tabKey) {
+      const plan = getActivePlan();
+      const editor = PLAN_TAB_EDITORS[tabKey];
+      if (!plan || !editor) return;
+      // Build a draft seeded with the current row config for every
+      // service in plan.services. Missing entries get the default
+      // hidden/0/<service name> from getPlanRowConfig.
+      const ids = Array.isArray(plan.services) ? plan.services : [];
+      const draft = {};
+      for (const id of ids) {
+        const cfg = getPlanRowConfig(plan, tabKey, id);
+        draft[id] = { state: cfg.state, price: cfg.price, label: cfg.label };
+      }
+      tabEditorState = { tabKey, planId: plan.id, draft };
+      planTabEditorStatus.textContent = "";
+      planTabEditorOverlay.classList.add("open");
+      renderTabEditor();
+    }
+
+    function closeTabEditor() {
+      tabEditorState = null;
+      planTabEditorOverlay.classList.remove("open");
+    }
+    planTabEditorClose.addEventListener("click", closeTabEditor);
+
+    function renderTabEditor() {
+      if (!tabEditorState) return;
+      const editor = PLAN_TAB_EDITORS[tabEditorState.tabKey];
+      if (!editor) { closeTabEditor(); return; }
+      planTabEditorTitle.textContent = editor.title;
+
+      if (editor.placeholder) {
+        planTabEditorBody.innerHTML = `
+          <div class="tab-editor-soon">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px;">Coming soon</div>
+            <div>The "${esc(editor.title)}" editor is wired up but not yet implemented. We'll fill in its fields in a follow-up pass.</div>
+          </div>`;
+        planTabEditorActions.innerHTML = `<button class="ghost" id="planTabEditorCloseBtn">Close</button>`;
+        document.getElementById("planTabEditorCloseBtn").addEventListener("click", closeTabEditor);
+        return;
+      }
+
+      // Real (Setup Fee) editor
+      const ids = Object.keys(tabEditorState.draft);
+      const body = ids.length === 0
+        ? `<div class="tab-result-empty">No services selected for this plan. Re-create the plan and check at least one service in step 1.</div>`
+        : `<div class="tab-editor-rows">${ids.map((id) => renderTabEditorRow(id)).join("")}</div>`;
+      planTabEditorBody.innerHTML = body;
+
+      const saveLabel = `Save ${editor.title}`;
+      planTabEditorActions.innerHTML = `
+        <button class="ghost" id="planTabEditorCancel">Cancel</button>
+        <button id="planTabEditorSave" ${ids.length === 0 ? "disabled" : ""}>${esc(saveLabel)}</button>
+      `;
+      document.getElementById("planTabEditorCancel").addEventListener("click", closeTabEditor);
+      document.getElementById("planTabEditorSave").addEventListener("click", saveTabEditor);
+    }
+
+    function renderTabEditorRow(id) {
+      const cfg = tabEditorState.draft[id] || { state: "hidden", price: 0, label: "" };
+      const showPrice = cfg.state === "priced";
+      const isHidden = cfg.state === "hidden";
+      const priceCell = showPrice
+        ? `<input type="number" min="0" step="0.01" inputmode="decimal" data-te-action="price" data-id="${esc(id)}" value="${esc(String(cfg.price ?? 0))}" placeholder="0.00">`
+        : `<div class="price-stub">&mdash;</div>`;
+      return `
+        <div class="plan-row ${isHidden ? "is-hidden" : ""}" data-te-row="${esc(id)}">
+          <input type="text" data-te-action="label" data-id="${esc(id)}" value="${esc(cfg.label)}" placeholder="Display label">
+          <select data-te-action="state" data-id="${esc(id)}">
+            <option value="hidden"   ${cfg.state === "hidden"   ? "selected" : ""}>Don't display</option>
+            <option value="included" ${cfg.state === "included" ? "selected" : ""}>Included</option>
+            <option value="priced"   ${cfg.state === "priced"   ? "selected" : ""}>Priced</option>
+          </select>
+          ${priceCell}
+        </div>`;
+    }
+
+    // Modal-scoped change/input listeners: keep tabEditorState.draft
+    // in sync as the user edits, and re-render the row on state
+    // change so the Priced row's price input appears/disappears.
+    planTabEditorBody.addEventListener("change", (e) => {
+      const el = e.target.closest("[data-te-action]");
+      if (!el || !tabEditorState) return;
+      const id = el.dataset.id;
+      const action = el.dataset.teAction;
+      if (!tabEditorState.draft[id]) return;
+      if (action === "state") {
+        tabEditorState.draft[id].state = el.value;
+        renderTabEditor();
+      } else if (action === "label") {
+        tabEditorState.draft[id].label = el.value;
+      } else if (action === "price") {
+        const num = parseFloat(el.value);
+        tabEditorState.draft[id].price = Number.isFinite(num) ? num : 0;
+      }
+    });
+    planTabEditorBody.addEventListener("input", (e) => {
+      const el = e.target.closest("[data-te-action]");
+      if (!el || !tabEditorState) return;
+      const id = el.dataset.id;
+      const action = el.dataset.teAction;
+      if (!tabEditorState.draft[id]) return;
+      if (action === "label") {
+        tabEditorState.draft[id].label = el.value;
+      } else if (action === "price") {
+        const num = parseFloat(el.value);
+        tabEditorState.draft[id].price = Number.isFinite(num) ? num : 0;
+      }
+    });
+
+    async function saveTabEditor() {
+      if (!tabEditorState) return;
+      const { tabKey, planId, draft } = tabEditorState;
+      const plan = plans.find((p) => String(p.id) === String(planId));
+      if (!plan) { closeTabEditor(); return; }
+      const saveBtn = document.getElementById("planTabEditorSave");
+      if (saveBtn) saveBtn.disabled = true;
+      planTabEditorStatus.textContent = "Saving...";
+      const prevTab = (plan[tabKey] && typeof plan[tabKey] === "object" && !Array.isArray(plan[tabKey])) ? plan[tabKey] : {};
+      // Merge draft into a fresh tab object so we keep any keys that
+      // weren't part of the editor (none today, but future-proof).
+      const nextTab = { ...prevTab, ...draft };
+      try {
+        const { error } = await sb.from("plans").update({ [tabKey]: nextTab }).eq("id", planId);
+        if (error) throw error;
+        plan[tabKey] = nextTab;
+        closeTabEditor();
+        renderPBRight();
+      } catch (err) {
+        console.error("saveTabEditor failed:", err);
+        planTabEditorStatus.textContent = "Save failed: " + (err.message || String(err));
+        if (saveBtn) saveBtn.disabled = false;
+      }
     }
 
     // ---- Plan wizard ----
@@ -7547,58 +7814,45 @@
       } else if (action === "select-service") {
         activeServiceId = btn.dataset.id || null;
         renderPBServices();
+      } else if (action === "open-tab-editor") {
+        const tab = btn.dataset.tab;
+        if (tab) openTabEditor(tab);
+      } else if (action === "delete-plan") {
+        if (btn.disabled || !activePlanId) return;
+        const target = plans.find((p) => String(p.id) === String(activePlanId));
+        if (!target) return;
+        if (!confirm(`Delete plan "${target.name || "(untitled)"}"? This cannot be undone.`)) return;
+        btn.disabled = true;
+        try {
+          const { error } = await sb.from("plans").delete().eq("id", target.id);
+          if (error) throw error;
+          plans = plans.filter((p) => String(p.id) !== String(target.id));
+          activePlanId = null;
+          activePlanTab = null;
+          renderPlanBuilder();
+        } catch (err) {
+          console.error("delete plan failed:", err);
+          alert("Delete failed: " + (err.message || String(err)));
+          btn.disabled = false;
+        }
+      } else if (action === "delete-service") {
+        if (btn.disabled || !activeServiceId) return;
+        const target = services.find((s) => String(s.id) === String(activeServiceId));
+        if (!target) return;
+        if (!confirm(`Delete service "${target.name || "(untitled)"}"? This cannot be undone.\n\nNote: any existing plans that reference this service will keep their stored label and price -- only the source service entry is removed.`)) return;
+        btn.disabled = true;
+        try {
+          const { error } = await sb.from("services").delete().eq("id", target.id);
+          if (error) throw error;
+          services = services.filter((s) => String(s.id) !== String(target.id));
+          activeServiceId = null;
+          renderPBServices();
+        } catch (err) {
+          console.error("delete service failed:", err);
+          alert("Delete failed: " + (err.message || String(err)));
+          btn.disabled = false;
+        }
       }
-    });
-
-    // ---- Plan tab body autosave ----
-    // Selects + label/price inputs all carry data-pb-action,
-    // data-tab and data-service-id. We listen for `change`
-    // (which fires immediately for selects and on blur/Enter
-    // for text+number inputs) and patch the matching tab jsonb
-    // on public.plans. Local cache is mutated in place; a state
-    // change re-renders the active tab body so the Priced row's
-    // price input appears/disappears.
-    async function savePlanRow(planId, tabKey, serviceId, patch) {
-      const plan = plans.find((p) => String(p.id) === String(planId));
-      if (!plan) return;
-      const prevTab = (plan[tabKey] && typeof plan[tabKey] === "object" && !Array.isArray(plan[tabKey])) ? plan[tabKey] : {};
-      const prevCfg = getPlanRowConfig(plan, tabKey, serviceId);
-      const nextCfg = { ...prevCfg, ...patch };
-      const nextTab = { ...prevTab, [serviceId]: nextCfg };
-      // Optimistic update
-      plan[tabKey] = nextTab;
-      const stateChanged = "state" in patch && patch.state !== prevCfg.state;
-      try {
-        const { error } = await sb.from("plans").update({ [tabKey]: nextTab }).eq("id", planId);
-        if (error) throw error;
-        if (stateChanged) renderPBRight();
-      } catch (err) {
-        console.error("savePlanRow failed:", err);
-        // Revert local cache
-        plan[tabKey] = prevTab;
-        renderPBRight();
-        alert("Save failed: " + (err.message || String(err)));
-      }
-    }
-
-    document.addEventListener("change", async (e) => {
-      const el = e.target.closest("[data-pb-action]");
-      if (!el) return;
-      const action = el.dataset.pbAction;
-      if (action !== "row-state" && action !== "row-label" && action !== "row-price") return;
-      const tabKey = el.dataset.tab;
-      const serviceId = el.dataset.serviceId;
-      if (!activePlanId || !tabKey || !serviceId) return;
-      let patch = null;
-      if (action === "row-state") {
-        patch = { state: el.value };
-      } else if (action === "row-label") {
-        patch = { label: el.value };
-      } else if (action === "row-price") {
-        const num = parseFloat(el.value);
-        patch = { price: Number.isFinite(num) ? num : 0 };
-      }
-      if (patch) await savePlanRow(activePlanId, tabKey, serviceId, patch);
     });
 
     // ---- Right panel event handling ----
