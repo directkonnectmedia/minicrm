@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- crm-deploy-stamp: 20260430-fix-overlay-reset — if this line is missing in View Source, the browser is not loading the current deployment -->
+<!-- crm-deploy-stamp: 20260430-fix-signin-restore — if this line is missing in View Source, the browser is not loading the current deployment -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="crm-build" content="20260430-fix-overlay-reset">
+  <meta name="crm-build" content="20260430-fix-signin-restore">
   <title>Mini CRM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -4005,34 +4005,71 @@
     // zero /clients requests) until a manual hard refresh.
     function localStorageLooksLikeSupabaseAuth() {
       try {
-        return Object.keys(localStorage).some((k) => {
-          if (!k.startsWith("sb-")) return false;
-          // Supabase v2 keys usually look like sb-<ref>-auth-token. Some
-          // builds omit the literal substring "auth-token" but still
-          // store auth under sb-*; any sb key mentioning auth/session is
-          // enough to justify waiting for hydration.
-          return k.includes("auth-token") || k.includes("-auth-") || k.includes("session");
-        });
+        // Be permissive: any `sb-` key counts. Different Supabase JS
+        // versions name the auth bucket differently (sb-ref-auth-token,
+        // sb-ref-auth, sb-{provider}-..., etc.), and a too-strict match
+        // produced false negatives that bailed the boot poll prematurely.
+        return Object.keys(localStorage).some((k) => k.startsWith("sb-"));
       } catch {
         return false;
       }
     }
+    // True session readiness signal. Resolves when ANY of:
+    //   - getSession() returns a session,
+    //   - the Supabase SDK fires SIGNED_IN / TOKEN_REFRESHED with a session,
+    //   - the deadline elapses (returns the last seen session, or null).
+    // Avoids the "we polled getSession() into nullness while SIGNED_IN
+    // was fired with a real session a few ms later" race.
     async function waitForClientSession(maxWaitMs = 2500) {
-      const deadline = Date.now() + maxWaitMs;
-      let last = null;
-      while (Date.now() < deadline) {
+      // Fast path: if a session is already cached, skip the wait entirely.
+      try {
+        const { data } = await sb.auth.getSession();
+        if (data && data.session) return data.session;
+      } catch {}
+      return new Promise((resolve) => {
+        let settled = false;
+        let unsubscribe = null;
+        const finish = (sess) => {
+          if (settled) return;
+          settled = true;
+          try { if (unsubscribe) unsubscribe(); } catch {}
+          resolve(sess || null);
+        };
+        // Listen for the SDK's own readiness events.
         try {
-          const { data, error } = await sb.auth.getSession();
-          if (error) console.warn("getSession error:", error);
-          last = data && data.session ? data.session : null;
-        } catch (err) {
-          console.warn("getSession threw:", err);
-        }
-        if (last) return last;
-        if (!localStorageLooksLikeSupabaseAuth()) return null;
-        await new Promise((r) => setTimeout(r, 60));
-      }
-      return last;
+          const listener = sb.auth.onAuthStateChange((event, session) => {
+            if (settled) return;
+            if (
+              session && (
+                event === "SIGNED_IN" ||
+                event === "INITIAL_SESSION" ||
+                event === "TOKEN_REFRESHED" ||
+                event === "USER_UPDATED"
+              )
+            ) {
+              finish(session);
+            }
+          });
+          unsubscribe = () => {
+            try { listener?.data?.subscription?.unsubscribe?.(); } catch {}
+          };
+        } catch {}
+        // Poll as a safety net. Even if no auth event fires (e.g.
+        // the SDK considers the session already restored before our
+        // listener was attached), getSession() will eventually return
+        // the cached session.
+        const deadline = Date.now() + maxWaitMs;
+        const tick = async () => {
+          if (settled) return;
+          try {
+            const { data } = await sb.auth.getSession();
+            if (data && data.session) return finish(data.session);
+          } catch {}
+          if (Date.now() >= deadline) return finish(null);
+          setTimeout(tick, 80);
+        };
+        tick();
+      });
     }
 
     async function checkAuthOnLoad() {
@@ -4171,14 +4208,6 @@
       dbg("info", "boot tick (" + reason + ") done=" + __crmAuthBootDone + " running=" + __crmAuthBootRunning);
       if (__crmAuthBootDone) return;
       if (__crmAuthBootRunning) return;
-      // Short-circuit retries when there's clearly nothing to recover
-      // (no persisted Supabase auth at all). Without this, retries at
-      // 1s/2.5s call checkAuthOnLoad which calls showLoginOverlay()
-      // again, fighting the user mid-login flow.
-      if (reason && reason.startsWith("retry+") && !localStorageLooksLikeSupabaseAuth()) {
-        dbg("info", "skip retry: no persisted auth in localStorage");
-        return;
-      }
       __crmAuthBootRunning = true;
       try {
         const ok = await checkAuthOnLoad();
@@ -4251,6 +4280,16 @@
         // (otherwise a stale cached actor from a prior session could
         // bleed into the new sign-in's audit row).
         try { _cachedActor = null; } catch {}
+        // The first cold-load bootstrap might have already given up
+        // (getSession returned null before the SDK finished restoring
+        // the session). Allow another attempt now that we definitely
+        // have a session in hand. handleLoginSubmit's own load() call
+        // is a no-op the second time because __crmAuthBootDone gets
+        // set to true after either path succeeds.
+        if (!__crmAuthBootDone) {
+          __crmAuthBootRunning = false;
+          bootstrapCrmFromAuth("SIGNED_IN");
+        }
         try {
           if (typeof logAction === "function") {
             const summary = typeof authSummary === "function" ? await authSummary("signed_in") : "Signed in";
