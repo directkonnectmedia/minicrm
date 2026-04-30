@@ -3666,17 +3666,29 @@
     // (no banner) from "logged in but degraded" (show banner). Set by
     // checkAuthOnLoad and the onAuthStateChange handler.
     let hasActiveSession = false;
+    // Tracks whether the LIVE Supabase JWT carries a non-empty
+    // user_metadata.roles array. This is intentionally separate from
+    // signedInRoles, which falls back to the static TEAM_MEMBERS roster
+    // roles when the JWT is missing claims (so the UI stays usable).
+    // The DATABASE only sees the JWT, not our local fallback, so for
+    // RLS-failure detection we have to ask "does the actual token have
+    // the claims?" -- which is exactly this flag.
+    let jwtTeamRolesPresent = false;
     const sessionRoleBanner = document.getElementById("sessionRoleBanner");
     const sessionRoleBannerSignOutBtn = document.getElementById("sessionRoleBannerSignOut");
 
     function applyAuthUIState() {
-      // Recovery banner: visible whenever a session exists but the team
-      // role check came back empty. That's the exact failure mode that
-      // hides every client behind RLS without explanation. Showing the
-      // banner gives the user a one-click escape hatch even if the
-      // profile pill / dropdown is somehow not rendering (which is the
-      // worst-case panic state -- no UI way to sign out at all).
-      const inDegradedSession = hasActiveSession && signedInRoles.length === 0;
+      // Recovery banner: visible whenever a session exists but the
+      // *live JWT* lacks team role claims. That is the exact RLS
+      // failure mode where is_team_member() returns false on the
+      // server and every client row gets hidden. We must check the
+      // JWT itself (jwtTeamRolesPresent), not signedInRoles -- the
+      // latter is intentionally padded with static fallback roles so
+      // the UI keeps rendering, but those fallback roles are invisible
+      // to Postgres. Banner shows the user a one-click escape hatch
+      // even if the profile pill / dropdown isn't rendering (panic
+      // state -- no UI way to sign out at all).
+      const inDegradedSession = hasActiveSession && !jwtTeamRolesPresent;
       if (sessionRoleBanner) {
         sessionRoleBanner.style.display = inDegradedSession ? "flex" : "none";
       }
@@ -3750,6 +3762,7 @@
       try { await sb.auth.signOut(); } catch (err) { console.warn("Sign out failed:", err); }
       try { sessionStorage.removeItem(SESSION_MARKER_KEY); } catch {}
       hasActiveSession = false;
+      jwtTeamRolesPresent = false;
       signedInMember = null;
       signedInRoles = [];
       applyAuthUIState();
@@ -3768,28 +3781,23 @@
       const rosterPromise = fetchPickerRoster();
       let session = null;
 
-      // Force a token refresh first so the JWT carries the freshest
-      // user_metadata.roles claim. Without this, an old access token
-      // issued before roles were stamped (or one that lost claims for
-      // any reason) sticks around for up to an hour and silently fails
-      // the team-membership check, hiding every client behind RLS. If
-      // refresh fails or there is nothing to refresh, fall through to
-      // getSession() which preserves the previous behaviour.
+      // Use the cached session as-is. We previously called
+      // sb.auth.refreshSession() here to flush stale role claims, but
+      // in this Supabase project the refresh endpoint returns a JWT
+      // *without* user_metadata.roles -- which is exactly the failure
+      // mode is_team_member() can't tolerate -- so forcing a refresh
+      // on every page load was actively replacing healthy sign-in
+      // tokens with stripped ones and hiding every client behind RLS.
+      // Trust the sign-in JWT instead. The TOKEN_REFRESHED branch in
+      // onAuthStateChange below handles Supabase's own auto-rotation
+      // (every ~hour), and the recovery banner catches any token
+      // that ends up without role claims so the user always has a
+      // visible escape hatch.
       try {
-        const { data: refreshed, error: refreshErr } = await sb.auth.refreshSession();
-        if (!refreshErr && refreshed && refreshed.session) {
-          session = refreshed.session;
-        }
+        const { data } = await sb.auth.getSession();
+        session = data && data.session ? data.session : null;
       } catch (err) {
-        console.warn("refreshSession failed, falling back to getSession:", err);
-      }
-      if (!session) {
-        try {
-          const { data } = await sb.auth.getSession();
-          session = data && data.session ? data.session : null;
-        } catch (err) {
-          console.warn("getSession failed:", err);
-        }
+        console.warn("getSession failed:", err);
       }
       try { await rosterPromise; } catch {}
 
@@ -3818,7 +3826,9 @@
       const fallbackName = (fromMeta && typeof fromMeta.display_name === "string" && fromMeta.display_name.trim())
         || (email ? email.split("@")[0] : "Team Member");
       signedInMember = (email && TEAM_BY_EMAIL[email]) || { name: fallbackName, email, color: colorForEmail(email), roles: [] };
-      signedInRoles = readUserRoles(session.user);
+      const jwtRoles = readUserRoles(session.user);
+      jwtTeamRolesPresent = jwtRoles.length > 0;
+      signedInRoles = jwtRoles.slice();
       if (signedInRoles.length === 0 && Array.isArray(signedInMember.roles)) {
         signedInRoles = signedInMember.roles.slice();
       }
@@ -3851,6 +3861,7 @@
         // can't accidentally attribute future actions to the old user.
         try { _cachedActor = null; } catch {}
         hasActiveSession = false;
+        jwtTeamRolesPresent = false;
         signedInMember = null;
         signedInRoles = [];
         applyAuthUIState();
@@ -3875,14 +3886,17 @@
         } catch (err) { console.warn("auth.signed_in log failed:", err); }
       } else if (event === "TOKEN_REFRESHED" && session) {
         // Supabase auto-refreshes access tokens periodically. The new
-        // JWT carries the latest user_metadata, so re-read roles from
-        // it and re-evaluate the recovery banner. This is what makes
-        // the "lost roles mid-session" case self-heal: as soon as the
-        // refresh lands with restored claims, the banner disappears
-        // without the user having to do anything.
+        // JWT *should* carry user_metadata.roles -- but in this
+        // project the refresh endpoint is currently returning JWTs
+        // without that claim, so the banner will fire on a stripped
+        // refresh and let the user trigger a fresh sign-in. Either
+        // way we re-read roles directly from the new JWT and update
+        // jwtTeamRolesPresent so the banner reflects the actual
+        // server-visible state.
         hasActiveSession = true;
         try {
           const fresh = readUserRoles(session.user);
+          jwtTeamRolesPresent = fresh.length > 0;
           if (fresh.length > 0) {
             signedInRoles = fresh;
           } else if (signedInMember && Array.isArray(signedInMember.roles)) {
