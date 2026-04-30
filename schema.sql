@@ -615,6 +615,14 @@ create trigger plans_set_updated_at
 alter table public.plans add column if not exists has_financing boolean not null default false;
 alter table public.plans add column if not exists financing jsonb not null default '{}'::jsonb;
 
+-- v1.7: services array (selected service ids) chosen during the wizard.
+-- Each per-tab jsonb column above is now keyed by service_id with shape:
+--   { "<service_id>": { "state": "hidden" | "included" | "priced",
+--                        "price": 0,
+--                        "label": "Display label" } }
+-- Existing rows default to '[]' which renders as an empty per-service editor.
+alter table public.plans add column if not exists services jsonb not null default '[]'::jsonb;
+
 -- =============================================================
 -- Services (Plan Builder reusable services library)
 -- =============================================================

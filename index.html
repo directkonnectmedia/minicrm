@@ -1030,6 +1030,62 @@
     .plan-wizard-checklist-list li.included { color: #15803d; font-weight: 600; }
     .plan-wizard-checklist-list li.pending { color: #9ca3af; }
     .plan-wizard-checklist-list li .pw-mark { width: 18px; text-align: center; font-weight: 700; }
+    .plan-wizard-checklist-list li.summary { color: #0B5394; font-weight: 700; border-bottom: 1px dashed #cbd5e1; padding-bottom: 6px; margin-bottom: 2px; }
+
+    /* Services checklist (wizard step 1) */
+    .plan-wizard-services {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 280px;
+      overflow-y: auto;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 8px;
+      background: #fff;
+    }
+    .pw-service-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background 100ms, border-color 100ms;
+    }
+    .pw-service-row:hover { background: #f3f4f6; }
+    .pw-service-row.checked { background: #eef2ff; border-color: #c7d2fe; }
+    .pw-service-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: #4f46e5; cursor: pointer; }
+    .pw-service-row .pw-service-name { font-size: 14px; color: #111827; font-weight: 500; }
+    .pw-service-empty { padding: 18px; text-align: center; color: #6b7280; font-size: 13px; }
+
+    /* Plan Builder per-service rows inside a tab body */
+    .plan-rows { display: flex; flex-direction: column; gap: 8px; }
+    .plan-row {
+      display: grid;
+      grid-template-columns: 1.5fr 140px 130px;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #fff;
+    }
+    .plan-row.is-hidden { background: #f9fafb; opacity: 0.78; }
+    .plan-row input[type="text"], .plan-row input[type="number"], .plan-row select {
+      padding: 8px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 13px;
+      background: #fff;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .plan-row select { cursor: pointer; }
+    .plan-row input[data-pb-action="row-price"] { text-align: right; }
+    .plan-row .price-stub { font-size: 12px; color: #9ca3af; text-align: right; padding-right: 4px; }
+    .plan-row-empty { padding: 24px; text-align: center; color: #6b7280; font-size: 13px; border: 1px dashed #e5e7eb; border-radius: 10px; background: #fafafa; }
 
     /* Plan Builder right-panel mini tabs */
     .plan-tabs { display: flex; gap: 6px; border-bottom: 1px solid #e5e7eb; margin-bottom: 14px; }
@@ -5440,9 +5496,7 @@
           </div>`;
       const activeTabDef = tabs.find((t) => t.key === activePlanTab);
       const tabBody = activeTabDef
-        ? `<div class="plan-tab-body">
-            <div class="muted">Coming soon &mdash; editor for <strong>${esc(activeTabDef.label)}</strong> goes here.</div>
-          </div>`
+        ? `<div class="plan-tab-body">${renderPlanTabRows(plan, activeTabDef)}</div>`
         : "";
       el.innerHTML = `
         <div class="cb-middle-header">
@@ -5453,6 +5507,47 @@
           ${tabBody}
         </div>
       `;
+    }
+
+    // Per-service rows inside an active plan tab body.
+    // The tab jsonb is keyed by service id with shape:
+    //   { "<id>": { state: "hidden"|"included"|"priced", price: number, label: string } }
+    // Defaults applied in-memory if the key is missing (e.g. for legacy rows).
+    function getPlanRowConfig(plan, tabKey, serviceId) {
+      const tabObj = (plan && plan[tabKey]) || {};
+      const cfg = (tabObj && typeof tabObj === "object" && !Array.isArray(tabObj)) ? tabObj[serviceId] : null;
+      const svc = services.find((s) => String(s.id) === String(serviceId));
+      return {
+        state: (cfg && cfg.state) || "hidden",
+        price: cfg && cfg.price != null ? Number(cfg.price) : 0,
+        label: (cfg && typeof cfg.label === "string" && cfg.label) ? cfg.label : (svc ? (svc.name || "") : ""),
+      };
+    }
+
+    function renderPlanTabRows(plan, tabDef) {
+      const ids = Array.isArray(plan.services) ? plan.services : [];
+      if (ids.length === 0) {
+        return `<div class="plan-row-empty">No services selected for this plan. Re-create the plan and check at least one service in step 1 to use the per-service editor.</div>`;
+      }
+      const rows = ids.map((id) => {
+        const cfg = getPlanRowConfig(plan, tabDef.key, id);
+        const isHidden = cfg.state === "hidden";
+        const showPrice = cfg.state === "priced";
+        const priceCell = showPrice
+          ? `<input type="number" min="0" step="0.01" inputmode="decimal" data-pb-action="row-price" data-tab="${esc(tabDef.key)}" data-service-id="${esc(id)}" value="${esc(String(cfg.price ?? 0))}" placeholder="0.00">`
+          : `<div class="price-stub">&mdash;</div>`;
+        return `
+          <div class="plan-row ${isHidden ? "is-hidden" : ""}" data-row-service-id="${esc(id)}">
+            <input type="text" data-pb-action="row-label" data-tab="${esc(tabDef.key)}" data-service-id="${esc(id)}" value="${esc(cfg.label)}" placeholder="Display label">
+            <select data-pb-action="row-state" data-tab="${esc(tabDef.key)}" data-service-id="${esc(id)}">
+              <option value="hidden"   ${cfg.state === "hidden"   ? "selected" : ""}>Don't display</option>
+              <option value="included" ${cfg.state === "included" ? "selected" : ""}>Included</option>
+              <option value="priced"   ${cfg.state === "priced"   ? "selected" : ""}>Priced</option>
+            </select>
+            ${priceCell}
+          </div>`;
+      }).join("");
+      return `<div class="plan-rows">${rows}</div>`;
     }
 
     function renderPBServices() {
@@ -5480,16 +5575,18 @@
     }
 
     // ---- Plan wizard ----
-    // Steps 1-4 ask one yes/no per category and write into the
-    // matching has_* boolean. Step 5 asks for a name. The right
-    // half of the modal shows a live "Included in this plan"
-    // checklist that updates as the user advances.
+    // Step 1 is a multi-select services checklist. Steps 2-6 ask
+    // one yes/no per category and write into the matching has_*
+    // boolean. Step 7 asks for a name. The right half of the
+    // modal shows a live "Included in this plan" checklist that
+    // updates as the user advances.
     const PLAN_WIZARD_STEPS = [
-      { flag: "has_one_time",     label: "One-time payment", prompt: "Does this plan include a one-time payment?" },
-      { flag: "has_setup",        label: "Setup fee",        prompt: "Does this plan include a setup fee?" },
-      { flag: "has_subscription", label: "Subscription",     prompt: "Does this plan include a subscription?" },
-      { flag: "has_addons",       label: "Add-ons",          prompt: "Does this plan include add-ons?" },
-      { flag: "has_financing",    label: "Financing",        prompt: "Does this plan include financing?" },
+      { kind: "services", label: "Services" },
+      { kind: "yesno", flag: "has_one_time",     label: "One-time payment", prompt: "Does this plan include a one-time payment?" },
+      { kind: "yesno", flag: "has_setup",        label: "Setup fee",        prompt: "Does this plan include a setup fee?" },
+      { kind: "yesno", flag: "has_subscription", label: "Subscription",     prompt: "Does this plan include a subscription?" },
+      { kind: "yesno", flag: "has_addons",       label: "Add-ons",          prompt: "Does this plan include add-ons?" },
+      { kind: "yesno", flag: "has_financing",    label: "Financing",        prompt: "Does this plan include financing?" },
     ];
     const PLAN_WIZARD_TOTAL_STEPS = PLAN_WIZARD_STEPS.length + 1; // + name step
 
@@ -5508,6 +5605,7 @@
       planWizardState = {
         step: 1,
         draft: {
+          services: [],
           has_one_time: false,
           has_setup: false,
           has_subscription: false,
@@ -5518,6 +5616,11 @@
       };
       planWizardStatus.textContent = "";
       planWizardOverlay.classList.add("open");
+      // Make sure the services library is loaded before we render
+      // the first step (the services checklist).
+      if (!servicesLoaded) {
+        loadServices().then(() => { if (planWizardState) renderPlanWizard(); });
+      }
       renderPlanWizard();
     }
 
@@ -5535,15 +5638,38 @@
       // Active question pane
       if (step >= 1 && step <= PLAN_WIZARD_STEPS.length) {
         const def = PLAN_WIZARD_STEPS[step - 1];
-        const current = draft[def.flag];
-        planWizardQuestion.innerHTML = `
-          <div class="plan-wizard-step-label">Step ${step} / ${PLAN_WIZARD_TOTAL_STEPS}</div>
-          <div class="plan-wizard-prompt">${esc(def.prompt)}</div>
-          <div class="plan-wizard-yesno">
-            <button type="button" class="plan-wizard-yesno-btn ${current === true ? "active" : ""}" data-pw-answer="yes">Yes</button>
-            <button type="button" class="plan-wizard-yesno-btn ${current === false ? "active" : ""}" data-pw-answer="no">No</button>
-          </div>
-        `;
+        if (def.kind === "services") {
+          const selected = new Set(draft.services || []);
+          const list = !servicesLoaded
+            ? `<div class="pw-service-empty">Loading services\u2026</div>`
+            : services.length === 0
+              ? `<div class="pw-service-empty">No services yet. Close this wizard and click "+ Create Service" on the right to add one.</div>`
+              : services.map((s) => {
+                  const checked = selected.has(s.id);
+                  return `
+                    <label class="pw-service-row ${checked ? "checked" : ""}" data-pw-service-id="${esc(s.id)}">
+                      <input type="checkbox" ${checked ? "checked" : ""} data-pw-service-checkbox="${esc(s.id)}">
+                      <span class="pw-service-name">${esc(s.name || "(untitled)")}</span>
+                    </label>`;
+                }).join("");
+          planWizardQuestion.innerHTML = `
+            <div class="plan-wizard-step-label">Step ${step} / ${PLAN_WIZARD_TOTAL_STEPS}</div>
+            <div class="plan-wizard-prompt">Which services does this plan include?</div>
+            <div class="muted" style="font-size:12px;margin-top:-6px;">Pick any from your services library. You can leave them all unchecked if this plan has no per-service granularity.</div>
+            <div class="plan-wizard-services">${list}</div>
+          `;
+        } else {
+          // yes/no step
+          const current = draft[def.flag];
+          planWizardQuestion.innerHTML = `
+            <div class="plan-wizard-step-label">Step ${step} / ${PLAN_WIZARD_TOTAL_STEPS}</div>
+            <div class="plan-wizard-prompt">${esc(def.prompt)}</div>
+            <div class="plan-wizard-yesno">
+              <button type="button" class="plan-wizard-yesno-btn ${current === true ? "active" : ""}" data-pw-answer="yes">Yes</button>
+              <button type="button" class="plan-wizard-yesno-btn ${current === false ? "active" : ""}" data-pw-answer="no">No</button>
+            </div>
+          `;
+        }
       } else {
         // Name step
         planWizardQuestion.innerHTML = `
@@ -5561,8 +5687,10 @@
         setTimeout(() => nameInput.focus(), 0);
       }
 
-      // Live checklist: tick = included, dash = answered No, dot = not answered yet
-      planWizardChecklist.innerHTML = PLAN_WIZARD_STEPS.map((def) => {
+      // Live checklist: services summary on top, then tick/dash/dot per yes/no step.
+      const servicesCount = (draft.services || []).length;
+      const summaryLi = `<li class="summary"><span class="pw-mark">\u2261</span><span>Services: ${servicesCount} selected</span></li>`;
+      const yesnoItems = PLAN_WIZARD_STEPS.filter((d) => d.kind === "yesno").map((def) => {
         const value = draft[def.flag];
         let cls, mark;
         if (value === true)       { cls = "included"; mark = "\u2713"; }
@@ -5570,15 +5698,22 @@
         else                      { cls = "pending";  mark = "\u2022"; }
         return `<li class="${cls}"><span class="pw-mark">${mark}</span><span>${esc(def.label)}</span></li>`;
       }).join("");
+      planWizardChecklist.innerHTML = summaryLi + yesnoItems;
 
       // Footer button states
       planWizardBack.disabled = step === 1;
       const isLast = step === PLAN_WIZARD_TOTAL_STEPS;
       planWizardNext.textContent = isLast ? "Save Plan" : "Next";
-      // Next is disabled on yes/no steps until an answer is picked, and on the name step until a non-empty name is entered.
+      // Next is disabled on yes/no steps until an answer is picked, on the
+      // name step until a non-empty name is entered, and always enabled on
+      // the services step (zero selections allowed).
       if (step <= PLAN_WIZARD_STEPS.length) {
         const def = PLAN_WIZARD_STEPS[step - 1];
-        planWizardNext.disabled = draft[def.flag] !== true && draft[def.flag] !== false;
+        if (def.kind === "services") {
+          planWizardNext.disabled = false;
+        } else {
+          planWizardNext.disabled = draft[def.flag] !== true && draft[def.flag] !== false;
+        }
       } else {
         planWizardNext.disabled = !(draft.name && draft.name.trim());
       }
@@ -5591,7 +5726,19 @@
       const { step } = planWizardState;
       if (step < 1 || step > PLAN_WIZARD_STEPS.length) return;
       const def = PLAN_WIZARD_STEPS[step - 1];
+      if (def.kind !== "yesno") return;
       planWizardState.draft[def.flag] = btn.dataset.pwAnswer === "yes";
+      renderPlanWizard();
+    });
+
+    // Services-checkbox toggles inside the wizard question pane
+    planWizardQuestion.addEventListener("change", (e) => {
+      const cb = e.target.closest("[data-pw-service-checkbox]");
+      if (!cb || !planWizardState) return;
+      const id = cb.dataset.pwServiceCheckbox;
+      const set = new Set(planWizardState.draft.services || []);
+      if (cb.checked) set.add(id); else set.delete(id);
+      planWizardState.draft.services = Array.from(set);
       renderPlanWizard();
     });
 
@@ -5616,6 +5763,14 @@
       planWizardStatus.textContent = "Saving...";
       try {
         const draft = planWizardState.draft;
+        const initTabConfig = (serviceIds) => {
+          const obj = {};
+          for (const id of serviceIds) {
+            const svc = services.find((s) => String(s.id) === String(id));
+            obj[id] = { state: "hidden", price: 0, label: svc ? (svc.name || "") : "" };
+          }
+          return obj;
+        };
         const row = {
           name: (draft.name || "").trim(),
           has_one_time: !!draft.has_one_time,
@@ -5623,6 +5778,12 @@
           has_subscription: !!draft.has_subscription,
           has_addons: !!draft.has_addons,
           has_financing: !!draft.has_financing,
+          services: draft.services || [],
+          setup:        initTabConfig(draft.services || []),
+          subscription: initTabConfig(draft.services || []),
+          addons:       initTabConfig(draft.services || []),
+          one_time:     initTabConfig(draft.services || []),
+          financing:    initTabConfig(draft.services || []),
         };
         const { data: inserted, error } = await sb.from("plans").insert(row).select().single();
         if (error) throw error;
@@ -7387,6 +7548,57 @@
         activeServiceId = btn.dataset.id || null;
         renderPBServices();
       }
+    });
+
+    // ---- Plan tab body autosave ----
+    // Selects + label/price inputs all carry data-pb-action,
+    // data-tab and data-service-id. We listen for `change`
+    // (which fires immediately for selects and on blur/Enter
+    // for text+number inputs) and patch the matching tab jsonb
+    // on public.plans. Local cache is mutated in place; a state
+    // change re-renders the active tab body so the Priced row's
+    // price input appears/disappears.
+    async function savePlanRow(planId, tabKey, serviceId, patch) {
+      const plan = plans.find((p) => String(p.id) === String(planId));
+      if (!plan) return;
+      const prevTab = (plan[tabKey] && typeof plan[tabKey] === "object" && !Array.isArray(plan[tabKey])) ? plan[tabKey] : {};
+      const prevCfg = getPlanRowConfig(plan, tabKey, serviceId);
+      const nextCfg = { ...prevCfg, ...patch };
+      const nextTab = { ...prevTab, [serviceId]: nextCfg };
+      // Optimistic update
+      plan[tabKey] = nextTab;
+      const stateChanged = "state" in patch && patch.state !== prevCfg.state;
+      try {
+        const { error } = await sb.from("plans").update({ [tabKey]: nextTab }).eq("id", planId);
+        if (error) throw error;
+        if (stateChanged) renderPBRight();
+      } catch (err) {
+        console.error("savePlanRow failed:", err);
+        // Revert local cache
+        plan[tabKey] = prevTab;
+        renderPBRight();
+        alert("Save failed: " + (err.message || String(err)));
+      }
+    }
+
+    document.addEventListener("change", async (e) => {
+      const el = e.target.closest("[data-pb-action]");
+      if (!el) return;
+      const action = el.dataset.pbAction;
+      if (action !== "row-state" && action !== "row-label" && action !== "row-price") return;
+      const tabKey = el.dataset.tab;
+      const serviceId = el.dataset.serviceId;
+      if (!activePlanId || !tabKey || !serviceId) return;
+      let patch = null;
+      if (action === "row-state") {
+        patch = { state: el.value };
+      } else if (action === "row-label") {
+        patch = { label: el.value };
+      } else if (action === "row-price") {
+        const num = parseFloat(el.value);
+        patch = { price: Number.isFinite(num) ? num : 0 };
+      }
+      if (patch) await savePlanRow(activePlanId, tabKey, serviceId, patch);
     });
 
     // ---- Right panel event handling ----
