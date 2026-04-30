@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- crm-deploy-stamp: 20260430-cdn-v3 — if this line is missing in View Source, the browser is not loading the current deployment -->
+<!-- crm-deploy-stamp: 20260430-authfix-initial-session — if this line is missing in View Source, the browser is not loading the current deployment -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="crm-build" content="20260430-cdn-v3">
+  <meta name="crm-build" content="20260430-authfix-initial-session">
   <title>Mini CRM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3983,7 +3983,17 @@
     // `auth.signed_out` rows into the action log so the Activity
     // feed shows who came online and when.
     sb.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_OUT" || !session) {
+      // IMPORTANT: never treat `!session` alone as a sign-out. Supabase
+      // emits `INITIAL_SESSION` (and occasionally other lifecycle
+      // events) where `session` is briefly null while storage is still
+      // hydrating. The old `SIGNED_OUT || !session` condition nuked
+      // signedInMember, stripped the sessionStorage marker, and
+      // re-opened the login overlay *after* checkAuthOnLoad had already
+      // painted a working CRM -- which is exactly the "refresh in
+      // Incognito and every client row vanishes with no /clients
+      // request" bug report. Only tear down UI state on a genuine
+      // `SIGNED_OUT` event from GoTrue.
+      if (event === "SIGNED_OUT") {
         // Capture the actor BEFORE we forget who they were so the
         // log row says e.g. "Ivan signed out" instead of "Unknown
         // signed out".
