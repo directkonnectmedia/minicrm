@@ -648,3 +648,59 @@ drop trigger if exists services_set_updated_at on public.services;
 create trigger services_set_updated_at
   before update on public.services
   for each row execute function public.set_updated_at();
+
+-- =============================================================
+-- ACTION LOG (immutable audit trail)
+-- =============================================================
+-- Single append-only table that records every meaningful action a
+-- team member takes anywhere in the CRM: client mutations, notes,
+-- contract lifecycle bumps, invoices, plans/services/templates,
+-- auth events, and the "Save Changes" full-state commits from the
+-- profile modal. Two goals:
+--
+--   1. Source of truth for "who did what, when". Every row carries
+--      a friendly actor_display_name ("Ivan", "Hector", "Jesus",
+--      ...) captured at write time, plus a complete sentence in
+--      `summary` so the Activity tab renders rows directly.
+--   2. Recovery net for race conditions (e.g. last-writer-wins on
+--      Save Changes): the structured `payload` jsonb has the
+--      before/after / changed-field shape, so a clobbered edit is
+--      attributable and recoverable from the feed.
+--
+-- Append-only by policy: team members get SELECT and INSERT, but
+-- there is intentionally no UPDATE or DELETE policy. Even admins
+-- cannot rewrite history through the API.
+create table if not exists public.action_log (
+  id uuid primary key default gen_random_uuid(),
+  at timestamptz not null default now(),
+  actor_email text,
+  actor_id uuid,
+  actor_display_name text,
+  action text not null,
+  entity_type text,
+  entity_id uuid,
+  summary text,
+  payload jsonb not null default '{}'::jsonb
+);
+
+create index if not exists action_log_at_idx
+  on public.action_log (at desc);
+create index if not exists action_log_entity_idx
+  on public.action_log (entity_type, entity_id);
+create index if not exists action_log_actor_email_idx
+  on public.action_log (actor_email);
+create index if not exists action_log_actor_display_name_idx
+  on public.action_log (actor_display_name);
+create index if not exists action_log_action_idx
+  on public.action_log (action);
+
+alter table public.action_log enable row level security;
+
+drop policy if exists "team read action_log"   on public.action_log;
+drop policy if exists "team insert action_log" on public.action_log;
+create policy "team read action_log"
+  on public.action_log for select to authenticated
+  using (public.is_team_member());
+create policy "team insert action_log"
+  on public.action_log for insert to authenticated
+  with check (public.is_team_member());

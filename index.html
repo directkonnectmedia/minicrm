@@ -2164,6 +2164,83 @@
     .team-empty { padding: 24px 14px; text-align: center; color: #6b7280; font-size: 13px; }
     .team-loading { padding: 24px 14px; text-align: center; color: #6b7280; font-size: 13px; }
     .team-error   { padding: 12px 14px; color: #b91c1c; font-size: 13px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; margin: 8px 14px; }
+
+    /* ========== ACTIVITY TAB ========== */
+    .activity-toolbar {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      padding: 10px 12px; border-bottom: 1px solid #e5e7eb; background: #f9fafb;
+    }
+    .activity-toolbar input[type="text"] {
+      flex: 1 1 240px; min-width: 200px;
+      padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;
+    }
+    .activity-toolbar select {
+      padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: white;
+    }
+    .activity-range { display: inline-flex; gap: 4px; }
+    .activity-range button {
+      padding: 6px 10px; font-size: 12px; border-radius: 6px;
+    }
+    .activity-range button.activity-range-active {
+      background: #111827; color: white; border-color: #111827;
+    }
+    .activity-feed {
+      max-height: calc(100vh - 280px); overflow-y: auto;
+    }
+    .activity-row {
+      display: grid;
+      grid-template-columns: 110px 110px 110px 1fr;
+      gap: 12px; align-items: center;
+      padding: 10px 14px; border-bottom: 1px solid #f3f4f6;
+      font-size: 13px;
+    }
+    .activity-row:hover { background: #fafafa; }
+    .activity-row.is-clickable { cursor: pointer; }
+    .activity-time { color: #6b7280; font-size: 12px; white-space: nowrap; }
+    .activity-actor {
+      display: inline-block; padding: 3px 10px; border-radius: 999px;
+      font-size: 12px; font-weight: 600; text-align: center;
+      background: #f3f4f6; color: #1f2937; border: 1px solid #e5e7eb;
+    }
+    /* Color-code known team members so the eye picks them out
+       instantly. Reuses the existing manager pill colors so any
+       teammate added to public.action_log with one of those names
+       gets the same color treatment they already have in the table.
+       Unknown / new names fall back to the default grey. */
+    .activity-actor.actor-Ivan   { background: #3b82f6; color: white; border-color: #3b82f6; }
+    .activity-actor.actor-Hector { background: #8b5cf6; color: white; border-color: #8b5cf6; }
+    .activity-actor.actor-Jesus  { background: #10b981; color: white; border-color: #10b981; }
+    .activity-actor.actor-Client-portal { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+    .activity-action-chip {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+      background: #e5e7eb; color: #4b5563;
+    }
+    .activity-action-chip.cat-client   { background: #dbeafe; color: #1e40af; }
+    .activity-action-chip.cat-contract { background: #ede9fe; color: #5b21b6; }
+    .activity-action-chip.cat-invoice  { background: #fef3c7; color: #92400e; }
+    .activity-action-chip.cat-plan     { background: #ccfbf1; color: #115e59; }
+    .activity-action-chip.cat-service  { background: #d1fae5; color: #065f46; }
+    .activity-action-chip.cat-template { background: #fce7f3; color: #9d174d; }
+    .activity-action-chip.cat-auth     { background: #f3f4f6; color: #4b5563; }
+    .activity-summary { color: #1f2937; line-height: 1.5; }
+    .activity-summary .activity-action-detail {
+      color: #6b7280; font-size: 11px; margin-left: 8px; font-style: italic;
+    }
+    .activity-empty {
+      padding: 32px 16px; text-align: center; color: #9ca3af; font-size: 14px;
+    }
+    .activity-footer {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; border-top: 1px solid #e5e7eb; background: #f9fafb;
+    }
+    .activity-footer .muted { color: #9ca3af; font-size: 12px; }
+    @media (max-width: 720px) {
+      .activity-row {
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -2267,6 +2344,7 @@
     <button class="tab" data-view="contract_builder">📝 Contract Builder</button>
     <button class="tab" data-view="invoice_builder">🧾 Invoice Builder</button>
     <button class="tab" data-view="plan_builder">🧩 Plan Builder</button>
+    <button class="tab" data-view="activity">📜 Activity</button>
   </div>
 
   <div id="filterChips" class="filter-chips"></div>
@@ -2368,6 +2446,41 @@
         <div class="builder-panel" id="pbLeft"></div>
         <div class="builder-panel" id="pbRight"></div>
         <div class="builder-panel" id="pbServices"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTIVITY tab — append-only feed of every meaningful action
+       across the CRM. Each row leads with the actor's display name
+       (Ivan / Hector / Jesus / ...) so it's obvious at a glance who
+       did what. Read-only; populated from public.action_log. -->
+  <div class="tab-content" data-view="activity">
+    <div class="card">
+      <div class="activity-toolbar">
+        <input type="text" id="activitySearch" placeholder="Search summary, actor, action..." />
+        <select id="activityActorFilter"><option value="">All actors</option></select>
+        <select id="activityActionFilter">
+          <option value="">All categories</option>
+          <option value="client">Clients</option>
+          <option value="contract">Contracts</option>
+          <option value="invoice">Invoices</option>
+          <option value="plan">Plans</option>
+          <option value="service">Services</option>
+          <option value="template">Templates</option>
+          <option value="auth">Auth</option>
+        </select>
+        <div class="activity-range">
+          <button class="ghost" data-activity-range="today">Today</button>
+          <button class="ghost" data-activity-range="7d">7d</button>
+          <button class="ghost" data-activity-range="30d">30d</button>
+          <button class="ghost activity-range-active" data-activity-range="all">All</button>
+        </div>
+        <button id="activityRefreshBtn" class="ghost" title="Refresh feed">↻</button>
+      </div>
+      <div id="activityFeed" class="activity-feed"></div>
+      <div class="activity-footer">
+        <button id="activityLoadMore" class="ghost" style="display:none;">Load more</button>
+        <span id="activityStatus" class="muted"></span>
       </div>
     </div>
   </div>
@@ -3593,14 +3706,45 @@
       return true;
     }
 
-    // React to auth events from anywhere (e.g. token expiry)
-    sb.auth.onAuthStateChange((event, session) => {
+    // React to auth events from anywhere (e.g. token expiry).
+    // Also a convenient single point to write `auth.signed_in` /
+    // `auth.signed_out` rows into the action log so the Activity
+    // feed shows who came online and when.
+    sb.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_OUT" || !session) {
+        // Capture the actor BEFORE we forget who they were so the
+        // log row says e.g. "Ivan signed out" instead of "Unknown
+        // signed out".
+        let summary = "Signed out";
+        try {
+          if (typeof authSummary === "function") summary = await authSummary("signed_out");
+        } catch (err) { console.warn("authSummary failed:", err); }
+        try {
+          if (typeof logAction === "function") {
+            await logAction({ action: "auth.signed_out", entityType: "session", summary });
+          }
+        } catch (err) { console.warn("auth.signed_out log failed:", err); }
+        // Now drop the cached actor so a different user signing in
+        // next gets resolved fresh, and so any in-flight UI state
+        // can't accidentally attribute future actions to the old user.
+        try { _cachedActor = null; } catch {}
         signedInMember = null;
         signedInRoles = [];
         applyAuthUIState();
         try { sessionStorage.removeItem(SESSION_MARKER_KEY); } catch {}
         showLoginOverlay();
+      } else if (event === "SIGNED_IN") {
+        // Drop the cached actor BEFORE composing the summary so the
+        // freshly-signed-in user's display_name is what gets stored
+        // (otherwise a stale cached actor from a prior session could
+        // bleed into the new sign-in's audit row).
+        try { _cachedActor = null; } catch {}
+        try {
+          if (typeof logAction === "function") {
+            const summary = typeof authSummary === "function" ? await authSummary("signed_in") : "Signed in";
+            await logAction({ action: "auth.signed_in", entityType: "session", summary });
+          }
+        } catch (err) { console.warn("auth.signed_in log failed:", err); }
       }
     });
 
@@ -4156,7 +4300,15 @@
       if (!client || !message) return;
       const field = thread === "web" ? "web_notes" : "client_notes";
       const next = appendNote(client[field] || [], message, "system");
-      await updateClientField({ [field]: next });
+      await updateClientField({ [field]: next }, { skipDefaultLog: true });
+      const summary = await systemNoteSummary(client, thread, message);
+      logAction({
+        action: "client.note.system",
+        entityType: "client",
+        entityId: client.id,
+        summary,
+        payload: { thread, message },
+      });
     }
     function notesTabForRightTab(rtab) {
       return rtab === "web_status" ? "web" : "client";
@@ -4171,6 +4323,147 @@
       if (field === "web_status") return { thread: "web", message: fmtChange("Web Status", from, to) };
       if (field === "contract_template") return { thread: "client", message: fmtChange("Contract tier", contractTemplateLabel(from), contractTemplateLabel(to)) };
       return null;
+    }
+
+    // ============================================================
+    // SUMMARY BUILDERS — sentences for the action_log feed.
+    // Each builder returns a complete, human-readable line beginning
+    // with the actor's display name ("Ivan", "Hector", "Jesus", ...)
+    // so the Activity tab can render the row's `summary` field as-is.
+    // ============================================================
+
+    // Map raw client column names -> friendly labels seen in the UI.
+    const CLIENT_FIELD_LABELS = {
+      company_name: "Company",
+      client_name: "Client",
+      business_type: "Business Type",
+      phone: "Phone",
+      email: "Email",
+      profile_link: "Profile Link",
+      post_link: "Post Link",
+      finished_website: "Finished Website",
+      manager: "Manager",
+      follow_up_at: "Follow-up",
+      follow_up_type: "Follow-up Type",
+      web_status: "Web Status",
+      client_status: "Client Status",
+      motivation: "Motivation",
+      contract_template: "Contract Tier",
+      contract: "Contract Details",
+      invoice: "Invoice Template",
+      client_notes: "Client Notes",
+      web_notes: "Web Notes",
+    };
+    function humanFieldLabel(field) {
+      return CLIENT_FIELD_LABELS[field] || field;
+    }
+
+    // Pretty-print a value for the audit summary. Hides null/undefined,
+    // formats timestamps, summarizes jsonb arrays/objects so a single
+    // log line stays readable even when the underlying value is large.
+    function displayVal(field, v) {
+      if (v === null || v === undefined || v === "") return "—";
+      if (field === "follow_up_at") return formatDateTime(v);
+      if (field === "contract_template") return contractTemplateLabel(v);
+      if (field === "client_notes" || field === "web_notes") {
+        const len = Array.isArray(v) ? v.length : 0;
+        return `${len} note${len === 1 ? "" : "s"}`;
+      }
+      if (typeof v === "object") {
+        try {
+          const keys = Object.keys(v);
+          return keys.length ? `{${keys.length} field${keys.length === 1 ? "" : "s"}}` : "{}";
+        } catch { return "(object)"; }
+      }
+      const s = String(v);
+      return s.length > 60 ? s.slice(0, 57) + "..." : s;
+    }
+
+    function clientLabel(client) {
+      if (!client) return "(unknown client)";
+      return client.company_name || client.client_name || "(unnamed client)";
+    }
+
+    async function clientUpdateSummary(client, updates, before = {}) {
+      const who = (await currentActor()).displayName;
+      const co  = clientLabel(client);
+      const parts = Object.keys(updates).map((field) => {
+        const from = before[field];
+        const to   = updates[field];
+        return `${humanFieldLabel(field)}: ${displayVal(field, from)} → ${displayVal(field, to)}`;
+      });
+      return `${who} updated ${co} — ${parts.join("; ")}`;
+    }
+
+    async function noteSentSummary(client, thread, text) {
+      const who = (await currentActor()).displayName;
+      const co  = clientLabel(client);
+      const kind = thread === "web" ? "web" : "client";
+      const t = String(text || "").trim();
+      const preview = t.length > 80 ? t.slice(0, 77) + "..." : t;
+      return `${who} sent ${kind} note on ${co}: "${preview}"`;
+    }
+
+    async function systemNoteSummary(client, thread, message) {
+      const who = (await currentActor()).displayName;
+      const co  = clientLabel(client);
+      const kind = thread === "web" ? "web" : "client";
+      const m = String(message || "").trim();
+      const preview = m.length > 100 ? m.slice(0, 97) + "..." : m;
+      return `${who} triggered ${kind} system note on ${co}: ${preview}`;
+    }
+
+    async function clientCreatedSummary(client) {
+      const who = (await currentActor()).displayName;
+      return `${who} created client ${clientLabel(client)}`;
+    }
+
+    async function clientDeletedSummary(client) {
+      const who = (await currentActor()).displayName;
+      return `${who} deleted client ${clientLabel(client)}`;
+    }
+
+    async function clientSaveAllStateSummary(client) {
+      const who = (await currentActor()).displayName;
+      return `${who} saved full state for ${clientLabel(client)} (Save Changes)`;
+    }
+
+    async function contractSummary(verb, client, templateName, extra = "") {
+      const who = (await currentActor()).displayName;
+      const co  = clientLabel(client);
+      const name = templateName ? `"${templateName}"` : "contract";
+      const tail = extra ? ` ${extra}` : "";
+      return `${who} ${verb} ${name} for ${co}${tail}`;
+    }
+
+    function contractLifecycleSummary(client, fromStatus, toStatus, signerName) {
+      // No actor here — this is triggered by realtime updates from the
+      // client portal, not a direct team action. Keep the sentence
+      // self-explanatory and attribute to "Client portal".
+      const co = clientLabel(client);
+      const signer = signerName ? ` (${signerName})` : "";
+      return `Contract status changed for ${co}: ${fromStatus || "?"} → ${toStatus || "?"}${signer}`;
+    }
+
+    async function invoiceSummary(verb, client, receiptNo, extra = "") {
+      const who = (await currentActor()).displayName;
+      const co  = clientLabel(client);
+      const num = receiptNo ? `invoice ${receiptNo}` : "invoice";
+      const tail = extra ? ` ${extra}` : "";
+      return `${who} ${verb} ${num} for ${co}${tail}`;
+    }
+
+    async function libraryItemSummary(verb, kind, name) {
+      const who = (await currentActor()).displayName;
+      const label = name ? `"${name}"` : kind;
+      return `${who} ${verb} ${kind} ${label}`;
+    }
+
+    async function authSummary(event) {
+      const who = (await currentActor()).displayName;
+      if (event === "signed_in")  return `${who} signed in`;
+      if (event === "signed_out") return `${who} signed out`;
+      return `${who} ${event}`;
     }
 
     // ---------- Filters ----------
@@ -4320,7 +4613,43 @@
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "signed_contracts" },
-          () => scheduleContractRefresh()
+          (payload) => {
+            // The portal-driven lifecycle bumps (received / viewed /
+            // signed) come in here. We log them as `contract.lifecycle`
+            // events so the Activity feed shows what the client did
+            // even though no team member triggered them. Skip UPDATEs
+            // that don't actually change the status (e.g. metadata
+            // tweaks from the team) -- those are already covered by
+            // the explicit handleSendContract / handleProviderSign
+            // hooks above.
+            try {
+              const newRow = payload && payload.new ? payload.new : null;
+              const oldRow = payload && payload.old ? payload.old : null;
+              if (payload && payload.eventType === "UPDATE" && newRow && oldRow && newRow.status !== oldRow.status) {
+                const c = (allClients || []).find((x) => x.id === newRow.client_id);
+                logAction({
+                  action: "contract.lifecycle",
+                  entityType: "contract",
+                  entityId: newRow.id,
+                  summary: contractLifecycleSummary(c, oldRow.status, newRow.status, newRow.signer_name),
+                  payload: {
+                    client_id: newRow.client_id,
+                    from_status: oldRow.status,
+                    to_status:   newRow.status,
+                    signer_name: newRow.signer_name || null,
+                    template_name: newRow.template_name || null,
+                  },
+                  // Portal-triggered events have no team actor; tag
+                  // the row with a synthetic "Client portal" name so
+                  // the Activity feed makes the source obvious.
+                  actorOverride: { email: null, id: null, displayName: "Client portal" },
+                });
+              }
+            } catch (err) {
+              console.warn("contract.lifecycle log failed:", err);
+            }
+            scheduleContractRefresh();
+          }
         )
         .subscribe();
 
@@ -4355,6 +4684,17 @@
           : "";
         const { error } = await sb.from("clients").delete().eq("id", id);
         if (error) { alert("Delete failed: " + error.message); return; }
+        // Audit: who deleted whom, and the snapshot of the row at
+        // deletion time (so the audit trail can rebuild the entity
+        // even after the row is gone from public.clients).
+        const delSummary = await clientDeletedSummary(clientRow);
+        logAction({
+          action: "client.deleted",
+          entityType: "client",
+          entityId: id,
+          summary: delSummary,
+          payload: { snapshot: clientRow ? pickClientWritableFields(clientRow) : null, email },
+        });
         if (email && isAdmin()) {
           // Fire-and-forget: a transient failure here just leaves an
           // orphan auth row that the role filter already hides. The
@@ -4561,9 +4901,18 @@
         follow_up_at: fuIso, follow_up_type: formData.fu_type || "Follow-up",
         client_notes: clientNotes, web_notes: webNotes,
       };
-      const { error } = await sb.from("clients").insert(row);
+      const { data: inserted, error } = await sb.from("clients").insert(row).select();
       nextBtn.disabled = false; nextBtn.textContent = "Save Client";
       if (error) { alert("Insert failed: " + error.message); return; }
+      const newRow = inserted && inserted[0] ? inserted[0] : null;
+      const created = await clientCreatedSummary(newRow || row);
+      logAction({
+        action: "client.created",
+        entityType: "client",
+        entityId: newRow ? newRow.id : null,
+        summary: created,
+        payload: { snapshot: newRow ? pickClientWritableFields(newRow) : row },
+      });
       closeWizard(); load();
     }
 
@@ -4591,12 +4940,15 @@
       detailEditingField = null;
       detailScheduleMode = "view";
       detailScheduleDraft = null;
+      // Fresh session: gate disarmed until the user does something.
+      profileSessionDirty = false;
       renderProfile();
       detailOverlay.classList.add("open");
     }
     function closeDetail() {
       detailOverlay.classList.remove("open");
       detailId = null; detailEditingField = null; detailScheduleDraft = null;
+      profileSessionDirty = false;
       // Drop any in-flight dictation state so it doesn't bleed into the
       // next profile we open.
       noteSttBaseline = "";
@@ -4659,8 +5011,26 @@
       if (type !== (c.follow_up_type || "Follow-up")) return true;
       return false;
     }
+    // ---- session-dirty gate ----
+    // The Save Changes button is now a session-acknowledgment gate:
+    // ANY meaningful action inside the open profile (pill click,
+    // inline edit, schedule change, note send, contract save, etc.)
+    // arms `profileSessionDirty`, and the gate is only disarmed when
+    // the user clicks Save Changes. This means even though pill
+    // clicks already autosave to the database via updateClientField,
+    // the user is still forced to acknowledge the session before
+    // exiting -- which doubles as a chance for the "overkill"
+    // full-state PUT to land as the source of truth.
+    let profileSessionDirty = false;
+    function markProfileDirty() {
+      if (!detailId) return;
+      if (profileSessionDirty) return;
+      profileSessionDirty = true;
+      updateSaveChangesBtn();
+    }
     function isProfileDirty() {
       if (!detailId) return false;
+      if (profileSessionDirty) return true;
       if (isNoteInputDirty()) return true;
       if (getInlineEditPending()) return true;
       if (isScheduleEditDirty()) return true;
@@ -4672,12 +5042,34 @@
       btn.style.display = isProfileDirty() ? "inline-flex" : "none";
     }
 
+    // Writable columns in public.clients. The Save Changes "overkill"
+    // PUT writes every field on this list back to the database in
+    // one go, using the in-memory client object as the source of
+    // truth. Read-only / server-managed columns (id, created_at,
+    // updated_at) are intentionally omitted.
+    const CLIENT_WRITABLE_FIELDS = [
+      "company_name", "client_name", "business_type", "phone", "email",
+      "profile_link", "post_link", "finished_website",
+      "client_notes", "web_notes",
+      "manager", "follow_up_at", "follow_up_type",
+      "client_status", "web_status", "motivation",
+      "contract_template", "contract", "invoice",
+    ];
+    function pickClientWritableFields(c) {
+      const out = {};
+      if (!c) return out;
+      for (const k of CLIENT_WRITABLE_FIELDS) {
+        if (k in c) out[k] = c[k];
+      }
+      return out;
+    }
+
     // Commit every pending change in the profile in a deterministic
-    // order: inline edit first (so a renamed company is in DB before
-    // any system note that references it), then schedule, then the
-    // typed note. Each step is best-effort: if one fails (e.g. dup
-    // email) the others still attempt so the user doesn't silently
-    // lose the others.
+    // order, then perform the "overkill" full-state PUT so the row in
+    // public.clients exactly matches the local in-memory object. The
+    // PUT is idempotent and authoritative -- this is the source of
+    // truth even if some prior per-field autosave failed silently or
+    // local state drifted from the database.
     let savingDetailChanges = false;
     async function saveDetailChanges() {
       if (savingDetailChanges) return false;
@@ -4700,6 +5092,30 @@
         if (isNoteInputDirty()) {
           await sendNote();
         }
+        // 4) Overkill: PUT the full snapshot of writable columns so
+        // the database row matches what the user sees on screen.
+        // This is the "source of truth" commit -- last writer wins
+        // by design; the action_log trail makes any clobbered edits
+        // attributable and recoverable.
+        const c = getCurrentClient();
+        if (c) {
+          const snapshot = pickClientWritableFields(c);
+          const { error } = await sb.from("clients").update(snapshot).eq("id", detailId);
+          if (error) {
+            alert("Save Changes failed: " + error.message);
+            return false;
+          }
+          const summary = await clientSaveAllStateSummary(c);
+          logAction({
+            action: "client.save_all_state",
+            entityType: "client",
+            entityId: detailId,
+            summary,
+            payload: { snapshot },
+          });
+        }
+        // Session is now acknowledged; disarm the gate.
+        profileSessionDirty = false;
       } catch (err) {
         console.error("saveDetailChanges failed:", err);
         alert("Some changes failed to save. Check the console for details.");
@@ -5992,6 +6408,14 @@
         const { error } = await sb.from("plans").update({ [tabKey]: nextTab }).eq("id", planId);
         if (error) throw error;
         plan[tabKey] = nextTab;
+        const summary = await libraryItemSummary("updated", `plan tab ${tabKey} on`, plan.name);
+        logAction({
+          action: "plan.updated",
+          entityType: "plan",
+          entityId: planId,
+          summary,
+          payload: { tab: tabKey, before: prevTab, after: nextTab, plan_name: plan.name },
+        });
         closeTabEditor();
         renderPBRight();
       } catch (err) {
@@ -6217,6 +6641,14 @@
         plans = [inserted, ...plans];
         activePlanId = inserted.id;
         activePlanTab = null;
+        const summary = await libraryItemSummary("created", "plan", inserted.name);
+        logAction({
+          action: "plan.created",
+          entityType: "plan",
+          entityId: inserted.id,
+          summary,
+          payload: { name: inserted.name, services: row.services || [] },
+        });
         planWizardStatus.textContent = "Saved.";
         closePlanWizard();
         renderPlanBuilder();
@@ -6269,6 +6701,14 @@
         if (error) throw error;
         services = [inserted, ...services];
         activeServiceId = inserted.id;
+        const summary = await libraryItemSummary("created", "service", name);
+        logAction({
+          action: "service.created",
+          entityType: "service",
+          entityId: inserted.id,
+          summary,
+          payload: { name },
+        });
         serviceWizardStatus.textContent = "Saved.";
         closeServiceWizard();
         renderPBServices();
@@ -6732,6 +7172,14 @@
         if (error) throw error;
         await refreshSignedContracts();
         await addSystemNote(c, "client", `Contract "${templateName}" saved to profile.`);
+        const saveSummary = await contractSummary("saved contract", c, templateName, "to profile");
+        logAction({
+          action: "contract.saved",
+          entityType: "contract",
+          entityId: null,
+          summary: saveSummary,
+          payload: { client_id: c.id, template_name: templateName, token, status: "saved" },
+        });
         status.style.color = "#065f46";
         status.textContent = "Saved to client profile. Open the Contract Status tab to view.";
         saveBtn.textContent = "✓ Saved";
@@ -6815,6 +7263,19 @@
 
         const c = signedContractClient(row);
         if (c) await addSystemNote(c, "client", `Contract "${row.template_name || "Contract"}" signed by ${signerName}.`);
+        const signedSummary = await contractSummary(
+          "signed contract",
+          c || { company_name: row.company_name },
+          row.template_name,
+          `on behalf of Direct Konnect (${signerName})`
+        );
+        logAction({
+          action: "contract.provider_signed",
+          entityType: "contract",
+          entityId: row.id,
+          summary: signedSummary,
+          payload: { client_id: row.client_id, template_name: row.template_name, signer_name: signerName },
+        });
 
         status.style.color = "#065f46";
         status.textContent = "Signed and saved.";
@@ -6887,6 +7348,19 @@
 
         const c = signedContractClient(row);
         if (c) await addSystemNote(c, "client", `Contract "${name}" sent to ${email} and now visible in their portal.`);
+        const sentSummary = await contractSummary(
+          "sent contract",
+          c || { company_name: row.company_name },
+          name,
+          `to ${email}`
+        );
+        logAction({
+          action: "contract.sent_to_client",
+          entityType: "contract",
+          entityId: row.id,
+          summary: sentSummary,
+          payload: { client_id: row.client_id, template_name: name, email, sent_at: nowIso },
+        });
 
         // Step 2: email the portal magic-link. We do this AFTER the status
         // change so a flaky email step never leaves the contract in a
@@ -7125,6 +7599,14 @@
       universalTemplates = [...universalTemplates, data];
       builderActiveTemplate = { source: "universal", id: data.id, name: data.name, body_html: data.body_html };
       builderEditorDraftHTML = "";
+      const tplSummary = await libraryItemSummary("created", "universal contract template", name);
+      logAction({
+        action: "template.contract.created",
+        entityType: "template",
+        entityId: data.id,
+        summary: tplSummary,
+        payload: { name, kind: "contract" },
+      });
       closeCBSaveModal();
       renderContractBuilder();
     });
@@ -7625,6 +8107,20 @@
         const { data: inserted, error } = await sb.from("invoices").insert(row).select().single();
         if (error) throw error;
         clientInvoices.unshift(inserted);
+        const invSummary = await invoiceSummary("saved", c, receiptNo);
+        logAction({
+          action: "invoice.saved",
+          entityType: "invoice",
+          entityId: inserted ? inserted.id : null,
+          summary: invSummary,
+          payload: {
+            client_id: c.id,
+            receipt_no: receiptNo,
+            status: "due",
+            line_item_count: Array.isArray(data.line_items) ? data.line_items.length : 0,
+            stripe_payment_link: data.stripe_payment_link || null,
+          },
+        });
         invWizardStatus.textContent = "Saved.";
         closeInvoiceEditor();
         renderInvoiceBuilder();
@@ -7808,6 +8304,14 @@
       universalInvoiceTemplates = [...universalInvoiceTemplates, data].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
       activeInvoiceTemplate = { source: "universal", id: data.id, name: data.name, line_items: data.line_items, terms_html: data.terms_html };
       invoiceTemplateEditorState = null;
+      const tplSum = await libraryItemSummary("created", "universal invoice template", name);
+      logAction({
+        action: "template.invoice.created",
+        entityType: "template",
+        entityId: data.id,
+        summary: tplSum,
+        payload: { name, kind: "invoice", line_item_count: Array.isArray(data.line_items) ? data.line_items.length : 0 },
+      });
       closeInvTplSave();
       renderInvoiceBuilder();
     });
@@ -7877,6 +8381,20 @@
         invoicePreviewBody.innerHTML = newHtml;
         invoicePreviewToggleStatus.textContent = newStatus === "paid" ? "Mark as Due" : "Mark as Paid";
         invoicePreviewStatus.textContent = newStatus === "paid" ? "Marked paid." : "Marked due.";
+        // Audit: status flips are first-class events.
+        const invClient = (allClients || []).find((x) => x.id === row.client_id);
+        const invSum = await invoiceSummary(
+          newStatus === "paid" ? "marked paid" : "marked due",
+          invClient || { company_name: row.billed_to_name },
+          row.receipt_no
+        );
+        logAction({
+          action: newStatus === "paid" ? "invoice.paid" : "invoice.unpaid",
+          entityType: "invoice",
+          entityId: row.id,
+          summary: invSum,
+          payload: { client_id: row.client_id, receipt_no: row.receipt_no, from_status: row.status, to_status: newStatus, amount_paid: paid },
+        });
         renderInvoiceBuilder();
       } catch (err) {
         console.error("toggle invoice status failed:", err);
@@ -7989,6 +8507,14 @@
           plans = plans.filter((p) => String(p.id) !== String(target.id));
           activePlanId = null;
           activePlanTab = null;
+          const summary = await libraryItemSummary("deleted", "plan", target.name);
+          logAction({
+            action: "plan.deleted",
+            entityType: "plan",
+            entityId: target.id,
+            summary,
+            payload: { name: target.name, snapshot: target },
+          });
           renderPlanBuilder();
         } catch (err) {
           console.error("delete plan failed:", err);
@@ -8006,6 +8532,14 @@
           if (error) throw error;
           services = services.filter((s) => String(s.id) !== String(target.id));
           activeServiceId = null;
+          const summary = await libraryItemSummary("deleted", "service", target.name);
+          logAction({
+            action: "service.deleted",
+            entityType: "service",
+            entityId: target.id,
+            summary,
+            payload: { name: target.name, snapshot: target },
+          });
           renderPBServices();
         } catch (err) {
           console.error("delete service failed:", err);
@@ -8169,6 +8703,14 @@
         if (c) {
           await addSystemNote(c, "client", `Portal sign-in link sent to ${email}.`);
         }
+        const sentSummary = await contractSummary("sent portal link", c, null, `to ${email}`);
+        logAction({
+          action: "contract.sent_to_client",
+          entityType: "client",
+          entityId: c ? c.id : null,
+          summary: sentSummary,
+          payload: { email, kind: "portal_magic_link" },
+        });
         setTimeout(() => {
           btn.disabled = false;
           btn.textContent = originalLabel;
@@ -8327,7 +8869,59 @@
       }
     }
 
-    async function updateClientField(updates) {
+    // ============================================================
+    // ACTION LOG -- "who did what, when" for every meaningful write
+    // anywhere in the CRM. logAction() is fire-and-forget so a
+    // transient Supabase error never blocks the user; the worst
+    // case is one missing audit row (logged to the console).
+    //
+    // currentActor() is cached so every log write doesn't round-trip
+    // to Supabase auth. The cache is invalidated on auth state
+    // changes so a re-login picks up the new identity right away.
+    // ============================================================
+    let _cachedActor = null;
+    async function currentActor() {
+      if (_cachedActor) return _cachedActor;
+      try {
+        const { data: { user } = { user: null } } = await sb.auth.getUser();
+        if (!user) return { email: null, id: null, displayName: "Unknown" };
+        const meta = user.user_metadata || {};
+        const displayName =
+          (typeof meta.display_name === "string" && meta.display_name.trim()) ||
+          (user.email ? String(user.email).split("@")[0] : "Unknown");
+        _cachedActor = { email: user.email || null, id: user.id || null, displayName };
+        return _cachedActor;
+      } catch (err) {
+        console.warn("currentActor lookup failed:", err);
+        return { email: null, id: null, displayName: "Unknown" };
+      }
+    }
+    try {
+      sb.auth.onAuthStateChange(() => { _cachedActor = null; });
+    } catch (err) {
+      console.warn("auth state listener failed to attach:", err);
+    }
+
+    async function logAction({ action, entityType = null, entityId = null, summary = "", payload = {}, actorOverride = null }) {
+      try {
+        const actor = actorOverride || (await currentActor());
+        const row = {
+          actor_email:        actor.email ?? null,
+          actor_id:           actor.id ?? null,
+          actor_display_name: actor.displayName ?? null,
+          action,
+          entity_type: entityType,
+          entity_id:   entityId && /^[0-9a-f-]{36}$/i.test(String(entityId)) ? entityId : null,
+          summary,
+          payload: payload || {},
+        };
+        await sb.from("action_log").insert(row);
+      } catch (err) {
+        console.warn("action_log insert failed:", err);
+      }
+    }
+
+    async function updateClientField(updates, opts = {}) {
       // Guard against a stale/missing detailId. Without this, a leaked
       // bad value (e.g. the string "null" from a half-loaded UI state)
       // gets sent to PostgREST as .eq("id", "null") and surfaces to the
@@ -8336,8 +8930,14 @@
         console.warn("updateClientField skipped: invalid detailId", detailId);
         return;
       }
-      // Optimistic local update
+      // Capture the pre-update snapshot for the audit log BEFORE we
+      // optimistically mutate the in-memory client object.
       const c = getCurrentClient();
+      const beforeSnap = {};
+      if (c) {
+        for (const k of Object.keys(updates)) beforeSnap[k] = c[k];
+      }
+      // Optimistic local update
       if (c) Object.assign(c, updates);
       const { error } = await sb.from("clients").update(updates).eq("id", detailId);
       if (error) {
@@ -8347,6 +8947,24 @@
       // Reflect in table + calendar
       render();
       refreshCalendar();
+      // Mark the profile session dirty (any write arms the Save
+      // Changes gate).
+      markProfileDirty();
+      // Default-log a generic client.update audit row with the
+      // changed fields and their before/after values, unless the
+      // caller is going to log a more specific action itself
+      // (e.g. sendNote logs client.note.sent and addSystemNote logs
+      // client.note.system, which are richer for filtering).
+      if (!opts.skipDefaultLog) {
+        const summary = await clientUpdateSummary(c || { id: detailId, ...updates }, updates, beforeSnap);
+        logAction({
+          action: "client.update",
+          entityType: "client",
+          entityId: detailId,
+          summary,
+          payload: { fields: Object.keys(updates), before: beforeSnap, after: updates },
+        });
+      }
     }
 
     // Right-panel tab clicks
@@ -8464,7 +9082,8 @@
       if (!text) return;
       const c = getCurrentClient();
       if (!c) return;
-      const field = detailNotesTab === "client" ? "client_notes" : "web_notes";
+      const thread = detailNotesTab === "client" ? "client" : "web";
+      const field  = thread === "client" ? "client_notes" : "web_notes";
       const newArr = appendNote(c[field] || [], text);
       noteInput.value = "";
       // Reset dictation accumulator so a stray onresult event after
@@ -8475,7 +9094,15 @@
       noteSttBaseline = "";
       noteSttAccumulated = "";
       updateSaveChangesBtn();
-      await updateClientField({ [field]: newArr });
+      await updateClientField({ [field]: newArr }, { skipDefaultLog: true });
+      const summary = await noteSentSummary(c, thread, text);
+      logAction({
+        action: "client.note.sent",
+        entityType: "client",
+        entityId: c.id,
+        summary,
+        payload: { thread, text },
+      });
       renderProfile();
     }
     document.getElementById("sendNoteBtn").addEventListener("click", sendNote);
@@ -8541,7 +9168,235 @@
       if (name === "plan_builder") {
         renderPlanBuilder();
       }
+      if (name === "activity") {
+        // First open lazy-loads the feed; subsequent visits also
+        // refresh so a teammate's actions taken since the last visit
+        // appear without requiring a full page reload.
+        loadActivityFeed({ reset: true });
+      }
     }
+
+    // ============================================================
+    // ACTIVITY TAB — read-only viewer for public.action_log
+    // ============================================================
+    const ACTIVITY_PAGE_SIZE = 200;
+    let activityRows = [];
+    let activityRange = "all";       // today | 7d | 30d | all
+    let activitySearchTerm = "";
+    let activityActorPick = "";
+    let activityCatPick = "";
+    let activityHasMore = false;
+    let activityLoading = false;
+    let activityKnownActors = new Set();
+
+    function activityRangeLowerBound(range) {
+      const now = new Date();
+      if (range === "today") {
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        return d.toISOString();
+      }
+      if (range === "7d") {
+        const d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        return d.toISOString();
+      }
+      if (range === "30d") {
+        const d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        return d.toISOString();
+      }
+      return null;
+    }
+
+    function fmtRelativeTime(iso) {
+      if (!iso) return "";
+      const then = new Date(iso).getTime();
+      if (!Number.isFinite(then)) return "";
+      const diffSec = Math.max(0, Math.round((Date.now() - then) / 1000));
+      if (diffSec < 5) return "just now";
+      if (diffSec < 60) return `${diffSec}s ago`;
+      const m = Math.round(diffSec / 60);
+      if (m < 60) return `${m} min ago`;
+      const h = Math.round(diffSec / 3600);
+      if (h < 24) return `${h} hr ago`;
+      const d = Math.round(diffSec / 86400);
+      if (d < 30) return `${d} day${d === 1 ? "" : "s"} ago`;
+      return new Date(iso).toLocaleDateString();
+    }
+
+    function actionCategory(action) {
+      if (!action) return "other";
+      return String(action).split(".")[0];
+    }
+
+    function actorChipClass(name) {
+      // Sanitize: only ASCII letters / digits / dashes are valid in
+      // class names. Spaces -> dashes so "Client portal" -> Client-portal.
+      const safe = String(name || "Unknown").replace(/[^a-zA-Z0-9]+/g, "-");
+      return `activity-actor actor-${safe}`;
+    }
+
+    async function loadActivityFeed({ reset = false } = {}) {
+      const feedEl   = document.getElementById("activityFeed");
+      const moreBtn  = document.getElementById("activityLoadMore");
+      const statusEl = document.getElementById("activityStatus");
+      if (!feedEl) return;
+      if (activityLoading) return;
+      activityLoading = true;
+      if (statusEl) statusEl.textContent = reset ? "Loading…" : "Loading more…";
+      try {
+        let q = sb.from("action_log").select("*").order("at", { ascending: false });
+        const lb = activityRangeLowerBound(activityRange);
+        if (lb) q = q.gte("at", lb);
+        const offset = reset ? 0 : activityRows.length;
+        q = q.range(offset, offset + ACTIVITY_PAGE_SIZE - 1);
+        const { data, error } = await q;
+        if (error) throw error;
+        const rows = data || [];
+        if (reset) {
+          activityRows = rows;
+          activityKnownActors = new Set();
+        } else {
+          activityRows = activityRows.concat(rows);
+        }
+        for (const r of rows) {
+          if (r.actor_display_name) activityKnownActors.add(r.actor_display_name);
+        }
+        activityHasMore = rows.length === ACTIVITY_PAGE_SIZE;
+        rebuildActorFilterOptions();
+        renderActivityFeed();
+        if (statusEl) {
+          statusEl.textContent = activityRows.length
+            ? `${activityRows.length} event${activityRows.length === 1 ? "" : "s"} loaded.`
+            : "";
+        }
+        if (moreBtn) moreBtn.style.display = activityHasMore ? "" : "none";
+      } catch (err) {
+        console.error("activity load failed:", err);
+        if (statusEl) statusEl.textContent = "Failed to load: " + (err.message || String(err));
+      } finally {
+        activityLoading = false;
+      }
+    }
+
+    function rebuildActorFilterOptions() {
+      const sel = document.getElementById("activityActorFilter");
+      if (!sel) return;
+      const prev = sel.value;
+      const names = Array.from(activityKnownActors).filter(Boolean).sort((a, b) => a.localeCompare(b));
+      sel.innerHTML = `<option value="">All actors</option>` +
+        names.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+      // Preserve the prior selection if still valid.
+      if (prev && (prev === "" || activityKnownActors.has(prev))) sel.value = prev;
+    }
+
+    function filterActivityRows() {
+      const term = (activitySearchTerm || "").trim().toLowerCase();
+      return activityRows.filter((r) => {
+        if (activityActorPick && r.actor_display_name !== activityActorPick) return false;
+        if (activityCatPick) {
+          if (actionCategory(r.action) !== activityCatPick) return false;
+        }
+        if (term) {
+          const haystack = [
+            r.summary, r.action, r.actor_display_name, r.actor_email, r.entity_type
+          ].filter(Boolean).join(" ").toLowerCase();
+          if (!haystack.includes(term)) return false;
+        }
+        return true;
+      });
+    }
+
+    function renderActivityFeed() {
+      const feedEl = document.getElementById("activityFeed");
+      if (!feedEl) return;
+      const rows = filterActivityRows();
+      if (!rows.length) {
+        feedEl.innerHTML = `<div class="activity-empty">No activity yet for this filter. Try a wider time range or change the actor.</div>`;
+        return;
+      }
+      feedEl.innerHTML = rows.map((r) => {
+        const cat = actionCategory(r.action);
+        const actorName = r.actor_display_name || "Unknown";
+        const isClient = r.entity_type === "client" && r.entity_id;
+        const clickAttr = isClient ? `data-activity-client-id="${esc(r.entity_id)}"` : "";
+        const cls = isClient ? "activity-row is-clickable" : "activity-row";
+        const dateAttr = r.at ? new Date(r.at).toLocaleString() : "";
+        return `
+          <div class="${cls}" ${clickAttr} title="${esc(dateAttr)}">
+            <div class="activity-time">${esc(fmtRelativeTime(r.at))}</div>
+            <div><span class="${actorChipClass(actorName)}">${esc(actorName)}</span></div>
+            <div><span class="activity-action-chip cat-${esc(cat)}">${esc(cat)}</span></div>
+            <div class="activity-summary">
+              ${esc(r.summary || r.action || "(no summary)")}
+              <span class="activity-action-detail">${esc(r.action || "")}</span>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    // Wire up the activity tab controls. All wiring is inside a guard
+    // because in dev/test snapshots these elements may not exist yet.
+    (function wireActivityTab() {
+      const search   = document.getElementById("activitySearch");
+      const actorSel = document.getElementById("activityActorFilter");
+      const catSel   = document.getElementById("activityActionFilter");
+      const refresh  = document.getElementById("activityRefreshBtn");
+      const moreBtn  = document.getElementById("activityLoadMore");
+      const ranges   = document.querySelectorAll("[data-activity-range]");
+      const feedEl   = document.getElementById("activityFeed");
+      if (!feedEl) return;
+
+      let searchTimer = null;
+      if (search) {
+        search.addEventListener("input", () => {
+          clearTimeout(searchTimer);
+          searchTimer = setTimeout(() => {
+            activitySearchTerm = search.value || "";
+            renderActivityFeed();
+          }, 150);
+        });
+      }
+      if (actorSel) {
+        actorSel.addEventListener("change", () => {
+          activityActorPick = actorSel.value || "";
+          renderActivityFeed();
+        });
+      }
+      if (catSel) {
+        catSel.addEventListener("change", () => {
+          activityCatPick = catSel.value || "";
+          renderActivityFeed();
+        });
+      }
+      if (refresh) {
+        refresh.addEventListener("click", () => loadActivityFeed({ reset: true }));
+      }
+      if (moreBtn) {
+        moreBtn.addEventListener("click", () => loadActivityFeed({ reset: false }));
+      }
+      ranges.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          activityRange = btn.dataset.activityRange || "all";
+          ranges.forEach((b) => b.classList.toggle("activity-range-active", b === btn));
+          loadActivityFeed({ reset: true });
+        });
+      });
+      // Click-through: open a client profile when the row is for a
+      // client entity. Saves a click compared to switching to List
+      // and finding the row.
+      feedEl.addEventListener("click", (e) => {
+        const row = e.target.closest("[data-activity-client-id]");
+        if (!row) return;
+        const id = row.getAttribute("data-activity-client-id");
+        if (id) {
+          // Make sure the List tab's data is what's in memory, so
+          // openDetail can find the client by id even if we never
+          // visited that tab.
+          switchTab("list");
+          setTimeout(() => openDetail(id, "info"), 30);
+        }
+      });
+    })();
 
     function buildCalendarEvents() {
       const visible = applyFiltersToClients(allClients);
@@ -9462,6 +10317,15 @@
       await load();
       const newId = data && data[0] && data[0].id;
       const companyName = row.company_name;
+      const newRow = data && data[0] ? data[0] : null;
+      const summary = await clientCreatedSummary(newRow || row);
+      logAction({
+        action: "client.created",
+        entityType: "client",
+        entityId: newId || null,
+        summary: summary + " (via Sekretary)",
+        payload: { snapshot: newRow ? pickClientWritableFields(newRow) : row, source: "sekretary" },
+      });
       sekWizardState = null;
       renderWriteSuccess("create_client", { success: true, action: "created", client: { id: newId, company_name: companyName } });
       appendSekBubble("assistant", t("wizardCreated", companyName));
@@ -9470,11 +10334,26 @@
     // ---- DB helper for write tools ----
     async function sekDbUpdate(clientId, updates) {
       const c = (allClients || []).find((x) => x.id === clientId);
-      if (c) Object.assign(c, updates);
+      const beforeSnap = {};
+      if (c) {
+        for (const k of Object.keys(updates)) beforeSnap[k] = c[k];
+        Object.assign(c, updates);
+      }
       const { error } = await sb.from("clients").update(updates).eq("id", clientId);
       if (error) return { error: error.message };
       render();
       refreshCalendar();
+      // Audit: same shape as updateClientField, tagged with the
+      // Sekretary source so we can tell apart team-driven updates
+      // from AI-driven ones in the Activity feed.
+      const summary = await clientUpdateSummary(c || { id: clientId, ...updates }, updates, beforeSnap);
+      logAction({
+        action: "client.update",
+        entityType: "client",
+        entityId: clientId,
+        summary: summary + " (via Sekretary)",
+        payload: { fields: Object.keys(updates), before: beforeSnap, after: updates, source: "sekretary" },
+      });
       return { ok: true };
     }
 
