@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- crm-deploy-stamp: 20260430-authfix-bootstrap — if this line is missing in View Source, the browser is not loading the current deployment -->
+<!-- crm-deploy-stamp: 20260430-authfix-boot-tdz — if this line is missing in View Source, the browser is not loading the current deployment -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="crm-build" content="20260430-authfix-bootstrap">
+  <meta name="crm-build" content="20260430-authfix-boot-tdz">
   <title>Mini CRM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3491,6 +3491,15 @@
     let currentTeamMember = null;     // selected member during the login flow
     let signedInMember    = null;     // currently authenticated team member (or null)
     let signedInRoles     = [];       // roles[] from the live Supabase session
+    // Boot coordination MUST live before handleLoginSubmit: that handler
+    // assigns __crmAuthBootDone after a successful load(). If these lets
+    // were declared thousands of lines later, any runtime error before
+    // that line would skip the initializer and leave the binding stuck in
+    // the TDZ forever -- every Sign-in click then throws ReferenceError on
+    // the assignment, finally never runs, the button stays dead, and it
+    // looks like "Sign in does nothing".
+    let __crmAuthBootDone = false;
+    let __crmAuthBootRunning = false;
 
     // Reads roles[] from a Supabase auth user. Falls back to a legacy single
     // `role` string if the account has not been migrated yet. Used for UI
@@ -4041,8 +4050,6 @@
     // first tick even though persisted auth exists, and the old one-shot
     // IIFE at the bottom of the script could miss the only moment the
     // session becomes visible.
-    let __crmAuthBootDone = false;
-    let __crmAuthBootRunning = false;
     async function bootstrapCrmFromAuth(reason) {
       if (__crmAuthBootDone) return;
       if (__crmAuthBootRunning) return;
