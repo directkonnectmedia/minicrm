@@ -166,6 +166,27 @@
       font-size: 22px; padding: 4px 8px; line-height: 1;
     }
     .modal-close:hover { background: #f3f4f6; }
+
+    /* Profile header actions — Save Changes button + close */
+    .detail-header-actions { display: flex; align-items: center; gap: 8px; }
+    .save-changes-btn {
+      background: #16a34a; color: #fff; border: none;
+      padding: 7px 14px; border-radius: 6px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 7px;
+      box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.4);
+      animation: saveChangesGlow 2s ease-in-out infinite;
+    }
+    .save-changes-btn:hover { background: #15803d; }
+    .save-changes-btn:disabled { opacity: 0.6; cursor: wait; animation: none; }
+    .save-changes-dot {
+      display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+      background: #fef9c3;
+    }
+    @keyframes saveChangesGlow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.45); }
+      50%      { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0);    }
+    }
     .modal-footer {
       padding: 14px 20px;
       border-top: 1px solid #e5e7eb;
@@ -2425,7 +2446,12 @@
     <div class="modal modal-wide" role="dialog" aria-modal="true">
       <div class="modal-header">
         <div class="modal-title" id="detailTitle">Client Details</div>
-        <button class="modal-close" id="closeDetail" aria-label="Close">×</button>
+        <div class="detail-header-actions">
+          <button id="saveDetailChangesBtn" class="save-changes-btn" type="button" style="display:none;">
+            <span class="save-changes-dot"></span>Save Changes
+          </button>
+          <button class="modal-close" id="closeDetail" aria-label="Close">×</button>
+        </div>
       </div>
       <div class="profile-layout">
         <div class="profile-notes">
@@ -4571,8 +4597,138 @@
     function closeDetail() {
       detailOverlay.classList.remove("open");
       detailId = null; detailEditingField = null; detailScheduleDraft = null;
+      // Drop any in-flight dictation state so it doesn't bleed into the
+      // next profile we open.
+      noteSttBaseline = "";
+      noteSttAccumulated = "";
+      updateSaveChangesBtn();
     }
     function getCurrentClient() { return allClients.find((c) => c.id === detailId); }
+
+    // ---------------------------------------------------------------
+    // Unsaved-changes tracking for the profile (notes, inline edits,
+    // schedule editor). This plugs the silent leaks where a user typed
+    // / dictated a note or pencil-edited a field and then closed the
+    // profile before the save fired -- the close path used to drop
+    // the work on the floor. Now any pending change lights up the
+    // "Save Changes" button in the header and any attempt to close
+    // pops a confirmation that forces a save-then-close or keeps you
+    // in the profile to finish editing.
+    // ---------------------------------------------------------------
+    function isNoteInputDirty() {
+      const el = document.getElementById("noteInput");
+      return !!(el && el.value && el.value.trim().length > 0);
+    }
+    function getInlineEditPending() {
+      // Returns { field, value, oldValue } if the user is mid-edit on
+      // an inline pencil field AND the value has actually changed,
+      // otherwise null.
+      if (!detailEditingField) return null;
+      const inp = rightContent.querySelector(`input[data-edit="${detailEditingField}"]`);
+      if (!inp) return null;
+      const c = getCurrentClient();
+      if (!c) return null;
+      const value = (inp.value || "").trim();
+      let oldValue;
+      if (detailEditingField.startsWith("contract.")) {
+        const key = detailEditingField.slice("contract.".length);
+        oldValue = (c.contract && c.contract[key]) ?? "";
+      } else {
+        oldValue = c[detailEditingField] ?? "";
+      }
+      const oldStr = oldValue == null ? "" : String(oldValue);
+      if (value === oldStr) return null;
+      return { field: detailEditingField, value, oldValue };
+    }
+    function isScheduleEditDirty() {
+      if (detailScheduleMode !== "edit" && detailScheduleMode !== "menu") return false;
+      const c = getCurrentClient();
+      if (!c) return false;
+      // Pull the latest values straight from the inputs in case the
+      // change-event listener hasn't synced detailScheduleDraft yet
+      // (e.g. user just typed a digit and clicked close).
+      const dateInp = document.getElementById("scheduleDate");
+      const timeInp = document.getElementById("scheduleTime");
+      const draft = detailScheduleDraft || {};
+      const date = (dateInp ? dateInp.value : draft.date) || "";
+      const time = (timeInp ? timeInp.value : draft.time) || "";
+      const type = draft.type || c.follow_up_type || "Follow-up";
+      if (!date) return false;
+      const iso = combineDateTime(date, time || "09:00");
+      if (iso !== c.follow_up_at) return true;
+      if (type !== (c.follow_up_type || "Follow-up")) return true;
+      return false;
+    }
+    function isProfileDirty() {
+      if (!detailId) return false;
+      if (isNoteInputDirty()) return true;
+      if (getInlineEditPending()) return true;
+      if (isScheduleEditDirty()) return true;
+      return false;
+    }
+    function updateSaveChangesBtn() {
+      const btn = document.getElementById("saveDetailChangesBtn");
+      if (!btn) return;
+      btn.style.display = isProfileDirty() ? "inline-flex" : "none";
+    }
+
+    // Commit every pending change in the profile in a deterministic
+    // order: inline edit first (so a renamed company is in DB before
+    // any system note that references it), then schedule, then the
+    // typed note. Each step is best-effort: if one fails (e.g. dup
+    // email) the others still attempt so the user doesn't silently
+    // lose the others.
+    let savingDetailChanges = false;
+    async function saveDetailChanges() {
+      if (savingDetailChanges) return false;
+      if (!detailId) return true;
+      const btn = document.getElementById("saveDetailChangesBtn");
+      const originalLabel = btn ? btn.innerHTML : "";
+      savingDetailChanges = true;
+      if (btn) { btn.disabled = true; btn.innerHTML = "Saving..."; }
+      try {
+        // 1) Inline pencil edit
+        const pending = getInlineEditPending();
+        if (pending) {
+          await handleSaveInlineEdit(pending.field);
+        }
+        // 2) Schedule draft (only if there's a real change)
+        if (isScheduleEditDirty()) {
+          await handleScheduleSave();
+        }
+        // 3) Typed / dictated note
+        if (isNoteInputDirty()) {
+          await sendNote();
+        }
+      } catch (err) {
+        console.error("saveDetailChanges failed:", err);
+        alert("Some changes failed to save. Check the console for details.");
+        return false;
+      } finally {
+        savingDetailChanges = false;
+        if (btn) { btn.disabled = false; btn.innerHTML = originalLabel; }
+        updateSaveChangesBtn();
+      }
+      return true;
+    }
+
+    // Gate every "close the profile" entry point (× button, backdrop
+    // click, Escape) through this guard. If there's unsaved work we
+    // pop a confirm: OK = save and close, Cancel = stay in profile.
+    // No discard option -- the user explicitly asked the system to
+    // refuse to close until Save Changes is pressed.
+    async function attemptCloseDetail() {
+      if (!detailId) { closeDetail(); return; }
+      if (!isProfileDirty()) { closeDetail(); return; }
+      const ok = window.confirm(
+        "You have unsaved changes on this client.\n\n" +
+        "Press OK to save them and close the profile.\n" +
+        "Press Cancel to keep editing."
+      );
+      if (!ok) return;
+      const saved = await saveDetailChanges();
+      if (saved && !isProfileDirty()) closeDetail();
+    }
 
     function renderProfile() {
       const c = getCurrentClient();
@@ -4627,6 +4783,10 @@
         const inp = rightContent.querySelector(`input[data-edit="${detailEditingField}"]`);
         if (inp) { inp.focus(); inp.select?.(); }
       }
+
+      // Sync the "Save Changes" button visibility on every re-render
+      // (covers tab switches, schedule mode changes, etc.)
+      updateSaveChangesBtn();
     }
 
     // ---- Info tab ----
@@ -8307,6 +8467,14 @@
       const field = detailNotesTab === "client" ? "client_notes" : "web_notes";
       const newArr = appendNote(c[field] || [], text);
       noteInput.value = "";
+      // Reset dictation accumulator so a stray onresult event after
+      // Send can't re-populate the textarea with already-saved text.
+      // Without this the user sees the note "come back" after sending
+      // and thinks dictation is still being recorded into the next
+      // note when in fact nothing is being captured.
+      noteSttBaseline = "";
+      noteSttAccumulated = "";
+      updateSaveChangesBtn();
       await updateClientField({ [field]: newArr });
       renderProfile();
     }
@@ -8425,8 +8593,19 @@
     backBtn.addEventListener("click", goBack);
     nextBtn.addEventListener("click", goNext);
 
-    document.getElementById("closeDetail").addEventListener("click", closeDetail);
-    dismissOnBackdropClick(detailOverlay, closeDetail);
+    document.getElementById("closeDetail").addEventListener("click", attemptCloseDetail);
+    dismissOnBackdropClick(detailOverlay, attemptCloseDetail);
+    document.getElementById("saveDetailChangesBtn").addEventListener("click", async () => {
+      await saveDetailChanges();
+    });
+    // Live-track typing in the note textarea so the Save Changes
+    // button lights up the moment there's unsaved text. Without this
+    // a user could type a note, click X, and lose it silently.
+    document.getElementById("noteInput").addEventListener("input", updateSaveChangesBtn);
+    // Inline pencil edits and the schedule date/time inputs both
+    // live inside rightContent. A single delegated input listener
+    // covers every editable field that ships in the right pane.
+    rightContent.addEventListener("input", updateSaveChangesBtn);
 
     document.getElementById("openFilters").addEventListener("click", openFilterModal);
     document.getElementById("closeFilter").addEventListener("click", closeFilterModal);
@@ -8442,7 +8621,7 @@
         else if (cbEditorOverlay.classList.contains("open")) closeCBEditor();
         else if (filterOverlay.classList.contains("open")) closeFilterModal();
         else if (wizardOverlay.classList.contains("open")) closeWizard();
-        else if (detailOverlay.classList.contains("open")) closeDetail();
+        else if (detailOverlay.classList.contains("open")) attemptCloseDetail();
       }
       if (e.key === "Enter" && wizardOverlay.classList.contains("open") && e.target.tagName !== "TEXTAREA" && e.target !== noteInput) {
         e.preventDefault(); goNext();
