@@ -2031,6 +2031,39 @@
       min-height: 18px;
     }
 
+    /* Emergency sign-out: always-visible, bottom-right corner. Subtle
+       enough not to clutter normal use, but always reachable when the
+       app's auth state is wedged. Hardcoded inline onclick so it works
+       even when our JS bundle errors out. */
+    #emergencyForceSignOutBtn {
+      position: fixed;
+      bottom: 12px;
+      right: 12px;
+      z-index: 99999;
+      background: #ffffff;
+      color: #6b7280;
+      border: 1px solid #d1d5db;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      opacity: 0.55;
+      transition: opacity 120ms, background 120ms, color 120ms, border-color 120ms;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-family: inherit;
+    }
+    #emergencyForceSignOutBtn:hover {
+      opacity: 1;
+      background: #fef2f2;
+      color: #b91c1c;
+      border-color: #fecaca;
+    }
+    #emergencyForceSignOutBtn:active { transform: translateY(1px); }
+
     /* Recovery banner: visible only when a session exists but the server
        doesn't recognize the user as team (empty roles). Gives a one-click
        escape hatch so the user never has to clear localStorage by hand. */
@@ -2362,6 +2395,24 @@
       </div>
     </div>
   </div>
+
+  <!--
+    Always-visible emergency sign-out. Hardcoded HTML with an
+    inline onclick so it works even when the rest of the JS is in
+    an unrecoverable state (Supabase SDK not loaded, signedInMember
+    null with no overlay shown, etc.). Clears every Supabase auth
+    key from localStorage and reloads. No matter how broken the
+    page gets, this always brings the user back to a clean sign-in.
+    Styled subtle bottom-right so it doesn't intrude on normal use.
+  -->
+  <button
+    id="emergencyForceSignOutBtn"
+    type="button"
+    title="Emergency: clears local auth tokens and reloads. Use only if you can't sign out the normal way."
+    onclick="(function(){try{Object.keys(localStorage).filter(function(k){return k.indexOf('sb-')===0}).forEach(function(k){localStorage.removeItem(k)});}catch(e){}try{sessionStorage.clear();}catch(e){}location.reload();})();return false;">
+    <span aria-hidden="true">&#x21AA;</span>
+    Force sign out
+  </button>
 
   <div id="sessionRoleBanner" class="session-role-banner" style="display:none;" role="alert">
     <div class="session-role-banner-icon" aria-hidden="true">!</div>
@@ -3865,6 +3916,41 @@
         applyAuthUIState();
         showLoginOverlay();
         return false;
+      }
+
+      // Sanity check: even though we have a "session" object, the
+      // backend may reject the access token (auth.uid() returns null
+      // server-side, RLS blocks every row, etc.). If a single tiny
+      // probe against public.clients fails, the session is dead --
+      // wipe it and bring up the login overlay instead of leaving the
+      // user in a half-broken state with an empty CRM and no way out.
+      try {
+        const probe = await sb
+          .from("clients")
+          .select("id", { count: "exact", head: true });
+        if (probe && probe.error) {
+          console.warn("Auth sanity probe failed; forcing clean re-auth:", probe.error);
+          try { await sb.auth.signOut(); } catch {}
+          try {
+            Object.keys(localStorage)
+              .filter((k) => k.startsWith("sb-"))
+              .forEach((k) => localStorage.removeItem(k));
+          } catch {}
+          try { sessionStorage.removeItem(SESSION_MARKER_KEY); } catch {}
+          hasActiveSession = false;
+          jwtTeamRolesPresent = false;
+          signedInMember = null;
+          signedInRoles = [];
+          applyAuthUIState();
+          showLoginOverlay();
+          return false;
+        }
+      } catch (err) {
+        // Network failure or unexpected throw: don't penalise the
+        // user just because the network blipped on a refresh. Keep
+        // the session optimistically; the UI still has the
+        // emergency Force Sign Out button as a manual escape.
+        console.warn("Auth sanity probe threw (kept session):", err);
       }
 
       const email = session.user && session.user.email;
