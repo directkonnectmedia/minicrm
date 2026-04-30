@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- crm-deploy-stamp: 20260430-debug-strip — if this line is missing in View Source, the browser is not loading the current deployment -->
+<!-- crm-deploy-stamp: 20260430-fix-overlay-reset — if this line is missing in View Source, the browser is not loading the current deployment -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="crm-build" content="20260430-debug-strip">
+  <meta name="crm-build" content="20260430-fix-overlay-reset">
   <title>Mini CRM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3715,11 +3715,20 @@
     }
 
     function showLoginOverlay() {
+      // Idempotent: if the overlay is already open, don't reset the
+      // user's in-progress selection. The auth boot retries call this
+      // every time getSession returns null, and on a cold load with no
+      // persisted auth the user needs to be able to click a team
+      // member and stay on the PIN screen without a 1s retry wiping
+      // the selection out from under them.
+      const wasOpen = loginOverlay.classList.contains("open");
       loginError.textContent = "";
-      loginPIN.hidden = true;
-      loginPicker.hidden = false;
-      currentTeamMember = null;
-      renderLoginPicker();
+      if (!wasOpen) {
+        loginPIN.hidden = true;
+        loginPicker.hidden = false;
+        currentTeamMember = null;
+        renderLoginPicker();
+      }
       loginOverlay.classList.add("open");
       loginOverlay.setAttribute("aria-hidden", "false");
       document.body.classList.add("login-active");
@@ -4162,6 +4171,14 @@
       dbg("info", "boot tick (" + reason + ") done=" + __crmAuthBootDone + " running=" + __crmAuthBootRunning);
       if (__crmAuthBootDone) return;
       if (__crmAuthBootRunning) return;
+      // Short-circuit retries when there's clearly nothing to recover
+      // (no persisted Supabase auth at all). Without this, retries at
+      // 1s/2.5s call checkAuthOnLoad which calls showLoginOverlay()
+      // again, fighting the user mid-login flow.
+      if (reason && reason.startsWith("retry+") && !localStorageLooksLikeSupabaseAuth()) {
+        dbg("info", "skip retry: no persisted auth in localStorage");
+        return;
+      }
       __crmAuthBootRunning = true;
       try {
         const ok = await checkAuthOnLoad();
