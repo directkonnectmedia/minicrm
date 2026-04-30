@@ -296,17 +296,48 @@ create policy "authenticated all"
 -- stay terse. Re-running this block is safe -- every drop/create is
 -- idempotent.
 
+-- Team membership check.
+--
+-- Original implementation read user_metadata.roles from auth.jwt().
+-- That works until a Supabase token-refresh ships an access token
+-- that omits user_metadata claims (we observed this in production:
+-- a refresh stripped the roles array, every client row vanished
+-- behind RLS, and the only recovery was wiping sb-* localStorage).
+--
+-- This version asks the database directly: does the row in
+-- auth.users for the calling auth.uid() carry team roles? That is
+-- bound to persisted state, not to whatever the access token
+-- happens to contain on a given request, so the policy can never
+-- be tricked by a stripped JWT again.
+--
+-- SECURITY DEFINER is required because authenticated users cannot
+-- read auth.users on their own. Safety: the function only ever
+-- inspects the row whose id equals auth.uid() (i.e. the caller's
+-- own row) and returns a boolean -- no row data leaves the
+-- function, no user input is interpolated, and search_path is
+-- pinned. Re-running this block is safe; create or replace is
+-- idempotent.
 create or replace function public.is_team_member() returns boolean
-  language sql stable
+  language sql
+  stable
+  security definer
+  set search_path = public, auth
 as $$
-  select case
-    when auth.jwt() is null then false
-    when (auth.jwt() #> '{user_metadata,roles}') is null then false
-    when jsonb_typeof(auth.jwt() #> '{user_metadata,roles}') = 'array'
-      then (auth.jwt() #> '{user_metadata,roles}') ?| array['admin', 'sales', 'web_designer']
-    else false
-  end;
+  select exists (
+    select 1
+    from auth.users u
+    where u.id = auth.uid()
+      and case
+        when u.raw_user_meta_data is null then false
+        when (u.raw_user_meta_data->'roles') is null then false
+        when jsonb_typeof(u.raw_user_meta_data->'roles') = 'array'
+          then (u.raw_user_meta_data->'roles') ?| array['admin', 'sales', 'web_designer']
+        else false
+      end
+  );
 $$;
+
+grant execute on function public.is_team_member() to authenticated;
 
 -- public.clients: team gets full access, portal clients see only their
 -- own row (matched by email). Replaces the broad "authenticated all"
