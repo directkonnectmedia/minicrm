@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- crm-deploy-stamp: 20260430-authfix-hydration — if this line is missing in View Source, the browser is not loading the current deployment -->
+<!-- crm-deploy-stamp: 20260430-authfix-bootstrap — if this line is missing in View Source, the browser is not loading the current deployment -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="crm-build" content="20260430-authfix-hydration">
+  <meta name="crm-build" content="20260430-authfix-bootstrap">
   <title>Mini CRM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3750,6 +3750,7 @@
         applyAuthUIState();
         hideLoginOverlay();
         await load();
+        __crmAuthBootDone = true;
       } catch (err) {
         loginError.textContent = "Sign in failed: " + (err.message || err);
       } finally {
@@ -3881,7 +3882,14 @@
     // zero /clients requests) until a manual hard refresh.
     function localStorageLooksLikeSupabaseAuth() {
       try {
-        return Object.keys(localStorage).some((k) => k.startsWith("sb-") && k.includes("auth-token"));
+        return Object.keys(localStorage).some((k) => {
+          if (!k.startsWith("sb-")) return false;
+          // Supabase v2 keys usually look like sb-<ref>-auth-token. Some
+          // builds omit the literal substring "auth-token" but still
+          // store auth under sb-*; any sb key mentioning auth/session is
+          // enough to justify waiting for hydration.
+          return k.includes("auth-token") || k.includes("-auth-") || k.includes("session");
+        });
       } catch {
         return false;
       }
@@ -3944,14 +3952,19 @@
 
       try { await rosterPromise; } catch {}
 
-      // Stay-logged-in OFF: if browser was closed since last login, force re-auth.
+      // "Stay logged in" OFF historically meant: if this tab's
+      // sessionStorage marker was missing, call signOut() even when
+      // Supabase still had a valid refresh token in localStorage -- the
+      // intent was "user closed the browser, come back clean". That
+      // cannot be distinguished from (a) a brand-new tab with a valid
+      // persisted session, (b) first paint before marker is written, or
+      // (c) sessionStorage quirks. In all of those cases the old logic
+      // destroyed the session and skipped load(), producing the empty
+      // CRM + zero /clients requests bug on refresh. We now only ensure
+      // the marker exists whenever we have a session; use Sign out /
+      // Force sign out to end a team session intentionally.
       if (session && !getStayLoggedIn()) {
-        let marker = null;
-        try { marker = sessionStorage.getItem(SESSION_MARKER_KEY); } catch {}
-        if (!marker) {
-          try { await sb.auth.signOut(); } catch {}
-          session = null;
-        }
+        try { sessionStorage.setItem(SESSION_MARKER_KEY, "1"); } catch {}
       }
 
       hasActiveSession = !!session;
@@ -4022,6 +4035,35 @@
       return true;
     }
 
+    // Single-flight boot: checkAuthOnLoad + load(). Retries are scheduled
+    // from INITIAL_SESSION and from staggered timeouts because some
+    // browsers / Supabase versions surface getSession() = null on the
+    // first tick even though persisted auth exists, and the old one-shot
+    // IIFE at the bottom of the script could miss the only moment the
+    // session becomes visible.
+    let __crmAuthBootDone = false;
+    let __crmAuthBootRunning = false;
+    async function bootstrapCrmFromAuth(reason) {
+      if (__crmAuthBootDone) return;
+      if (__crmAuthBootRunning) return;
+      __crmAuthBootRunning = true;
+      try {
+        const ok = await checkAuthOnLoad();
+        if (!ok) return;
+        await load();
+        __crmAuthBootDone = true;
+      } catch (err) {
+        console.warn("bootstrapCrmFromAuth failed:", reason, err);
+      } finally {
+        __crmAuthBootRunning = false;
+      }
+    }
+    function scheduleAuthBootstrapRetries() {
+      [0, 50, 150, 400, 1000, 2500].forEach((ms) => {
+        setTimeout(() => bootstrapCrmFromAuth("retry+" + ms + "ms"), ms);
+      });
+    }
+
     // React to auth events from anywhere (e.g. token expiry).
     // Also a convenient single point to write `auth.signed_in` /
     // `auth.signed_out` rows into the action log so the Activity
@@ -4058,6 +4100,7 @@
         jwtTeamRolesPresent = false;
         signedInMember = null;
         signedInRoles = [];
+        __crmAuthBootDone = false;
         applyAuthUIState();
         try { sessionStorage.removeItem(SESSION_MARKER_KEY); } catch {}
         showLoginOverlay();
@@ -4103,6 +4146,12 @@
         } catch (err) { console.warn("token refresh role re-read failed:", err); }
         try { _cachedActor = null; } catch {}
         applyAuthUIState();
+      } else if (event === "INITIAL_SESSION") {
+        // Official first paint hook: run the same boot path as our
+        // staggered timeouts below. Some environments only become
+        // consistent after INITIAL_SESSION fires even though getSession
+        // looked empty a few milliseconds earlier.
+        await bootstrapCrmFromAuth("INITIAL_SESSION");
       }
     });
 
@@ -11882,8 +11931,7 @@ SOLO para charla casual (saludos, "¿cómo estás?", preguntas sobre ti mismo). 
     }
 
     (async () => {
-      const ok = await checkAuthOnLoad();
-      if (ok) await load();
+      scheduleAuthBootstrapRetries();
     })();
   </script>
 </body>
