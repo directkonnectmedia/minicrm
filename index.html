@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- crm-deploy-stamp: 20260430-authfix-boot-tdz — if this line is missing in View Source, the browser is not loading the current deployment -->
+<!-- crm-deploy-stamp: 20260430-debug-strip — if this line is missing in View Source, the browser is not loading the current deployment -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="crm-build" content="20260430-authfix-boot-tdz">
+  <meta name="crm-build" content="20260430-debug-strip">
   <title>Mini CRM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2066,6 +2066,39 @@
     }
     #emergencyForceSignOutBtn:active { transform: translateY(1px); }
 
+    /* Diagnostic strip: live boot log, screenshot-friendly. Drawn at
+       the bottom-left so it never overlaps the Force sign out button.
+       Tiny font, semi-transparent dark background, scrolls vertically
+       inside a small viewport. Click to copy entire contents to the
+       clipboard for fast sharing. */
+    #crmDebugStrip {
+      position: fixed;
+      bottom: 12px;
+      left: 12px;
+      z-index: 99998;
+      max-width: 460px;
+      max-height: 180px;
+      overflow-y: auto;
+      background: rgba(17, 24, 39, 0.92);
+      color: #d1d5db;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+      pointer-events: auto;
+    }
+    #crmDebugStrip:empty { display: none; }
+    #crmDebugStrip .dbg-ok    { color: #6ee7b7; }
+    #crmDebugStrip .dbg-warn  { color: #fcd34d; }
+    #crmDebugStrip .dbg-err   { color: #fca5a5; }
+    #crmDebugStrip .dbg-info  { color: #93c5fd; }
+    #crmDebugStrip .dbg-hdr   { color: #f9fafb; font-weight: 700; }
+
     /* Recovery banner: visible only when a session exists but the server
        doesn't recognize the user as team (empty roles). Gives a one-click
        escape hatch so the user never has to clear localStorage by hand. */
@@ -2415,6 +2448,15 @@
     <span aria-hidden="true">&#x21AA;</span>
     Force sign out
   </button>
+
+  <!--
+    On-screen boot diagnostics. Always visible (small, fixed
+    bottom-left) so when something goes wrong the user can simply
+    screenshot it. Mirrors what would otherwise live behind F12
+    Console: each step of the auth bootstrap appends one line.
+    Click to copy all entries.
+  -->
+  <div id="crmDebugStrip" title="Click to copy. Boot diagnostics."></div>
 
   <div id="sessionRoleBanner" class="session-role-banner" style="display:none;" role="alert">
     <div class="session-role-banner-icon" aria-hidden="true">!</div>
@@ -3182,6 +3224,65 @@
     }
 
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ---------------------------------------------------------
+    // On-screen diagnostics. Always-visible micro-log so when the
+    // app misbehaves the user can screenshot one image instead of
+    // navigating DevTools. Lines are color-coded by severity. Click
+    // the strip to copy the whole log to clipboard. Also catches
+    // window.onerror / unhandledrejection so a runtime error that
+    // would otherwise be invisible is loud and obvious.
+    // ---------------------------------------------------------
+    (function setupCrmDebug() {
+      const el = document.getElementById("crmDebugStrip");
+      if (!el) return;
+      const log = [];
+      function ts() {
+        const d = new Date();
+        return (
+          String(d.getHours()).padStart(2, "0") + ":" +
+          String(d.getMinutes()).padStart(2, "0") + ":" +
+          String(d.getSeconds()).padStart(2, "0") + "." +
+          String(d.getMilliseconds()).padStart(3, "0")
+        );
+      }
+      function paint(line, kind) {
+        const span = document.createElement("div");
+        span.className = "dbg-" + (kind || "info");
+        span.textContent = "[" + ts() + "] " + line;
+        el.appendChild(span);
+        el.scrollTop = el.scrollHeight;
+        log.push(line);
+      }
+      window.crmDbg = {
+        info: (s) => paint(String(s), "info"),
+        ok:   (s) => paint(String(s), "ok"),
+        warn: (s) => paint(String(s), "warn"),
+        err:  (s) => paint(String(s), "err"),
+        hdr:  (s) => paint(String(s), "hdr"),
+        dump: () => log.slice(),
+      };
+      // First line so the user can confirm the strip is alive.
+      window.crmDbg.hdr("crm boot start (build=" + (document.querySelector('meta[name="crm-build"]')?.content || "?") + ")");
+      el.addEventListener("click", () => {
+        try {
+          navigator.clipboard.writeText(log.join("\n")).then(
+            () => window.crmDbg.ok("(copied to clipboard)"),
+            () => window.crmDbg.warn("(copy failed)")
+          );
+        } catch { window.crmDbg.warn("(copy unavailable)"); }
+      });
+      window.addEventListener("error", (ev) => {
+        window.crmDbg.err("window.error: " + (ev.message || ev.error || "unknown"));
+      });
+      window.addEventListener("unhandledrejection", (ev) => {
+        const m = ev?.reason?.message || ev?.reason || "unknown";
+        window.crmDbg.err("unhandledrejection: " + m);
+      });
+    })();
+    function dbg(kind, msg) {
+      try { window.crmDbg && window.crmDbg[kind] && window.crmDbg[kind](msg); } catch {}
+    }
     const tbody = document.getElementById("rows");
     const emptyEl = document.getElementById("empty");
 
@@ -3729,6 +3830,7 @@
     }
 
     async function handleLoginSubmit() {
+      dbg("info", "Sign in click for " + (currentTeamMember && currentTeamMember.email));
       if (!currentTeamMember) return;
       const pin = getPINFromBoxes();
       loginError.textContent = "";
@@ -3744,11 +3846,13 @@
           password: pin,
         });
         if (error) {
+          dbg("err", "signInWithPassword: " + error.message);
           loginError.textContent = "Wrong PIN. Try again.";
           loginPinBoxes.querySelectorAll("input").forEach((i) => { i.value = ""; i.classList.remove("filled"); });
           loginPinBoxes.querySelector('input[data-pin-idx="0"]').focus();
           return;
         }
+        dbg("ok", "signInWithPassword ok; user=" + (signInData?.user?.email || "?"));
         try { sessionStorage.setItem(SESSION_MARKER_KEY, "1"); } catch {}
         signedInMember = currentTeamMember;
         signedInRoles = readUserRoles(signInData && signInData.user);
@@ -3761,6 +3865,7 @@
         await load();
         __crmAuthBootDone = true;
       } catch (err) {
+        dbg("err", "handleLoginSubmit threw: " + (err && err.message || err));
         loginError.textContent = "Sign in failed: " + (err.message || err);
       } finally {
         setLoginBusy(false);
@@ -3937,8 +4042,9 @@
       // null -- classic cold-reload race on fast machines.
       try {
         session = await waitForClientSession(2500);
+        dbg(session ? "ok" : "warn", "getSession -> " + (session ? "session for " + (session.user && session.user.email) : "null"));
       } catch (err) {
-        console.warn("waitForClientSession failed:", err);
+        dbg("err", "waitForClientSession failed: " + (err && err.message || err));
       }
 
       // Mint a fresh access token on boot when possible. We previously
@@ -3997,6 +4103,7 @@
           .from("clients")
           .select("id", { count: "exact", head: true });
         if (probe && probe.error) {
+          dbg("err", "sanity probe blocked: " + (probe.error.code || "") + " " + (probe.error.message || ""));
           console.warn("Auth sanity probe failed; forcing clean re-auth:", probe.error);
           try { await sb.auth.signOut(); } catch {}
           try {
@@ -4018,6 +4125,7 @@
         // user just because the network blipped on a refresh. Keep
         // the session optimistically; the UI still has the
         // emergency Force Sign Out button as a manual escape.
+        dbg("warn", "sanity probe threw (kept session): " + (err && err.message || err));
         console.warn("Auth sanity probe threw (kept session):", err);
       }
 
@@ -4051,16 +4159,19 @@
     // IIFE at the bottom of the script could miss the only moment the
     // session becomes visible.
     async function bootstrapCrmFromAuth(reason) {
+      dbg("info", "boot tick (" + reason + ") done=" + __crmAuthBootDone + " running=" + __crmAuthBootRunning);
       if (__crmAuthBootDone) return;
       if (__crmAuthBootRunning) return;
       __crmAuthBootRunning = true;
       try {
         const ok = await checkAuthOnLoad();
+        dbg(ok ? "ok" : "warn", "checkAuthOnLoad -> " + ok);
         if (!ok) return;
         await load();
+        dbg("ok", "load() complete; clients=" + (allClients ? allClients.length : "?"));
         __crmAuthBootDone = true;
       } catch (err) {
-        console.warn("bootstrapCrmFromAuth failed:", reason, err);
+        dbg("err", "bootstrap " + reason + " threw: " + (err && err.message || err));
       } finally {
         __crmAuthBootRunning = false;
       }
@@ -4076,6 +4187,7 @@
     // `auth.signed_out` rows into the action log so the Activity
     // feed shows who came online and when.
     sb.auth.onAuthStateChange(async (event, session) => {
+      dbg("info", "auth event: " + event + (session ? " (with session)" : " (no session)"));
       // IMPORTANT: never treat `!session` alone as a sign-out. Supabase
       // emits `INITIAL_SESSION` (and occasionally other lifecycle
       // events) where `session` is briefly null while storage is still
