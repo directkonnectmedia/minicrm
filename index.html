@@ -3440,7 +3440,9 @@
     let signedInRoles     = [];       // roles[] from the live Supabase session
 
     // Reads roles[] from a Supabase auth user. Falls back to a legacy single
-    // `role` string if the account has not been migrated yet.
+    // `role` string if the account has not been migrated yet. Used for UI
+    // rendering only -- for any check that has to mirror what the server
+    // sees in the JWT (RLS, banner detection), use readJwtRoles() instead.
     function readUserRoles(user) {
       if (!user || !user.user_metadata) return [];
       const meta = user.user_metadata;
@@ -3448,6 +3450,50 @@
         return meta.roles.filter((r) => typeof r === "string" && VALID_ROLES.includes(r));
       }
       if (typeof meta.role === "string" && VALID_ROLES.includes(meta.role)) {
+        return [meta.role];
+      }
+      return [];
+    }
+    // Decode a base64url JWT payload. Mirrors what auth.jwt() returns
+    // server-side, so this is the source of truth for "what does the
+    // database actually see right now". The Supabase JS SDK does not
+    // always expose user_metadata through session.user, but the access
+    // token itself still carries the claim -- so the only honest way
+    // to know what the server sees is to decode the token ourselves.
+    function decodeJwtPayload(token) {
+      if (!token || typeof token !== "string") return null;
+      const parts = token.split(".");
+      if (parts.length < 2) return null;
+      try {
+        let b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+        while (b64.length % 4) b64 += "=";
+        const json = atob(b64);
+        // atob produces a binary string; decode UTF-8 properly so non-ASCII
+        // display names ("José") survive.
+        const utf8 = decodeURIComponent(
+          Array.prototype.map
+            .call(json, (c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+            .join("")
+        );
+        return JSON.parse(utf8);
+      } catch (err) {
+        console.warn("decodeJwtPayload failed:", err);
+        return null;
+      }
+    }
+    // Roles[] as the database sees them. Reads user_metadata.roles
+    // from the live access token. Returns [] when the token is
+    // missing the claim, which is exactly the condition the recovery
+    // banner uses to fire.
+    function readJwtRoles(session) {
+      if (!session) return [];
+      const payload = decodeJwtPayload(session.access_token);
+      if (!payload) return [];
+      const meta = payload.user_metadata;
+      if (meta && Array.isArray(meta.roles)) {
+        return meta.roles.filter((r) => typeof r === "string" && VALID_ROLES.includes(r));
+      }
+      if (meta && typeof meta.role === "string" && VALID_ROLES.includes(meta.role)) {
         return [meta.role];
       }
       return [];
@@ -3826,9 +3872,15 @@
       const fallbackName = (fromMeta && typeof fromMeta.display_name === "string" && fromMeta.display_name.trim())
         || (email ? email.split("@")[0] : "Team Member");
       signedInMember = (email && TEAM_BY_EMAIL[email]) || { name: fallbackName, email, color: colorForEmail(email), roles: [] };
-      const jwtRoles = readUserRoles(session.user);
+      // Authoritative role check: decode the JWT payload directly so
+      // we see exactly what is_team_member() sees on the server. The
+      // SDK's session.user.user_metadata is unreliable on newer
+      // versions, which is why an earlier build false-fired the
+      // recovery banner even though RLS was happily letting clients
+      // through.
+      const jwtRoles = readJwtRoles(session);
       jwtTeamRolesPresent = jwtRoles.length > 0;
-      signedInRoles = jwtRoles.slice();
+      signedInRoles = jwtRoles.length > 0 ? jwtRoles.slice() : readUserRoles(session.user);
       if (signedInRoles.length === 0 && Array.isArray(signedInMember.roles)) {
         signedInRoles = signedInMember.roles.slice();
       }
@@ -3885,22 +3937,26 @@
           }
         } catch (err) { console.warn("auth.signed_in log failed:", err); }
       } else if (event === "TOKEN_REFRESHED" && session) {
-        // Supabase auto-refreshes access tokens periodically. The new
-        // JWT *should* carry user_metadata.roles -- but in this
-        // project the refresh endpoint is currently returning JWTs
-        // without that claim, so the banner will fire on a stripped
-        // refresh and let the user trigger a fresh sign-in. Either
-        // way we re-read roles directly from the new JWT and update
-        // jwtTeamRolesPresent so the banner reflects the actual
-        // server-visible state.
+        // Supabase auto-refreshes access tokens periodically. Re-read
+        // roles from the FRESH JWT (not the SDK's user object, which
+        // doesn't always surface user_metadata) and update
+        // jwtTeamRolesPresent so the recovery banner reflects what
+        // the server now sees. If the refreshed token is missing
+        // claims the banner self-arms; if it has them the banner
+        // self-clears -- both without user input.
         hasActiveSession = true;
         try {
-          const fresh = readUserRoles(session.user);
+          const fresh = readJwtRoles(session);
           jwtTeamRolesPresent = fresh.length > 0;
           if (fresh.length > 0) {
             signedInRoles = fresh;
-          } else if (signedInMember && Array.isArray(signedInMember.roles)) {
-            signedInRoles = signedInMember.roles.slice();
+          } else {
+            const fromUser = readUserRoles(session.user);
+            if (fromUser.length > 0) {
+              signedInRoles = fromUser;
+            } else if (signedInMember && Array.isArray(signedInMember.roles)) {
+              signedInRoles = signedInMember.roles.slice();
+            }
           }
         } catch (err) { console.warn("token refresh role re-read failed:", err); }
         try { _cachedActor = null; } catch {}
