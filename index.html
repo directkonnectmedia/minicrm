@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- crm-deploy-stamp: 20260430-authfix-initial-session — if this line is missing in View Source, the browser is not loading the current deployment -->
+<!-- crm-deploy-stamp: 20260430-authfix-hydration — if this line is missing in View Source, the browser is not loading the current deployment -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="crm-build" content="20260430-authfix-initial-session">
+  <meta name="crm-build" content="20260430-authfix-hydration">
   <title>Mini CRM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3873,6 +3873,37 @@
     }
     logoutBtn.addEventListener("click", handleLogout);
 
+    // True when localStorage still holds a Supabase auth bucket for this
+    // project. Used to spin briefly on cold reload: the very first
+    // getSession() sometimes returns null for a tick while the client
+    // finishes hydrating from storage, which used to make checkAuthOnLoad
+    // think nobody was signed in and skip load() entirely (empty CRM,
+    // zero /clients requests) until a manual hard refresh.
+    function localStorageLooksLikeSupabaseAuth() {
+      try {
+        return Object.keys(localStorage).some((k) => k.startsWith("sb-") && k.includes("auth-token"));
+      } catch {
+        return false;
+      }
+    }
+    async function waitForClientSession(maxWaitMs = 2500) {
+      const deadline = Date.now() + maxWaitMs;
+      let last = null;
+      while (Date.now() < deadline) {
+        try {
+          const { data, error } = await sb.auth.getSession();
+          if (error) console.warn("getSession error:", error);
+          last = data && data.session ? data.session : null;
+        } catch (err) {
+          console.warn("getSession threw:", err);
+        }
+        if (last) return last;
+        if (!localStorageLooksLikeSupabaseAuth()) return null;
+        await new Promise((r) => setTimeout(r, 60));
+      }
+      return last;
+    }
+
     async function checkAuthOnLoad() {
       // Kick off the team roster fetch in parallel with session restoration
       // so the right name/color is available for the signed-in pill even
@@ -3880,24 +3911,37 @@
       const rosterPromise = fetchPickerRoster();
       let session = null;
 
-      // Use the cached session as-is. We previously called
-      // sb.auth.refreshSession() here to flush stale role claims, but
-      // in this Supabase project the refresh endpoint returns a JWT
-      // *without* user_metadata.roles -- which is exactly the failure
-      // mode is_team_member() can't tolerate -- so forcing a refresh
-      // on every page load was actively replacing healthy sign-in
-      // tokens with stripped ones and hiding every client behind RLS.
-      // Trust the sign-in JWT instead. The TOKEN_REFRESHED branch in
-      // onAuthStateChange below handles Supabase's own auto-rotation
-      // (every ~hour), and the recovery banner catches any token
-      // that ends up without role claims so the user always has a
-      // visible escape hatch.
+      // Yield one macrotask so the Supabase client's internal init (it
+      // reads persisted auth from localStorage asynchronously) can run
+      // before our first getSession snapshot.
+      await new Promise((r) => setTimeout(r, 0));
+
+      // Spin briefly if persisted auth keys exist but session is still
+      // null -- classic cold-reload race on fast machines.
       try {
-        const { data } = await sb.auth.getSession();
-        session = data && data.session ? data.session : null;
+        session = await waitForClientSession(2500);
       } catch (err) {
-        console.warn("getSession failed:", err);
+        console.warn("waitForClientSession failed:", err);
       }
+
+      // Mint a fresh access token on boot when possible. We previously
+      // avoided refreshSession() because JWT user_metadata.roles were
+      // stripped and is_team_member() read the JWT -- which made RLS
+      // hide every client. is_team_member() now reads auth.users, so a
+      // refresh only needs a valid `sub` claim; missing roles in the
+      // JWT no longer breaks Postgres. An expired first paint token
+      // was another source of "F5 -> empty list" when the sanity probe
+      // or load() ran against a dead access_token before the auto-
+      // refresh middleware kicked in.
+      if (session) {
+        try {
+          const { data: ref, error: refErr } = await sb.auth.refreshSession();
+          if (!refErr && ref && ref.session) session = ref.session;
+        } catch (err) {
+          console.warn("boot refreshSession failed (continuing with cached session):", err);
+        }
+      }
+
       try { await rosterPromise; } catch {}
 
       // Stay-logged-in OFF: if browser was closed since last login, force re-auth.
