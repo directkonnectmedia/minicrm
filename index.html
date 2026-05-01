@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- crm-deploy-stamp: 20260430-fix-banner-hang — if this line is missing in View Source, the browser is not loading the current deployment -->
+<!-- crm-deploy-stamp: 20260430-probe-timeout — if this line is missing in View Source, the browser is not loading the current deployment -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="crm-build" content="20260430-fix-banner-hang">
+  <meta name="crm-build" content="20260430-probe-timeout">
   <title>Mini CRM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -4116,7 +4116,9 @@
         dbg("err", "waitForClientSession failed: " + (err && err.message || err));
       }
 
+      dbg("info", "roster wait start");
       try { await Promise.race([rosterPromise, new Promise((r) => setTimeout(r, 1500))]); } catch {}
+      dbg("info", "roster wait done");
 
       // NOTE: do NOT call sb.auth.refreshSession() here. We tried, and
       // it caused "Lock broken by another request with the 'steal'
@@ -4159,11 +4161,21 @@
       // probe against public.clients fails, the session is dead --
       // wipe it and bring up the login overlay instead of leaving the
       // user in a half-broken state with an empty CRM and no way out.
+      // Hard 3s timeout so a stalled network request can't freeze the
+      // entire boot. If the probe doesn't finish in 3s, we trust the
+      // session and let load() do the real fetch.
+      dbg("info", "sanity probe start");
       try {
-        const probe = await sb
+        const probePromise = sb
           .from("clients")
           .select("id", { count: "exact", head: true });
-        if (probe && probe.error) {
+        const probe = await Promise.race([
+          probePromise,
+          new Promise((resolve) => setTimeout(() => resolve({ __timedOut: true }), 3000)),
+        ]);
+        if (probe && probe.__timedOut) {
+          dbg("warn", "sanity probe timed out (kept session); load() will retry");
+        } else if (probe && probe.error) {
           const errMsg = String(probe.error.message || "");
           const isLockConflict = errMsg.includes("Lock broken") || errMsg.includes("AbortError");
           const code = String(probe.error.code || "");
@@ -4204,6 +4216,7 @@
         dbg("warn", "sanity probe threw (kept session): " + (err && err.message || err));
         console.warn("Auth sanity probe threw (kept session):", err);
       }
+      dbg("info", "sanity probe done");
 
       const email = session.user && session.user.email;
       const fromMeta = session.user && session.user.user_metadata;
