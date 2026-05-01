@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Dancing+Script:wght@500;700&family=Great+Vibes&family=Sacramento&display=swap" rel="stylesheet">
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -2653,9 +2654,16 @@
       </div>
       <div class="team-backup-card">
         <div class="team-backup-title">CRM Backup</div>
-        <div class="team-backup-blurb">Download a snapshot of every client, note, contract, template, and team member as an Excel file. Use this any time before a risky change, so you always have a safety net.</div>
+        <div class="team-backup-blurb">
+          Download a snapshot of every client, note, contract, template, and team member.
+          <strong>JSON</strong> and <strong>CSV ZIP</strong> are lossless &mdash; nothing is truncated.
+          The Excel option is convenient for browsing but caps any cell longer than ~32k characters.
+          Use either lossless option before a risky change so you always have a complete safety net.
+        </div>
         <div class="team-backup-actions">
           <button id="backupDownloadBtn" type="button">Download backup (.xlsx)</button>
+          <button id="backupDownloadJsonBtn" type="button">Download full backup (.json)</button>
+          <button id="backupDownloadCsvBtn" type="button">Download CSVs (.zip)</button>
           <span id="backupStatus" class="team-backup-status"></span>
         </div>
       </div>
@@ -4760,6 +4768,264 @@
     }
 
     document.getElementById("backupDownloadBtn").addEventListener("click", handleDownloadBackup);
+
+    // ================================================================
+    // LOSSLESS BACKUP HELPERS
+    // The .xlsx flow above uses SheetJS, which has to honour Excel's
+    // 32,767-char-per-cell ceiling. The two flows below skip that
+    // ceiling entirely:
+    //   - .json  : single file, every byte of every column preserved.
+    //   - .csv   : one CSV per table, bundled in a ZIP. CSV has no
+    //              practical per-cell limit; long contract HTML and
+    //              long notes survive intact.
+    // Both pull the same four sources as the .xlsx flow so users
+    // can pick whichever format suits them.
+    // ================================================================
+    async function pullBackupData() {
+      let bearer = "";
+      try {
+        const { data } = await sb.auth.getSession();
+        bearer = (data && data.session && data.session.access_token) || "";
+      } catch (err) { console.warn("getSession failed:", err); }
+      if (!bearer) throw new Error("Couldn't read your session. Sign out and back in.");
+
+      const [clientsRes, contractsRes, templatesRes, teamRes] = await Promise.all([
+        sb.from("clients").select("*").order("created_at", { ascending: false }),
+        sb.from("signed_contracts").select("*").order("created_at", { ascending: false }),
+        sb.from("contract_text_templates").select("*").order("created_at", { ascending: true }),
+        fetch("/api/admin/team", { headers: { Authorization: `Bearer ${bearer}` } })
+          .then(async (r) => {
+            const body = await r.json().catch(() => null);
+            if (!r.ok) throw new Error("team fetch failed: " + (body && body.error ? body.error : r.status));
+            return body;
+          }),
+      ]);
+
+      if (clientsRes.error)   throw new Error("clients query failed: "   + clientsRes.error.message);
+      if (contractsRes.error) throw new Error("contracts query failed: " + contractsRes.error.message);
+      if (templatesRes.error) throw new Error("templates query failed: " + templatesRes.error.message);
+
+      return {
+        clientsRows:   clientsRes.data   || [],
+        contractsRows: contractsRes.data || [],
+        templatesRows: templatesRes.data || [],
+        teamRows:      (teamRes && Array.isArray(teamRes.members)) ? teamRes.members : [],
+      };
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        try { document.body.removeChild(a); } catch {}
+        URL.revokeObjectURL(url);
+      }, 0);
+    }
+
+    // RFC 4180 style: wrap any field that contains a comma, quote, CR
+    // or LF in double quotes, and double-up internal quotes. Returning
+    // empty string for null/undefined keeps spreadsheets happy.
+    function csvField(v) {
+      if (v === null || v === undefined) return "";
+      let s = (typeof v === "object") ? JSON.stringify(v) : String(v);
+      if (/[",\r\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    }
+
+    // Convert an array of plain objects into a CSV string. Header row
+    // is the union of every key encountered (so optional columns
+    // aren't dropped just because the first row happened not to have
+    // them). \r\n line endings -- best Excel compatibility on Windows.
+    function rowsToCsv(rows, preferredHeader) {
+      const safe = Array.isArray(rows) ? rows : [];
+      const keySet = new Set(preferredHeader || []);
+      safe.forEach((r) => { if (r && typeof r === "object") Object.keys(r).forEach((k) => keySet.add(k)); });
+      const headers = Array.from(keySet);
+      const lines = [headers.map(csvField).join(",")];
+      safe.forEach((r) => {
+        const row = (r && typeof r === "object") ? r : {};
+        lines.push(headers.map((k) => csvField(row[k])).join(","));
+      });
+      return lines.join("\r\n");
+    }
+
+    async function handleDownloadBackupJson() {
+      const btn = document.getElementById("backupDownloadJsonBtn");
+      if (!btn) return;
+      const originalLabel = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Gathering...";
+      setBackupStatus("Pulling fresh data from Supabase...", "");
+      try {
+        const { clientsRows, contractsRows, templatesRows, teamRows } = await pullBackupData();
+        setBackupStatus("Writing JSON file...", "");
+
+        const payload = {
+          format: "directkonnect-crm-backup",
+          format_version: 1,
+          generated_at: new Date().toISOString(),
+          generated_by: (signedInMember && signedInMember.email) || "",
+          counts: {
+            clients: clientsRows.length,
+            signed_contracts: contractsRows.length,
+            contract_text_templates: templatesRows.length,
+            team_members: teamRows.length,
+          },
+          clients: clientsRows,
+          signed_contracts: contractsRows,
+          contract_text_templates: templatesRows,
+          team_members: teamRows,
+        };
+
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+        downloadBlob(blob, "directkonnect-crm-backup-" + ts() + ".json");
+
+        setBackupStatus("JSON backup downloaded (lossless).", "ok");
+        btn.textContent = "Done";
+        try {
+          if (typeof logAction === "function") {
+            await logAction({
+              action: "backup.export",
+              entityType: "system",
+              summary: "Downloaded full JSON backup",
+              payload: { format: "json", clients: clientsRows.length },
+            });
+          }
+        } catch {}
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = originalLabel;
+        }, 4000);
+      } catch (err) {
+        console.error("JSON backup failed:", err);
+        setBackupStatus("JSON backup failed: " + (err && err.message ? err.message : String(err)), "error");
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      }
+    }
+
+    async function handleDownloadBackupCsv() {
+      const btn = document.getElementById("backupDownloadCsvBtn");
+      if (!btn) return;
+      if (typeof JSZip === "undefined") {
+        setBackupStatus("ZIP library failed to load (CDN unreachable). Refresh and try again.", "error");
+        return;
+      }
+      const originalLabel = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Gathering...";
+      setBackupStatus("Pulling fresh data from Supabase...", "");
+      try {
+        const { clientsRows, contractsRows, templatesRows, teamRows } = await pullBackupData();
+        setBackupStatus("Building CSVs...", "");
+
+        const stamp = ts();
+        const zip = new JSZip();
+        const folder = zip.folder("directkonnect-crm-backup-" + stamp);
+
+        // Top-level tables: object/array fields are JSON-stringified
+        // so each cell stays a single string. CSV has no per-cell
+        // size limit, so this is safe even for huge contract HTML.
+        function flatten(rows) {
+          return (rows || []).map((row) => {
+            const out = {};
+            Object.keys(row || {}).forEach((k) => {
+              const v = row[k];
+              out[k] = (v && typeof v === "object") ? JSON.stringify(v) : v;
+            });
+            return out;
+          });
+        }
+
+        folder.file("clients.csv",                 rowsToCsv(flatten(clientsRows)));
+        folder.file("signed_contracts.csv",        rowsToCsv(flatten(contractsRows)));
+        folder.file("contract_text_templates.csv", rowsToCsv(flatten(templatesRows)));
+        folder.file("team_members.csv",            rowsToCsv(teamRows.map((m) => ({
+          id: m.id,
+          name: m.name || "",
+          email: m.email || "",
+          roles: Array.isArray(m.roles) ? m.roles.join(", ") : (m.roles || ""),
+          created_at: m.created_at || "",
+          last_sign_in_at: m.last_sign_in_at || "",
+        }))));
+
+        // Notes: flatten one row per note so they're easy to grep.
+        const clientById = new Map();
+        clientsRows.forEach((c) => clientById.set(c.id, c));
+        function notesRows(field) {
+          const out = [];
+          clientsRows.forEach((c) => {
+            const arr = Array.isArray(c[field]) ? c[field] : [];
+            arr.forEach((n) => {
+              const body = (typeof n === "string")
+                ? n
+                : ((n && (n.body || n.text)) || JSON.stringify(n));
+              out.push({
+                client_id:    c.id,
+                company_name: c.company_name || "",
+                created_at:   (n && (n.created_at || n.timestamp)) || "",
+                author:       (n && (n.author || n.by)) || "",
+                body:         body,
+              });
+            });
+          });
+          return out;
+        }
+        folder.file("client_notes.csv", rowsToCsv(notesRows("client_notes"), ["client_id","company_name","created_at","author","body"]));
+        folder.file("web_notes.csv",    rowsToCsv(notesRows("web_notes"),    ["client_id","company_name","created_at","author","body"]));
+
+        // Manifest so anyone opening the ZIP knows what they're looking at.
+        const manifest = [
+          "Direct Konnect CRM backup (CSV bundle)",
+          "Generated at: " + new Date().toISOString(),
+          "Generated by: " + ((signedInMember && signedInMember.email) || ""),
+          "",
+          "Files:",
+          "  clients.csv                 (" + clientsRows.length + " rows)",
+          "  client_notes.csv            (one row per client note)",
+          "  web_notes.csv               (one row per web note)",
+          "  signed_contracts.csv        (" + contractsRows.length + " rows)",
+          "  contract_text_templates.csv (" + templatesRows.length + " rows)",
+          "  team_members.csv            (" + teamRows.length + " rows)",
+          "",
+          "All cells are stored as plain text. JSONB fields are JSON-encoded ",
+          "strings. There is no per-cell character limit in CSV.",
+        ].join("\r\n");
+        folder.file("README.txt", manifest);
+
+        const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+        downloadBlob(blob, "directkonnect-crm-backup-" + stamp + ".zip");
+
+        setBackupStatus("CSV ZIP backup downloaded (lossless).", "ok");
+        btn.textContent = "Done";
+        try {
+          if (typeof logAction === "function") {
+            await logAction({
+              action: "backup.export",
+              entityType: "system",
+              summary: "Downloaded full CSV ZIP backup",
+              payload: { format: "csv-zip", clients: clientsRows.length },
+            });
+          }
+        } catch {}
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = originalLabel;
+        }, 4000);
+      } catch (err) {
+        console.error("CSV backup failed:", err);
+        setBackupStatus("CSV backup failed: " + (err && err.message ? err.message : String(err)), "error");
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      }
+    }
+
+    document.getElementById("backupDownloadJsonBtn").addEventListener("click", handleDownloadBackupJson);
+    document.getElementById("backupDownloadCsvBtn").addEventListener("click", handleDownloadBackupCsv);
 
     const CONTRACT_TEMPLATES = [
       {
