@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- crm-deploy-stamp: 20260430-event-session — if this line is missing in View Source, the browser is not loading the current deployment -->
+<!-- crm-deploy-stamp: 20260430-fix-lock-conflict — if this line is missing in View Source, the browser is not loading the current deployment -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="crm-build" content="20260430-event-session">
+  <meta name="crm-build" content="20260430-fix-lock-conflict">
   <title>Mini CRM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -4121,25 +4121,17 @@
         dbg("err", "waitForClientSession failed: " + (err && err.message || err));
       }
 
-      // Mint a fresh access token on boot when possible. We previously
-      // avoided refreshSession() because JWT user_metadata.roles were
-      // stripped and is_team_member() read the JWT -- which made RLS
-      // hide every client. is_team_member() now reads auth.users, so a
-      // refresh only needs a valid `sub` claim; missing roles in the
-      // JWT no longer breaks Postgres. An expired first paint token
-      // was another source of "F5 -> empty list" when the sanity probe
-      // or load() ran against a dead access_token before the auto-
-      // refresh middleware kicked in.
-      if (session) {
-        try {
-          const { data: ref, error: refErr } = await sb.auth.refreshSession();
-          if (!refErr && ref && ref.session) session = ref.session;
-        } catch (err) {
-          console.warn("boot refreshSession failed (continuing with cached session):", err);
-        }
-      }
-
       try { await rosterPromise; } catch {}
+
+      // NOTE: do NOT call sb.auth.refreshSession() here. We tried, and
+      // it caused "Lock broken by another request with the 'steal'
+      // option" AbortErrors when concurrent code paths (the staggered
+      // bootstrap retries, handleLoginSubmit, and Supabase's own
+      // auto-refresh) all touched the auth lock at once. The session
+      // we already have from waitForClientSession is fine for our
+      // purposes; the SDK will refresh it in the background on its
+      // own schedule, and the TOKEN_REFRESHED handler updates our
+      // local state when it does.
 
       // "Stay logged in" OFF historically meant: if this tab's
       // sessionStorage marker was missing, call signOut() even when
@@ -4177,22 +4169,37 @@
           .from("clients")
           .select("id", { count: "exact", head: true });
         if (probe && probe.error) {
-          dbg("err", "sanity probe blocked: " + (probe.error.code || "") + " " + (probe.error.message || ""));
-          console.warn("Auth sanity probe failed; forcing clean re-auth:", probe.error);
-          try { await sb.auth.signOut(); } catch {}
-          try {
-            Object.keys(localStorage)
-              .filter((k) => k.startsWith("sb-"))
-              .forEach((k) => localStorage.removeItem(k));
-          } catch {}
-          try { sessionStorage.removeItem(SESSION_MARKER_KEY); } catch {}
-          hasActiveSession = false;
-          jwtTeamRolesPresent = false;
-          signedInMember = null;
-          signedInRoles = [];
-          applyAuthUIState();
-          showLoginOverlay();
-          return false;
+          const errMsg = String(probe.error.message || "");
+          const isLockConflict = errMsg.includes("Lock broken") || errMsg.includes("AbortError");
+          const code = String(probe.error.code || "");
+          // Only treat 401/403 (genuine auth/RLS denials) as a dead
+          // session. Lock conflicts from concurrent boots, transient
+          // network errors, and PostgREST errors that aren't auth
+          // failures must not destroy the user's session -- doing so
+          // is what trapped the user in a "no clients, no logout"
+          // loop on every refresh. Keep the session and let the next
+          // legitimate request decide.
+          if (isLockConflict || (code !== "401" && code !== "403" && code !== "PGRST301")) {
+            dbg("warn", "sanity probe transient error (kept session): " + (code || "") + " " + errMsg);
+            console.warn("Auth sanity probe transient (kept session):", probe.error);
+          } else {
+            dbg("err", "sanity probe blocked: " + code + " " + errMsg);
+            console.warn("Auth sanity probe failed; forcing clean re-auth:", probe.error);
+            try { await sb.auth.signOut(); } catch {}
+            try {
+              Object.keys(localStorage)
+                .filter((k) => k.startsWith("sb-"))
+                .forEach((k) => localStorage.removeItem(k));
+            } catch {}
+            try { sessionStorage.removeItem(SESSION_MARKER_KEY); } catch {}
+            hasActiveSession = false;
+            jwtTeamRolesPresent = false;
+            signedInMember = null;
+            signedInRoles = [];
+            applyAuthUIState();
+            showLoginOverlay();
+            return false;
+          }
         }
       } catch (err) {
         // Network failure or unexpected throw: don't penalise the
@@ -4316,16 +4323,14 @@
         // (otherwise a stale cached actor from a prior session could
         // bleed into the new sign-in's audit row).
         try { _cachedActor = null; } catch {}
-        // The first cold-load bootstrap might have already given up
-        // (getSession returned null before the SDK finished restoring
-        // the session). Allow another attempt now that we definitely
-        // have a session in hand. handleLoginSubmit's own load() call
-        // is a no-op the second time because __crmAuthBootDone gets
-        // set to true after either path succeeds.
-        if (!__crmAuthBootDone) {
-          __crmAuthBootRunning = false;
-          bootstrapCrmFromAuth("SIGNED_IN");
-        }
+        // NOTE: do NOT spawn another bootstrap here. handleLoginSubmit
+        // already calls load() after sign-in, and the cold-load retry
+        // chain (waitForClientSession listens for SIGNED_IN through
+        // __lastEventSession) handles session restoration on refresh.
+        // Spawning a parallel bootstrap caused Supabase's auth lock
+        // ("Lock broken by another request with the 'steal' option")
+        // to abort the very query we were trying to run, leaving the
+        // CRM empty even on a successful sign-in.
         try {
           if (typeof logAction === "function") {
             const summary = typeof authSummary === "function" ? await authSummary("signed_in") : "Signed in";
