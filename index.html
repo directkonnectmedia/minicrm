@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- crm-deploy-stamp: 20260430-fix-lock-conflict — if this line is missing in View Source, the browser is not loading the current deployment -->
+<!-- crm-deploy-stamp: 20260430-fix-banner-hang — if this line is missing in View Source, the browser is not loading the current deployment -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="crm-build" content="20260430-fix-lock-conflict">
+  <meta name="crm-build" content="20260430-fix-banner-hang">
   <title>Mini CRM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3923,19 +3923,18 @@
     const sessionRoleBannerSignOutBtn = document.getElementById("sessionRoleBannerSignOut");
 
     function applyAuthUIState() {
-      // Recovery banner: visible whenever a session exists but the
-      // *live JWT* lacks team role claims. That is the exact RLS
-      // failure mode where is_team_member() returns false on the
-      // server and every client row gets hidden. We must check the
-      // JWT itself (jwtTeamRolesPresent), not signedInRoles -- the
-      // latter is intentionally padded with static fallback roles so
-      // the UI keeps rendering, but those fallback roles are invisible
-      // to Postgres. Banner shows the user a one-click escape hatch
-      // even if the profile pill / dropdown isn't rendering (panic
-      // state -- no UI way to sign out at all).
-      const inDegradedSession = hasActiveSession && !jwtTeamRolesPresent;
+      // Recovery banner kept around for emergencies but disabled by
+      // default. It used to fire when user_metadata.roles was missing
+      // from the JWT, which mattered when is_team_member() read the
+      // JWT. The function now reads auth.users directly, so JWT
+      // claims have nothing to do with whether the user can see
+      // client rows -- the banner had become a false positive that
+      // also dragged users into a sign-out loop. If we ever need to
+      // surface a real "your session can't read data" condition
+      // again, drive this from a server-confirmed denial response,
+      // not from a JWT introspection.
       if (sessionRoleBanner) {
-        sessionRoleBanner.style.display = inDegradedSession ? "flex" : "none";
+        sessionRoleBanner.style.display = "none";
       }
 
       if (signedInMember) {
@@ -4036,23 +4035,18 @@
         return false;
       }
     }
-    // True session readiness signal. Resolves when ANY of:
-    //   - getSession() returns a session,
-    //   - the Supabase SDK fires SIGNED_IN / TOKEN_REFRESHED with a session,
-    //   - the deadline elapses (returns the last seen session, or null).
-    // Avoids the "we polled getSession() into nullness while SIGNED_IN
-    // was fired with a real session a few ms later" race.
+    // True session readiness signal. Resolves when:
+    //   - __lastEventSession is already populated by an earlier auth event,
+    //   - the Supabase SDK fires SIGNED_IN / INITIAL_SESSION / TOKEN_REFRESHED with a session,
+    //   - or the deadline elapses (returns null).
+    // We deliberately DO NOT await sb.auth.getSession() here -- that
+    // call has been observed to hang indefinitely in some Supabase
+    // v2 builds when its internal navigator.locks coordination is
+    // contended, freezing the entire boot. Auth events are the
+    // authoritative signal and they always fire on page load if a
+    // session exists.
     async function waitForClientSession(maxWaitMs = 2500) {
-      // Fast path 1: a session was already delivered via auth event.
-      // Trust this over getSession() because in some browsers the
-      // getter returns null even when the SDK's internal session is
-      // valid (incognito + strict cookies, certain webviews).
       if (__lastEventSession) return __lastEventSession;
-      // Fast path 2: a cached session is available via the SDK.
-      try {
-        const { data } = await sb.auth.getSession();
-        if (data && data.session) return data.session;
-      } catch {}
       return new Promise((resolve) => {
         let settled = false;
         let unsubscribe = null;
@@ -4062,7 +4056,9 @@
           try { if (unsubscribe) unsubscribe(); } catch {}
           resolve(sess || __lastEventSession || null);
         };
-        // Listen for the SDK's own readiness events.
+        // Hard deadline -- if no event arrives in time, give up.
+        const deadlineId = setTimeout(() => finish(null), maxWaitMs);
+        // Listen for SDK readiness events.
         try {
           const listener = sb.auth.onAuthStateChange((event, session) => {
             if (settled) return;
@@ -4074,6 +4070,7 @@
                 event === "USER_UPDATED"
               )
             ) {
+              clearTimeout(deadlineId);
               finish(session);
             }
           });
@@ -4081,22 +4078,20 @@
             try { listener?.data?.subscription?.unsubscribe?.(); } catch {}
           };
         } catch {}
-        // Poll as a safety net. Even if no auth event fires (e.g.
-        // the SDK considers the session already restored before our
-        // listener was attached), getSession() will eventually return
-        // the cached session.
-        const deadline = Date.now() + maxWaitMs;
-        const tick = async () => {
-          if (settled) return;
-          if (__lastEventSession) return finish(__lastEventSession);
-          try {
-            const { data } = await sb.auth.getSession();
-            if (data && data.session) return finish(data.session);
-          } catch {}
-          if (Date.now() >= deadline) return finish(null);
-          setTimeout(tick, 80);
-        };
-        tick();
+        // Also poll __lastEventSession briefly (no SDK call) in case
+        // an event fired before our listener attached but after our
+        // initial fast-path read.
+        let poll = 0;
+        const pollId = setInterval(() => {
+          poll++;
+          if (settled) { clearInterval(pollId); return; }
+          if (__lastEventSession) {
+            clearInterval(pollId);
+            clearTimeout(deadlineId);
+            finish(__lastEventSession);
+          }
+          if (poll > 30) clearInterval(pollId);
+        }, 80);
       });
     }
 
@@ -4121,7 +4116,7 @@
         dbg("err", "waitForClientSession failed: " + (err && err.message || err));
       }
 
-      try { await rosterPromise; } catch {}
+      try { await Promise.race([rosterPromise, new Promise((r) => setTimeout(r, 1500))]); } catch {}
 
       // NOTE: do NOT call sb.auth.refreshSession() here. We tried, and
       // it caused "Lock broken by another request with the 'steal'
