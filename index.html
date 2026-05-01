@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- crm-deploy-stamp: 20260430-fix-signin-restore — if this line is missing in View Source, the browser is not loading the current deployment -->
+<!-- crm-deploy-stamp: 20260430-event-session — if this line is missing in View Source, the browser is not loading the current deployment -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="crm-build" content="20260430-fix-signin-restore">
+  <meta name="crm-build" content="20260430-event-session">
   <title>Mini CRM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3592,6 +3592,13 @@
     let currentTeamMember = null;     // selected member during the login flow
     let signedInMember    = null;     // currently authenticated team member (or null)
     let signedInRoles     = [];       // roles[] from the live Supabase session
+    // Last session we saw from onAuthStateChange, kept as a fallback
+    // because in some browsers (incognito with strict cookie policy,
+    // some embedded webviews) sb.auth.getSession() returns null even
+    // immediately after SIGNED_IN fires with a real session. Trust the
+    // event-delivered session over the SDK's getter when both are
+    // available.
+    let __lastEventSession = null;
     // Boot coordination MUST live before handleLoginSubmit: that handler
     // assigns __crmAuthBootDone after a successful load(). If these lets
     // were declared thousands of lines later, any runtime error before
@@ -3862,6 +3869,13 @@
           return;
         }
         dbg("ok", "signInWithPassword ok; user=" + (signInData?.user?.email || "?"));
+        // Capture the live session from signInData and stash it
+        // globally so anything downstream (waitForClientSession's
+        // fast path, sanity probes) sees a real session even if
+        // sb.auth.getSession() is currently misbehaving.
+        if (signInData && signInData.session) {
+          __lastEventSession = signInData.session;
+        }
         try { sessionStorage.setItem(SESSION_MARKER_KEY, "1"); } catch {}
         signedInMember = currentTeamMember;
         signedInRoles = readUserRoles(signInData && signInData.user);
@@ -3869,9 +3883,17 @@
           // Fallback for accounts not yet synced via setup-team-accounts.js.
           signedInRoles = signedInMember.roles.slice();
         }
+        hasActiveSession = true;
         applyAuthUIState();
         hideLoginOverlay();
-        await load();
+        dbg("info", "calling load() after sign-in");
+        try {
+          await load();
+          dbg("ok", "load() complete; clients=" + (allClients ? allClients.length : "?"));
+        } catch (loadErr) {
+          dbg("err", "load() threw: " + (loadErr && loadErr.message || loadErr));
+          throw loadErr;
+        }
         __crmAuthBootDone = true;
       } catch (err) {
         dbg("err", "handleLoginSubmit threw: " + (err && err.message || err));
@@ -4021,7 +4043,12 @@
     // Avoids the "we polled getSession() into nullness while SIGNED_IN
     // was fired with a real session a few ms later" race.
     async function waitForClientSession(maxWaitMs = 2500) {
-      // Fast path: if a session is already cached, skip the wait entirely.
+      // Fast path 1: a session was already delivered via auth event.
+      // Trust this over getSession() because in some browsers the
+      // getter returns null even when the SDK's internal session is
+      // valid (incognito + strict cookies, certain webviews).
+      if (__lastEventSession) return __lastEventSession;
+      // Fast path 2: a cached session is available via the SDK.
       try {
         const { data } = await sb.auth.getSession();
         if (data && data.session) return data.session;
@@ -4033,7 +4060,7 @@
           if (settled) return;
           settled = true;
           try { if (unsubscribe) unsubscribe(); } catch {}
-          resolve(sess || null);
+          resolve(sess || __lastEventSession || null);
         };
         // Listen for the SDK's own readiness events.
         try {
@@ -4061,6 +4088,7 @@
         const deadline = Date.now() + maxWaitMs;
         const tick = async () => {
           if (settled) return;
+          if (__lastEventSession) return finish(__lastEventSession);
           try {
             const { data } = await sb.auth.getSession();
             if (data && data.session) return finish(data.session);
@@ -4233,6 +4261,14 @@
     // `auth.signed_out` rows into the action log so the Activity
     // feed shows who came online and when.
     sb.auth.onAuthStateChange(async (event, session) => {
+      // Stash the most recent event session globally. Some browsers
+      // refuse to surface the same session via sb.auth.getSession()
+      // immediately after SIGNED_IN -- by keeping the live session in
+      // a module variable here, the rest of the boot path has a
+      // reliable source of truth that doesn't depend on the SDK's
+      // getter behaving consistently.
+      if (session) __lastEventSession = session;
+      else if (event === "SIGNED_OUT") __lastEventSession = null;
       dbg("info", "auth event: " + event + (session ? " (with session)" : " (no session)"));
       // IMPORTANT: never treat `!session` alone as a sign-out. Supabase
       // emits `INITIAL_SESSION` (and occasionally other lifecycle
@@ -5157,20 +5193,26 @@
     let allClients = [];
     let signedContracts = [];
     async function load() {
+      dbg("info", "load() start");
       const { data, error } = await sb.from("clients").select("*").order("created_at", { ascending: false });
-      if (error) { alert("Load failed: " + error.message); return; }
+      if (error) {
+        dbg("err", "clients query failed: " + (error.code || "") + " " + (error.message || ""));
+        alert("Load failed: " + error.message); return;
+      }
       allClients = data || [];
+      dbg("ok", "clients fetched: " + allClients.length);
       const sent = await sb.from("signed_contracts").select("*").order("created_at", { ascending: false });
       if (sent.error) {
+        dbg("warn", "signed_contracts unavailable: " + sent.error.message);
         console.warn("Signed contracts unavailable:", sent.error.message);
         signedContracts = [];
       } else {
         signedContracts = sent.data || [];
       }
-      populateFilterModalOptions();
-      render();
-      refreshCalendar();
-      subscribeToContractChanges();
+      try { populateFilterModalOptions(); } catch (e) { dbg("warn", "populateFilterModalOptions threw: " + (e && e.message || e)); }
+      try { render(); } catch (e) { dbg("err", "render threw: " + (e && e.message || e)); }
+      try { refreshCalendar(); } catch (e) { dbg("warn", "refreshCalendar threw: " + (e && e.message || e)); }
+      try { subscribeToContractChanges(); } catch (e) { dbg("warn", "subscribeToContractChanges threw: " + (e && e.message || e)); }
     }
 
     // Live updates: any time the signed_contracts table changes (status
