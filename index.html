@@ -1174,6 +1174,17 @@
     .plan-tab.active { color: #4f46e5; border-bottom-color: #4f46e5; }
     .plan-tab-body { padding: 8px 4px; }
 
+    /* Service add-on wizard (Plan Builder) */
+    .svc-addon-wiz-title { font-size: 20px; font-weight: 700; color: #111827; margin-bottom: 4px; }
+    .svc-addon-wiz-hint { font-size: 13px; color: #6b7280; margin-bottom: 16px; line-height: 1.45; }
+    .svc-addon-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; max-height: 240px; overflow-y: auto; padding: 4px 0; }
+    .svc-addon-row { display: flex; gap: 8px; align-items: center; }
+    .svc-addon-row input[type="text"] {
+      flex: 1; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px;
+    }
+    .svc-addon-row .ghost { flex-shrink: 0; padding: 6px 10px; font-size: 12px; }
+    .svc-addon-add-wrap { margin-bottom: 16px; }
+
     /* Right panel — Generate + plugin mapping */
     .builder-generate-btn {
       width: 100%;
@@ -2803,6 +2814,26 @@
         <div style="display:flex;gap:8px;">
           <button class="ghost" id="serviceWizardCancel">Cancel</button>
           <button id="serviceWizardSave" disabled>Save Service</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Service add-on wizard (Plan Builder: manage add-ons for a saved service) -->
+  <div class="overlay" id="serviceAddonWizardOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="serviceAddonWizardTitle" style="max-width: 520px;">
+      <div class="modal-header">
+        <div class="modal-title" id="serviceAddonWizardTitle">Service add-ons</div>
+        <button class="modal-close" id="serviceAddonWizardClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="step-body">
+        <div id="serviceAddonWizardBody"></div>
+      </div>
+      <div class="modal-footer">
+        <span class="muted" id="serviceAddonWizardStatus" style="font-size:13px;"></span>
+        <div style="display:flex;gap:8px;">
+          <button class="ghost" id="serviceAddonWizardCancel">Close</button>
+          <button id="serviceAddonWizardSave">Save add-ons</button>
         </div>
       </div>
     </div>
@@ -5483,11 +5514,12 @@
     let activeServiceId = null;
 
     const PLAN_TAB_DEFS = [
-      { key: "one_time",     flag: "has_one_time",     label: "One-time" },
-      { key: "setup",        flag: "has_setup",        label: "Setup Fee" },
-      { key: "subscription", flag: "has_subscription", label: "Subscription" },
-      { key: "addons",       flag: "has_addons",       label: "Add-ons" },
-      { key: "financing",    flag: "has_financing",    label: "Financing" },
+      { key: "one_time",     flag: "has_one_time",     label: "One-time",     alwaysInclude: false },
+      { key: "setup",        flag: "has_setup",        label: "Setup Fee",    alwaysInclude: false },
+      { key: "subscription", flag: "has_subscription", label: "Subscription", alwaysInclude: false },
+      /* Add-ons: always shown; line items derive from Saved Services (+ their child add-ons), not wizard flags */
+      { key: "addons",       flag: null,               label: "Add-ons",      alwaysInclude: true },
+      { key: "financing",    flag: "has_financing",    label: "Financing",    alwaysInclude: false },
     ];
 
     // ---- Per-tab editor registry ----
@@ -5500,13 +5532,37 @@
       one_time:     { title: "One-Time Payment", ctaLabel: "Configure One-Time",     placeholder: true },
       setup:        { title: "Setup Fee",        ctaLabel: "Configure Setup Fee",    placeholder: false },
       subscription: { title: "Subscription",     ctaLabel: "Configure Subscription", placeholder: true },
-      addons:       { title: "Add-Ons",          ctaLabel: "Configure Add-Ons",      placeholder: true },
+      addons:       { title: "Add-Ons",          ctaLabel: "Configure Add-Ons",      placeholder: false },
       financing:    { title: "Financing",        ctaLabel: "Configure Financing",   placeholder: true },
     };
 
     function activePlanTabsFor(plan) {
       if (!plan) return [];
-      return PLAN_TAB_DEFS.filter((t) => plan[t.flag] === true);
+      return PLAN_TAB_DEFS.filter((t) =>
+        t.alwaysInclude === true || (typeof t.flag === "string" && plan[t.flag] === true));
+    }
+
+    /** Parent Saved Service IDs stored on plans.services (addons never stored here once normalized). */
+    function getPlanParentServiceIds(plan) {
+      const raw = Array.isArray(plan?.services) ? plan.services : [];
+      const out = [];
+      const seen = new Set();
+      for (const x of raw) {
+        const id = String(x);
+        if (seen.has(id)) continue;
+        if (services.some((s) => String(s.id) === id)) {
+          out.push(id);
+          seen.add(id);
+        }
+      }
+      return out;
+    }
+
+    /** Line ids shown in editors & tab panels: parents only vs parent+child add-ons. */
+    function planLineIdsForTab(plan, tabKey) {
+      const parents = getPlanParentServiceIds(plan);
+      if (tabKey === "addons") return collectPlanLineIds(parents);
+      return parents;
     }
 
     async function loadPlans() {
@@ -5525,10 +5581,67 @@
       if (error) {
         console.warn("Services unavailable:", error.message);
         services = [];
+        servicesLoaded = true;
+        return;
+      }
+      services = data || [];
+      const { data: addonRows, error: addonErr } = await sb
+        .from("service_addons")
+        .select("*")
+        .order("created_at", { ascending: true });
+      if (addonErr) {
+        console.warn("Service add-ons unavailable:", addonErr.message);
+        for (const s of services) s.addons = [];
       } else {
-        services = data || [];
+        const bySvc = {};
+        for (const a of addonRows || []) {
+          if (!bySvc[a.service_id]) bySvc[a.service_id] = [];
+          bySvc[a.service_id].push(a);
+        }
+        for (const s of services) {
+          s.addons = bySvc[s.id] || [];
+        }
       }
       servicesLoaded = true;
+    }
+
+    function findServiceAddonById(addonId) {
+      const aid = String(addonId);
+      for (const s of services) {
+        const hit = (s.addons || []).find((a) => String(a.id) === aid);
+        if (hit) return hit;
+      }
+      return null;
+    }
+
+    function getDefaultPlanRowLabel(lineId) {
+      const svc = services.find((s) => String(s.id) === String(lineId));
+      if (svc) return svc.name || "";
+      const ad = findServiceAddonById(lineId);
+      return ad ? (ad.name || "") : "";
+    }
+
+    // Expand parent Saved Service ids into line ids used only for Add-ons —
+    // each parent plus rows from service_addons joined in loadServices().
+    function collectPlanLineIds(selectedServiceIds) {
+      const out = [];
+      const seen = new Set();
+      for (const rawId of selectedServiceIds || []) {
+        const id = String(rawId);
+        if (!seen.has(id)) {
+          out.push(id);
+          seen.add(id);
+        }
+        const svc = services.find((s) => String(s.id) === id);
+        for (const a of (svc && svc.addons) || []) {
+          const aid = String(a.id);
+          if (!seen.has(aid)) {
+            out.push(aid);
+            seen.add(aid);
+          }
+        }
+      }
+      return out;
     }
 
     function getActivePlan() {
@@ -5615,18 +5728,17 @@
       `;
     }
 
-    // Per-service rows inside an active plan tab body.
-    // The tab jsonb is keyed by service id with shape:
+    // Per-line rows inside an active plan tab body.
+    // The tab jsonb is keyed by service id or add-on id with shape:
     //   { "<id>": { state: "hidden"|"included"|"priced", price: number, label: string } }
-    // Defaults applied in-memory if the key is missing (e.g. for legacy rows).
-    function getPlanRowConfig(plan, tabKey, serviceId) {
+    function getPlanRowConfig(plan, tabKey, lineId) {
+      const key = String(lineId);
       const tabObj = (plan && plan[tabKey]) || {};
-      const cfg = (tabObj && typeof tabObj === "object" && !Array.isArray(tabObj)) ? tabObj[serviceId] : null;
-      const svc = services.find((s) => String(s.id) === String(serviceId));
+      const cfg = (tabObj && typeof tabObj === "object" && !Array.isArray(tabObj)) ? tabObj[key] : null;
       return {
         state: (cfg && cfg.state) || "hidden",
         price: cfg && cfg.price != null ? Number(cfg.price) : 0,
-        label: (cfg && typeof cfg.label === "string" && cfg.label) ? cfg.label : (svc ? (svc.name || "") : ""),
+        label: (cfg && typeof cfg.label === "string" && cfg.label) ? cfg.label : getDefaultPlanRowLabel(key),
       };
     }
 
@@ -5642,13 +5754,17 @@
         return `${cta}<div class="tab-result-empty">Click the button above to configure this section. (Coming soon.)</div>`;
       }
 
-      // Real tabs (currently just Setup Fee) show the read-only results list.
-      const ids = Array.isArray(plan.services) ? plan.services : [];
+      // Wired tabs show the read-only results list from service-derived ids.
+      const ids = planLineIdsForTab(plan, tabDef.key);
       if (ids.length === 0) {
-        return `${cta}<div class="tab-result-empty">No services selected for this plan. Re-create the plan and check at least one service in step 1 to populate this section.</div>`;
+        const hint =
+          tabDef.key === "addons"
+            ? "No Saved Services linked to this plan yet. Include services in Step 1 when you create a plan — add-ons configured on each Saved Service appear here automatically."
+            : "No services selected for this plan. Re-create the plan and check at least one service in step 1 to populate this section.";
+        return `${cta}<div class="tab-result-empty">${esc(hint)}</div>`;
       }
       const visible = ids
-        .map((id) => ({ id, cfg: getPlanRowConfig(plan, tabDef.key, id) }))
+        .map((id) => ({ id: String(id), cfg: getPlanRowConfig(plan, tabDef.key, id) }))
         .filter(({ cfg }) => cfg.state !== "hidden");
       if (visible.length === 0) {
         return `${cta}<div class="tab-result-empty">Nothing configured yet. Open the editor and switch a service to "Included" or "Priced".</div>`;
@@ -5673,10 +5789,12 @@
         ? `<div class="cb-tmpl-empty">No services yet. Click "+ Create Service" to start.</div>`
         : services.map((s) => {
             const isActive = s.id === activeServiceId;
+            const ac = Array.isArray(s.addons) ? s.addons.length : 0;
+            const addonBit = ac ? ` · ${ac} add-on${ac === 1 ? "" : "s"}` : "";
             return `
-              <button class="cb-tmpl-item ${isActive ? "active" : ""}" data-pb-action="select-service" data-id="${esc(s.id)}">
+              <button class="cb-tmpl-item ${isActive ? "active" : ""}" data-pb-action="open-service-addon-wizard" data-id="${esc(s.id)}" type="button">
                 <div class="cb-tmpl-name">${esc(s.name || "(untitled)")}</div>
-                <div class="cb-tmpl-meta">Saved ${s.created_at ? esc(formatDateTime(s.created_at)) : ""}</div>
+                <div class="cb-tmpl-meta">Saved ${s.created_at ? esc(formatDateTime(s.created_at)) : ""}${addonBit}</div>
               </button>`;
           }).join("");
       const canDelete = !!activeServiceId;
@@ -5710,12 +5828,11 @@
       const plan = getActivePlan();
       const editor = PLAN_TAB_EDITORS[tabKey];
       if (!plan || !editor) return;
-      // Build a draft seeded with the current row config for every
-      // service in plan.services. Missing entries get the default
-      // hidden/0/<service name> from getPlanRowConfig.
-      const ids = Array.isArray(plan.services) ? plan.services : [];
+      // Seed from tab-specific line ids (parents vs parent+addons for Add-ons).
+      const ids = planLineIdsForTab(plan, tabKey);
       const draft = {};
-      for (const id of ids) {
+      for (const rawId of ids) {
+        const id = String(rawId);
         const cfg = getPlanRowConfig(plan, tabKey, id);
         draft[id] = { state: cfg.state, price: cfg.price, label: cfg.label };
       }
@@ -5748,10 +5865,15 @@
         return;
       }
 
-      // Real (Setup Fee) editor
+      // Real editors (Setup Fee, Add-ons): one row per line id for this tab.
       const ids = Object.keys(tabEditorState.draft);
+      const tabKeyNow = tabEditorState.tabKey;
+      const emptyMsg =
+        tabKeyNow === "addons"
+          ? "No Saved Services linked to this plan yet, or none have add-ons configured. Include services when creating this plan — add-ons are managed on each Saved Service."
+          : "No services selected for this plan. Re-create the plan and check at least one service in step 1.";
       const body = ids.length === 0
-        ? `<div class="tab-result-empty">No services selected for this plan. Re-create the plan and check at least one service in step 1.</div>`
+        ? `<div class="tab-result-empty">${esc(emptyMsg)}</div>`
         : `<div class="tab-editor-rows">${ids.map((id) => renderTabEditorRow(id)).join("")}</div>`;
       planTabEditorBody.innerHTML = body;
 
@@ -5842,17 +5964,13 @@
     }
 
     // ---- Plan wizard ----
-    // Step 1 is a multi-select services checklist. Steps 2-6 ask
-    // one yes/no per category and write into the matching has_*
-    // boolean. Step 7 asks for a name. The right half of the
-    // modal shows a live "Included in this plan" checklist that
-    // updates as the user advances.
+    // Step 1: services checklist; steps 2–n: yes/no skeleton flags except
+    // Add-ons (service-defined). Final step names the plan.
     const PLAN_WIZARD_STEPS = [
       { kind: "services", label: "Services" },
       { kind: "yesno", flag: "has_one_time",     label: "One-time payment", prompt: "Does this plan include a one-time payment?" },
       { kind: "yesno", flag: "has_setup",        label: "Setup fee",        prompt: "Does this plan include a setup fee?" },
       { kind: "yesno", flag: "has_subscription", label: "Subscription",     prompt: "Does this plan include a subscription?" },
-      { kind: "yesno", flag: "has_addons",       label: "Add-ons",          prompt: "Does this plan include add-ons?" },
       { kind: "yesno", flag: "has_financing",    label: "Financing",        prompt: "Does this plan include financing?" },
     ];
     const PLAN_WIZARD_TOTAL_STEPS = PLAN_WIZARD_STEPS.length + 1; // + name step
@@ -5876,7 +5994,6 @@
           has_one_time: false,
           has_setup: false,
           has_subscription: false,
-          has_addons: false,
           has_financing: false,
           name: "",
         },
@@ -6029,12 +6146,15 @@
       planWizardNext.disabled = true;
       planWizardStatus.textContent = "Saving...";
       try {
+        await loadServices();
         const draft = planWizardState.draft;
-        const initTabConfig = (serviceIds) => {
+        const parentIds = (draft.services || []).map((id) => String(id));
+        const addonLineIds = collectPlanLineIds(parentIds);
+        const initTabConfig = (ids) => {
           const obj = {};
-          for (const id of serviceIds) {
-            const svc = services.find((s) => String(s.id) === String(id));
-            obj[id] = { state: "hidden", price: 0, label: svc ? (svc.name || "") : "" };
+          for (const raw of ids) {
+            const id = String(raw);
+            obj[id] = { state: "hidden", price: 0, label: getDefaultPlanRowLabel(id) };
           }
           return obj;
         };
@@ -6043,14 +6163,14 @@
           has_one_time: !!draft.has_one_time,
           has_setup: !!draft.has_setup,
           has_subscription: !!draft.has_subscription,
-          has_addons: !!draft.has_addons,
           has_financing: !!draft.has_financing,
-          services: draft.services || [],
-          setup:        initTabConfig(draft.services || []),
-          subscription: initTabConfig(draft.services || []),
-          addons:       initTabConfig(draft.services || []),
-          one_time:     initTabConfig(draft.services || []),
-          financing:    initTabConfig(draft.services || []),
+          has_addons: false,
+          services: parentIds,
+          setup:        initTabConfig(parentIds),
+          subscription: initTabConfig(parentIds),
+          one_time:     initTabConfig(parentIds),
+          financing:    initTabConfig(parentIds),
+          addons:       initTabConfig(addonLineIds),
         };
         const { data: inserted, error } = await sb.from("plans").insert(row).select().single();
         if (error) throw error;
@@ -6107,7 +6227,7 @@
       try {
         const { data: inserted, error } = await sb.from("services").insert({ name }).select().single();
         if (error) throw error;
-        services = [inserted, ...services];
+        services = [{ ...inserted, addons: [] }, ...services];
         activeServiceId = inserted.id;
         serviceWizardStatus.textContent = "Saved.";
         closeServiceWizard();
@@ -6118,6 +6238,130 @@
         alert("Save failed: " + (err.message || String(err)));
       } finally {
         serviceWizardSave.disabled = false;
+      }
+    });
+
+    // ---- Service add-on wizard (saved service → manage child add-ons) ----
+    let serviceAddonWizardState = null;
+    const serviceAddonWizardOverlay  = document.getElementById("serviceAddonWizardOverlay");
+    const serviceAddonWizardClose     = document.getElementById("serviceAddonWizardClose");
+    const serviceAddonWizardCancel    = document.getElementById("serviceAddonWizardCancel");
+    const serviceAddonWizardSave      = document.getElementById("serviceAddonWizardSave");
+    const serviceAddonWizardBody      = document.getElementById("serviceAddonWizardBody");
+    const serviceAddonWizardStatus    = document.getElementById("serviceAddonWizardStatus");
+
+    function renderServiceAddonWizard() {
+      if (!serviceAddonWizardState || !serviceAddonWizardBody) return;
+      const svc = services.find((s) => String(s.id) === String(serviceAddonWizardState.serviceId));
+      const titleName = svc ? (svc.name || "(untitled)") : "(missing service)";
+      const rows = serviceAddonWizardState.rows;
+      serviceAddonWizardBody.innerHTML = `
+        <div class="svc-addon-wiz-title">${esc(titleName)}</div>
+        <div class="svc-addon-wiz-hint">Named add-ons belong to this service. New plans that include this service automatically get these rows in each fee category (alongside the service line).</div>
+        <div class="svc-addon-add-wrap">
+          <button type="button" class="tab-cta" id="serviceAddonWizardAddBtn" style="margin-bottom:0;">Add Add-ons</button>
+        </div>
+        <div class="svc-addon-list">
+          ${rows.length === 0
+            ? `<div class="tab-result-empty" style="margin:0;">No add-ons yet. Click &quot;Add Add-ons&quot; to create one.</div>`
+            : rows.map((r, idx) => `
+            <div class="svc-addon-row" data-sa-row="${idx}">
+              <input type="text" data-sa-input="${idx}" value="${esc(r.name)}" placeholder="Add-on name" aria-label="Add-on ${idx + 1} name">
+              <button type="button" class="ghost" data-sa-remove="${idx}">Remove</button>
+            </div>`).join("")}
+        </div>`;
+      const addBtn = document.getElementById("serviceAddonWizardAddBtn");
+      if (addBtn) {
+        addBtn.addEventListener("click", () => {
+          serviceAddonWizardState.rows.push({ id: null, name: "" });
+          renderServiceAddonWizard();
+        });
+      }
+      serviceAddonWizardBody.querySelectorAll("[data-sa-remove]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const i = Number(btn.dataset.saRemove);
+          if (!Number.isFinite(i)) return;
+          serviceAddonWizardState.rows.splice(i, 1);
+          renderServiceAddonWizard();
+        });
+      });
+      serviceAddonWizardBody.querySelectorAll("[data-sa-input]").forEach((inp) => {
+        inp.addEventListener("input", (e) => {
+          const i = Number(e.target.dataset.saInput);
+          if (!Number.isFinite(i) || !serviceAddonWizardState.rows[i]) return;
+          serviceAddonWizardState.rows[i].name = e.target.value;
+        });
+      });
+    }
+
+    function openServiceAddonWizard(serviceId) {
+      if (!serviceId) return;
+      activeServiceId = serviceId;
+      const svc = services.find((s) => String(s.id) === String(serviceId));
+      const rows = (svc && svc.addons)
+        ? svc.addons.map((a) => ({ id: a.id, name: a.name || "" }))
+        : [];
+      serviceAddonWizardState = { serviceId, rows };
+      serviceAddonWizardStatus.textContent = "";
+      serviceAddonWizardOverlay.classList.add("open");
+      renderPBServices();
+      renderServiceAddonWizard();
+    }
+
+    function closeServiceAddonWizard() {
+      serviceAddonWizardOverlay.classList.remove("open");
+      serviceAddonWizardState = null;
+    }
+
+    serviceAddonWizardClose.addEventListener("click", closeServiceAddonWizard);
+    serviceAddonWizardCancel.addEventListener("click", closeServiceAddonWizard);
+    dismissOnBackdropClick(serviceAddonWizardOverlay, () => closeServiceAddonWizard());
+
+    serviceAddonWizardSave.addEventListener("click", async () => {
+      if (!serviceAddonWizardState) return;
+      const serviceId = serviceAddonWizardState.serviceId;
+      const cleaned = serviceAddonWizardState.rows
+        .map((r) => ({ id: r.id || null, name: (r.name || "").trim() }))
+        .filter((r) => r.name);
+      serviceAddonWizardSave.disabled = true;
+      serviceAddonWizardStatus.textContent = "Saving...";
+      try {
+        const { data: existingRows, error: exErr } = await sb
+          .from("service_addons")
+          .select("id")
+          .eq("service_id", serviceId);
+        if (exErr) throw exErr;
+        const existingIds = new Set((existingRows || []).map((r) => r.id));
+        const keepIds = new Set(cleaned.filter((r) => r.id).map((r) => r.id));
+        for (const row of existingRows || []) {
+          if (!keepIds.has(row.id)) {
+            const { error } = await sb.from("service_addons").delete().eq("id", row.id);
+            if (error) throw error;
+          }
+        }
+        for (const r of cleaned) {
+          if (r.id && existingIds.has(r.id)) {
+            const { error } = await sb.from("service_addons").update({ name: r.name }).eq("id", r.id);
+            if (error) throw error;
+          } else {
+            const { error } = await sb.from("service_addons").insert({ service_id: serviceId, name: r.name });
+            if (error) throw error;
+          }
+        }
+        await loadServices();
+        serviceAddonWizardStatus.textContent = "Saved.";
+        const svc = services.find((s) => String(s.id) === String(serviceId));
+        serviceAddonWizardState.rows = (svc && svc.addons)
+          ? svc.addons.map((a) => ({ id: a.id, name: a.name || "" }))
+          : [];
+        renderPBServices();
+        renderServiceAddonWizard();
+      } catch (err) {
+        console.error("save service add-ons failed:", err);
+        serviceAddonWizardStatus.textContent = "Save failed: " + (err.message || String(err));
+        alert("Save failed: " + (err.message || String(err)));
+      } finally {
+        serviceAddonWizardSave.disabled = false;
       }
     });
 
@@ -7811,9 +8055,9 @@
         renderPBRight();
       } else if (action === "create-service") {
         openServiceWizard();
-      } else if (action === "select-service") {
-        activeServiceId = btn.dataset.id || null;
-        renderPBServices();
+      } else if (action === "open-service-addon-wizard") {
+        const id = btn.dataset.id;
+        if (id) openServiceAddonWizard(id);
       } else if (action === "open-tab-editor") {
         const tab = btn.dataset.tab;
         if (tab) openTabEditor(tab);

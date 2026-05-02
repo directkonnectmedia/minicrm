@@ -648,3 +648,26 @@ drop trigger if exists services_set_updated_at on public.services;
 create trigger services_set_updated_at
   before update on public.services
   for each row execute function public.set_updated_at();
+
+-- Service add-ons (many rows per service; cascade when parent service is deleted)
+create table if not exists public.service_addons (
+  id uuid primary key default gen_random_uuid(),
+  service_id uuid not null references public.services(id) on delete cascade,
+  name text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists service_addons_service_id_idx on public.service_addons (service_id);
+
+alter table public.service_addons enable row level security;
+drop policy if exists "team only service_addons" on public.service_addons;
+create policy "team only service_addons"
+  on public.service_addons for all to authenticated
+  using (public.is_team_member())
+  with check (public.is_team_member());
+
+drop trigger if exists service_addons_set_updated_at on public.service_addons;
+create trigger service_addons_set_updated_at
+  before update on public.service_addons
+  for each row execute function public.set_updated_at();
