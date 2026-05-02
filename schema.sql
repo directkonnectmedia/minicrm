@@ -622,10 +622,22 @@ alter table public.plans add column if not exists financing jsonb not null defau
 --                        "label": "Display label" } }
 -- Existing rows default to '[]' which renders as an empty per-service editor.
 --
--- Setup tab only: logical fields (same semantics as relational column names below):
+-- Setup tab only: logical fields (canonical storage: public.plans.setup[<service_uuid>] JSON keys):
+--   "label"                 — display string (relational name: service_label).
+--   "price"                  — billed setup total when state = priced (total_setup_amount).
+--   "finance_frequency"      — text slug for the live-calculator installment cadence:
+--                              daily | weekly | biweekly | monthly | every_3_months | every_6_months | yearly.
+--   "payment_count"        — integer ≥ 1 installments on the financed remainder (payment_count).
 --   "state" mirrors service_display_status (priced | included | hidden).
 --   "down_payment_amount" mirrors service_down_payment_amount (decimal ≥ 0),
 --       present only when the plan wizard flagged a setup/fixed-project down payment.
+
+-- Hypothetical normalized table example (requires creating public.plan_setup_lines first):
+-- alter table public.plan_setup_lines add column if not exists service_label text;
+-- alter table public.plan_setup_lines add column if not exists total_setup_amount numeric(14, 2);
+-- alter table public.plan_setup_lines add column if not exists finance_frequency text not null default 'monthly';
+-- alter table public.plan_setup_lines add column if not exists payment_count integer not null default 1 check (payment_count >= 1);
+
 alter table public.plans add column if not exists services jsonb not null default '[]'::jsonb;
 
 -- Plan Creation Wizard — Phase 1 payment fork (nullable for legacy rows)
@@ -647,9 +659,10 @@ exception
   when duplicate_object then null;
 end $$;
 
--- If you split per-service setup rows into a relational table (not used by current app):
+-- If you normalize setup lines into relational rows (requires public.plan_setup_lines):
 -- alter table public.plan_setup_lines add column if not exists service_display_status public.service_display_status not null default 'hidden'::public.service_display_status;
 -- alter table public.plan_setup_lines add column if not exists service_down_payment_amount numeric(14, 2);
+-- (service_label / total_setup_amount / finance_frequency / payment_count snippets appear above.)
 
 -- =============================================================
 -- Services (Plan Builder reusable services library)

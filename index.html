@@ -1209,7 +1209,7 @@
     .sf-wizard-content-pane {
       margin-top: 22px;
       min-height: 420px;
-      padding: 40px 32px;
+      padding: 28px 24px 32px;
       border: 1px solid #e5e7eb;
       border-radius: 14px;
       background: linear-gradient(180deg, #fafafa 0%, #f4f6fb 100%);
@@ -1257,12 +1257,84 @@
       background: #fff;
       color: #111827;
     }
+    .sf-field-block input.sf-field-text {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px 14px;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 16px;
+      background: #fff;
+      color: #111827;
+    }
     .sf-field-block select.sf-field-select { cursor: pointer; }
     .sf-field-block input.sf-field-money {
       font-variant-numeric: tabular-nums;
       text-align: right;
     }
     .sf-field-hint { font-size: 13px; color: #6b7280; margin-top: 8px; line-height: 1.45; }
+
+    .sf-split {
+      display: grid;
+      grid-template-columns: 1fr minmax(280px, 38%);
+      gap: clamp(18px, 3vw, 28px);
+      align-items: start;
+      margin-top: 8px;
+    }
+    .sf-split-left {
+      padding-right: 4px;
+      min-height: 1px;
+    }
+    .sf-split-left .sf-field-block { max-width: none; margin-bottom: 20px; }
+    .sf-split-right {
+      position: sticky;
+      top: 12px;
+      align-self: start;
+      padding: 22px 20px;
+      border-radius: 14px;
+      border: 2px solid #a5b4fc;
+      background: linear-gradient(165deg, #eef2ff 0%, #e0e7ff 48%, #f5f7ff 100%);
+      box-shadow: 0 10px 30px rgba(79, 70, 229, 0.12);
+      box-sizing: border-box;
+    }
+    .sf-calc-heading {
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #3730a3;
+      margin: 0 0 16px;
+    }
+    .sf-calc-rows { display: flex; flex-direction: column; gap: 14px; }
+    .sf-calc-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      font-size: 15px;
+      color: #1e1b4b;
+    }
+    .sf-calc-row span:first-child { color: #4338ca; font-weight: 600; flex-shrink: 0; }
+    .sf-calc-row strong { font-variant-numeric: tabular-nums; font-weight: 800; }
+    .sf-calc-divider {
+      margin: 4px 0 8px;
+      border: none;
+      border-top: 2px dashed #c7d2fe;
+    }
+    .sf-calc-copy {
+      font-size: 15px;
+      line-height: 1.55;
+      color: #312e81;
+      margin: 18px 0 0;
+      padding-top: 16px;
+      border-top: 2px solid #c7d2fe;
+      font-weight: 500;
+    }
+    .sf-calc-muted { font-size: 14px; color: #6b7280; line-height: 1.45; margin: 0; }
+    @media (max-width: 760px) {
+      .sf-split { grid-template-columns: 1fr; }
+      .sf-split-right { position: relative; top: 0; }
+    }
 
     /* Plan Builder right-panel mini tabs */
     .plan-tabs { display: flex; gap: 6px; border-bottom: 1px solid #e5e7eb; margin-bottom: 14px; }
@@ -5888,10 +5960,115 @@
       `;
     }
 
+    const SETUP_FINANCE_FREQUENCIES = [
+      ["daily", "Daily"],
+      ["weekly", "Weekly"],
+      ["biweekly", "Bi-Weekly"],
+      ["monthly", "Monthly"],
+      ["every_3_months", "3 Months"],
+      ["every_6_months", "6 Months"],
+      ["yearly", "Yearly"],
+    ];
+    const SETUP_FINANCE_FREQUENCY_SET = new Set(SETUP_FINANCE_FREQUENCIES.map((r) => r[0]));
+
+    function setupFinanceSentencePhrase(slug) {
+      const map = {
+        daily: "per day",
+        weekly: "every week",
+        biweekly: "every two weeks",
+        monthly: "per month",
+        every_3_months: "every 3 months",
+        every_6_months: "every 6 months",
+        yearly: "per year",
+      };
+      return map[slug] || "each period";
+    }
+
+    /** Integer ≥ 1 for financed installment count (setup tab draft). */
+    function parsePaymentCount(raw) {
+      const n = parseInt(String(raw), 10);
+      return Number.isFinite(n) && n >= 1 ? n : 1;
+    }
+
+    /** Split-pane calculator (setup fee modal): syncs instantly from draft; no React. */
+    function refreshSetupFeeCalculator() {
+      if (!tabEditorState || tabEditorState.tabKey !== "setup") return;
+      const host = document.getElementById("setupFeeCalcInner");
+      if (!host) return;
+      const active = tabEditorState.setupActiveServiceId;
+      const planForCtx = plans.find((p) => String(p.id) === String(tabEditorState.planId));
+      const showDownCtx = planShowsDownPaymentContext(planForCtx);
+      const dc = (active && tabEditorState.draft[active]) || {};
+      const st = dc.state || "hidden";
+      const priced = st === "priced";
+      const totalSetup = priced && dc.price != null ? Number(dc.price) : NaN;
+      const totalFinite = Number.isFinite(totalSetup) && totalSetup >= 0 ? totalSetup : priced ? 0 : null;
+      const downRaw =
+        priced && showDownCtx ? parseDownPaymentAmt(dc.down_payment_amount != null ? dc.down_payment_amount : null) : null;
+      const down = downRaw != null && downRaw >= 0 ? downRaw : null;
+      const remaining =
+        priced && totalFinite !== null ? Math.max(0, totalFinite - (down != null ? down : 0)) : null;
+      const freq = SETUP_FINANCE_FREQUENCY_SET.has(dc.finance_frequency) ? dc.finance_frequency : "monthly";
+      const payN = priced ? parsePaymentCount(dc.payment_count) : null;
+      let perPayment = priced && remaining !== null && payN != null && payN >= 1 ? remaining / payN : null;
+
+      if (!priced) {
+        host.innerHTML = `
+          <h3 class="sf-calc-heading">Live preview</h3>
+          <p class="sf-calc-muted">Select <strong>Priced</strong> to see totals, remaining balance, and payment schedule preview.</p>`;
+        return;
+      }
+
+      const freqSentence = setupFinanceSentencePhrase(freq);
+      const freqSelLabel = SETUP_FINANCE_FREQUENCIES.find((r) => r[0] === freq)?.[1] || "Monthly";
+
+      let narrative = "";
+      if (remaining === 0 || (totalFinite === 0 && (down === 0 || down == null))) {
+        narrative =
+          down != null && down > 0
+            ? `The customer's plan starts with ${esc(fmtMoney(down))} today. Nothing further is financed for this setup line.`
+            : `Nothing is financed here yet — enter a setup fee ${showDownCtx ? "and optional down payment" : ""}.`;
+      } else if (perPayment !== null && payN !== null && payN >= 1 && remaining !== null && remaining > 0) {
+        const perStr = esc(fmtMoney(perPayment));
+        if (showDownCtx && down != null && down > 0) {
+          narrative = `The customer will pay ${esc(fmtMoney(down))} today, followed by ${esc(String(payN))} payments of ${perStr} ${esc(freqSentence)}.`;
+        } else {
+          narrative = `The customer will pay ${esc(String(payN))} payments of ${perStr} ${esc(freqSentence)} (${esc(fmtMoney(remaining))} balance after today's costs).`;
+        }
+      }
+
+      host.innerHTML = `
+        <h3 class="sf-calc-heading">Live calculator</h3>
+        <div class="sf-calc-rows">
+          <div class="sf-calc-row"><span>Total setup fee</span><strong>${esc(fmtMoney(totalFinite))}</strong></div>
+          ${
+            showDownCtx && down != null
+              ? `<div class="sf-calc-row"><span>Down payment</span><strong>${esc(fmtMoney(down))}</strong></div>`
+              : showDownCtx
+                ? `<div class="sf-calc-row"><span>Down payment</span><strong>—</strong></div>`
+                : ""
+          }
+        </div>
+        <hr class="sf-calc-divider" />
+        <div class="sf-calc-rows">
+          <div class="sf-calc-row"><span>Remaining balance</span><strong>${remaining !== null ? esc(fmtMoney(remaining)) : "—"}</strong></div>
+          ${
+            perPayment !== null && payN != null && remaining !== null && remaining > 0
+              ? `
+            <div class="sf-calc-row"><span>Each installment</span><strong>${esc(fmtMoney(perPayment))}</strong></div>
+            <div class="sf-calc-row"><span>Payments</span><strong>${esc(String(payN))}</strong></div>
+            <div class="sf-calc-row"><span>Frequency</span><strong>${esc(freqSelLabel)}</strong></div>`
+              : ""
+          }
+        </div>
+        ${narrative ? `<p class="sf-calc-copy">${narrative}</p>` : ""}`;
+    }
+
     // Per-line rows inside an active plan tab body.
     // The tab jsonb is keyed by service id or add-on id with shape:
     //   { "<id>": { state: "priced"|"included"|"hidden" (service display / legacy),
-    //               price: number, label: string,
+    //               price: number (= total_setup_amount), label (= service_label string),
+    //               finance_frequency, payment_count (setup finance preview),
     //               optional down_payment_amount when plan mandates down-payment context } }
     function parseDownPaymentAmt(raw) {
       if (raw == null || raw === "") return null;
@@ -5913,11 +6090,16 @@
       const cfg = (tabObj && typeof tabObj === "object" && !Array.isArray(tabObj)) ? tabObj[key] : null;
       const down =
         cfg && cfg.down_payment_amount != null ? parseDownPaymentAmt(cfg.down_payment_amount) : null;
+      const finance_frequency =
+        cfg && SETUP_FINANCE_FREQUENCY_SET.has(cfg.finance_frequency) ? cfg.finance_frequency : "monthly";
+      const payment_count = cfg != null && cfg.payment_count != null ? parsePaymentCount(cfg.payment_count) : 1;
       return {
         state: (cfg && cfg.state) || "hidden",
         price: cfg && cfg.price != null ? Number(cfg.price) : 0,
         label: (cfg && typeof cfg.label === "string" && cfg.label) ? cfg.label : getDefaultPlanRowLabel(key),
         down_payment_amount: down,
+        finance_frequency,
+        payment_count,
       };
     }
 
@@ -6016,7 +6198,13 @@
           state: cfg.state,
           price: cfg.price,
           label: cfg.label,
-          ...(tabKey === "setup" ? { down_payment_amount: cfg.down_payment_amount } : {}),
+          ...(tabKey === "setup"
+            ? {
+                down_payment_amount: cfg.down_payment_amount,
+                finance_frequency: cfg.finance_frequency,
+                payment_count: cfg.payment_count,
+              }
+            : {}),
         };
       }
       let setupActiveServiceId = null;
@@ -6088,50 +6276,88 @@
           const activeLabel = getDefaultPlanRowLabel(active) || "(service)";
           const planForCtx = plans.find((p) => String(p.id) === String(tabEditorState.planId));
           const showDownCtx = planShowsDownPaymentContext(planForCtx);
-          const dc = tabEditorState.draft[active] || { state: "hidden", price: 0, label: "", down_payment_amount: null };
+          const dc =
+            tabEditorState.draft[active] ||
+            ({
+              state: "hidden",
+              price: 0,
+              label: "",
+              down_payment_amount: null,
+              finance_frequency: "monthly",
+              payment_count: 1,
+            });
           const st = dc.state || "hidden";
           const showPriceUi = st === "priced";
           const downVal =
             dc.down_payment_amount != null && dc.down_payment_amount !== ""
               ? String(dc.down_payment_amount)
               : "";
+          const freqSlug =
+            typeof dc.finance_frequency === "string" && SETUP_FINANCE_FREQUENCY_SET.has(dc.finance_frequency)
+              ? dc.finance_frequency
+              : "monthly";
+          const payCt = parsePaymentCount(dc.payment_count);
+          const freqOpts = SETUP_FINANCE_FREQUENCIES.map(([slug, lbl]) => {
+            const sel = freqSlug === slug ? " selected" : "";
+            return `<option value="${esc(slug)}"${sel}>${esc(lbl)}</option>`;
+          }).join("");
           const bannerHtml = showDownCtx
             ? `<div class="sf-context-banner" role="status">Down Payment Required</div>`
             : "";
           const downBlock = showDownCtx
             ? `<div class="sf-field-block">
-                <label class="sf-field-label" for="setupSvcDownPaymentInput">How much is the down payment?</label>
+                <label class="sf-field-label" for="setupSvcDownPaymentInput">Down payment amount</label>
                 <input type="number" class="sf-field-money" id="setupSvcDownPaymentInput" inputmode="decimal" min="0" step="0.01" placeholder="0.00" value="${esc(downVal)}" data-te-action="setup-down" data-id="${esc(active)}">
                 <p class="sf-field-hint muted">Collected at signing for plans that include a setup down payment.</p>
               </div>`
             : "";
           const priceBlock = showPriceUi
             ? `<div class="sf-field-block">
-                <label class="sf-field-label" for="setupSvcPriceInput">Setup fee amount</label>
-                <input type="number" class="sf-field-money" id="setupSvcPriceInput" inputmode="decimal" min="0" step="0.01" placeholder="0.00" value="${esc(String(dc.price ?? 0))}" data-te-action="price" data-id="${esc(active)}">
+                <label class="sf-field-label" for="setupSvcTotalSetupInput">Total setup fee</label>
+                <input type="number" class="sf-field-money" id="setupSvcTotalSetupInput" inputmode="decimal" min="0" step="0.01" placeholder="0.00" value="${esc(String(dc.price ?? 0))}" data-te-action="price" data-id="${esc(active)}">
+              </div>`
+            : "";
+          const financeBlock = showPriceUi
+            ? `<div class="sf-field-block">
+                <label class="sf-field-label" for="setupSvcPayFreqSelect">Payment frequency</label>
+                <select id="setupSvcPayFreqSelect" class="sf-field-select" data-te-action="setup-finance-freq" data-id="${esc(active)}">${freqOpts}</select>
+              </div>
+              <div class="sf-field-block">
+                <label class="sf-field-label" for="setupSvcPayCountInput">Number of payments</label>
+                <input type="number" id="setupSvcPayCountInput" class="sf-field-text" inputmode="numeric" min="1" step="1" value="${esc(String(payCt))}" data-te-action="setup-pay-count" data-id="${esc(active)}">
+                <p class="sf-field-hint muted">Remaining balance ÷ installments (shown live on the right).</p>
               </div>`
             : "";
           planTabEditorBody.innerHTML = `
-            <p class="sf-wizard-intro">Each tab below is a Saved Service included in this plan (from Plan Creation step 1). Switch tabs to configure how this setup fee appears.</p>
+            <p class="sf-wizard-intro">Pick a Saved Service tab, tune the billing fields on the left, and watch the schedule update live on the right.</p>
             <div class="sf-wizard-tab-bar" role="tablist" aria-label="Services in this plan">${tabButtons}</div>
             <div class="sf-wizard-content-pane" role="tabpanel" aria-live="polite">
               ${bannerHtml}
               <h2 class="sf-wizard-placeholder-title">Setup fee — ${esc(activeLabel)}</h2>
-              <div class="sf-field-block">
-                <label class="sf-field-label" for="setupSvcStatusSelect">Service status</label>
-                <select id="setupSvcStatusSelect" class="sf-field-select" data-te-action="state" data-id="${esc(active)}">
-                  <option value="priced" ${st === "priced" ? "selected" : ""}>Priced — Standard billing applies.</option>
-                  <option value="included" ${st === "included" ? "selected" : ""}>Included — No line-item cost (shown as included).</option>
-                  <option value="hidden" ${st === "hidden" ? "selected" : ""}>Don't display — Hide from customer-facing proposal.</option>
-                </select>
+              <div class="sf-split">
+                <div class="sf-split-left">
+                  <div class="sf-field-block">
+                    <label class="sf-field-label" for="setupSvcDisplayLabelInput">Service label</label>
+                    <input type="text" class="sf-field-text" id="setupSvcDisplayLabelInput" data-te-action="label" data-id="${esc(active)}" value="${esc(dc.label || "")}" placeholder="Display label on proposals">
+                  </div>
+                  <div class="sf-field-block">
+                    <label class="sf-field-label" for="setupSvcStatusSelect">Service status</label>
+                    <select id="setupSvcStatusSelect" class="sf-field-select" data-te-action="state" data-id="${esc(active)}">
+                      <option value="priced" ${st === "priced" ? "selected" : ""}>Priced — Standard billing applies.</option>
+                      <option value="included" ${st === "included" ? "selected" : ""}>Included — No line-item cost (shown as included).</option>
+                      <option value="hidden" ${st === "hidden" ? "selected" : ""}>Don't display — Hide from customer-facing proposal.</option>
+                    </select>
+                  </div>
+                  ${priceBlock}
+                  ${downBlock}
+                  ${financeBlock}
+                </div>
+                <aside class="sf-split-right" aria-live="polite">
+                  <div id="setupFeeCalcInner"></div>
+                </aside>
               </div>
-              ${downBlock}
-              <div class="sf-field-block">
-                <label class="sf-field-label" for="setupSvcDisplayLabelInput">Display label</label>
-                <input type="text" id="setupSvcDisplayLabelInput" data-te-action="label" data-id="${esc(active)}" value="${esc(dc.label || "")}" placeholder="Display label">
-              </div>
-              ${priceBlock}
             </div>`;
+          refreshSetupFeeCalculator();
         }
         const saveLabel = `Save ${editor.title}`;
         planTabEditorActions.innerHTML = `
@@ -6198,6 +6424,23 @@
         const sid = id || tabEditorState.setupActiveServiceId;
         if (!sid || !tabEditorState.draft[sid]) return;
         tabEditorState.draft[sid].down_payment_amount = parseDownPaymentAmt(el.value);
+        refreshSetupFeeCalculator();
+        return;
+      }
+      if (action === "setup-finance-freq") {
+        if (tabEditorState.tabKey !== "setup") return;
+        const sid = id || tabEditorState.setupActiveServiceId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        tabEditorState.draft[sid].finance_frequency = el.value;
+        refreshSetupFeeCalculator();
+        return;
+      }
+      if (action === "setup-pay-count") {
+        if (tabEditorState.tabKey !== "setup") return;
+        const sid = id || tabEditorState.setupActiveServiceId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        tabEditorState.draft[sid].payment_count = parsePaymentCount(el.value);
+        refreshSetupFeeCalculator();
         return;
       }
       if (!tabEditorState.draft[id]) return;
@@ -6206,9 +6449,11 @@
         renderTabEditor();
       } else if (action === "label") {
         tabEditorState.draft[id].label = el.value;
+        refreshSetupFeeCalculator();
       } else if (action === "price") {
         const num = parseFloat(el.value);
         tabEditorState.draft[id].price = Number.isFinite(num) ? num : 0;
+        refreshSetupFeeCalculator();
       }
     });
     planTabEditorBody.addEventListener("input", (e) => {
@@ -6221,14 +6466,25 @@
         const sid = id || tabEditorState.setupActiveServiceId;
         if (!sid || !tabEditorState.draft[sid]) return;
         tabEditorState.draft[sid].down_payment_amount = parseDownPaymentAmt(el.value);
+        refreshSetupFeeCalculator();
+        return;
+      }
+      if (action === "setup-pay-count") {
+        if (tabEditorState.tabKey !== "setup") return;
+        const sid = id || tabEditorState.setupActiveServiceId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        tabEditorState.draft[sid].payment_count = parsePaymentCount(el.value);
+        refreshSetupFeeCalculator();
         return;
       }
       if (!tabEditorState.draft[id]) return;
       if (action === "label") {
         tabEditorState.draft[id].label = el.value;
+        refreshSetupFeeCalculator();
       } else if (action === "price") {
         const num = parseFloat(el.value);
         tabEditorState.draft[id].price = Number.isFinite(num) ? num : 0;
+        refreshSetupFeeCalculator();
       }
     });
 
@@ -6759,6 +7015,8 @@
                 price: 0,
                 label: getDefaultPlanRowLabel(id),
                 down_payment_amount: null,
+                finance_frequency: "monthly",
+                payment_count: 1,
               };
             }
             return obj;
