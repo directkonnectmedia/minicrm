@@ -6315,7 +6315,6 @@
 
     serviceAddonWizardClose.addEventListener("click", closeServiceAddonWizard);
     serviceAddonWizardCancel.addEventListener("click", closeServiceAddonWizard);
-    dismissOnBackdropClick(serviceAddonWizardOverlay, () => closeServiceAddonWizard());
 
     serviceAddonWizardSave.addEventListener("click", async () => {
       if (!serviceAddonWizardState) return;
@@ -6349,13 +6348,8 @@
           }
         }
         await loadServices();
-        serviceAddonWizardStatus.textContent = "Saved.";
-        const svc = services.find((s) => String(s.id) === String(serviceId));
-        serviceAddonWizardState.rows = (svc && svc.addons)
-          ? svc.addons.map((a) => ({ id: a.id, name: a.name || "" }))
-          : [];
         renderPBServices();
-        renderServiceAddonWizard();
+        closeServiceAddonWizard();
       } catch (err) {
         console.error("save service add-ons failed:", err);
         serviceAddonWizardStatus.textContent = "Save failed: " + (err.message || String(err));
