@@ -1011,6 +1011,17 @@
     }
     .plan-wizard-yesno-btn:hover { border-color: #4f46e5; background: #eef2ff; }
     .plan-wizard-yesno-btn.active { border-color: #4f46e5; background: #4f46e5; color: #fff; }
+    .plan-wizard-yesno-btn .pw-choice-title { display: block; font-size: 15px; font-weight: 700; text-align: left; }
+    .plan-wizard-yesno-btn .pw-choice-sub {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.4;
+      margin-top: 8px;
+      text-align: left;
+      color: #6b7280;
+    }
+    .plan-wizard-yesno-btn.active .pw-choice-sub { color: rgba(255, 255, 255, 0.92); font-weight: 500; }
     .plan-wizard-name-input {
       width: 100%;
       padding: 10px 12px;
@@ -6017,16 +6028,24 @@
       }
     }
 
-    // ---- Plan Creation Wizard (phase 1: services → payment fork → conditional billing identity → summary) ----
+    // ---- Plan Creation Wizard (phase 1+ subscription branch screens) ----
     const PLAN_WIZARD_STEP_IDS = {
       SERVICES: "services",
       PAYMENT_FORK: "payment_fork",
       BILLING_IDENTITY: "billing_identity",
+      SUBSCRIPTION_SETUP_FEE: "subscription_setup_fee",
+      SUBSCRIPTION_SETUP_DOWN: "subscription_setup_down",
       PLAN_SUMMARY: "plan_summary",
     };
 
+    function planWizardDraftClearSubscriptionBranch(draft) {
+      draft.subscription_has_setup_fee = null;
+      draft.subscription_setup_requires_down_payment = null;
+    }
+
     function planWizardDraftClearPaymentDerived(draft) {
       draft.multi_billing = null;
+      planWizardDraftClearSubscriptionBranch(draft);
     }
 
     function planWizardStepSequence(draft) {
@@ -6036,6 +6055,12 @@
       ];
       if (draft.payment_receive === "multiple") {
         seq.push(PLAN_WIZARD_STEP_IDS.BILLING_IDENTITY);
+        if (draft.multi_billing === "ongoing") {
+          seq.push(PLAN_WIZARD_STEP_IDS.SUBSCRIPTION_SETUP_FEE);
+          if (draft.subscription_has_setup_fee === true) {
+            seq.push(PLAN_WIZARD_STEP_IDS.SUBSCRIPTION_SETUP_DOWN);
+          }
+        }
       }
       seq.push(PLAN_WIZARD_STEP_IDS.PLAN_SUMMARY);
       return seq;
@@ -6061,8 +6086,12 @@
       if (pr === "single") {
         flags.has_one_time = true;
       } else if (pr === "multiple") {
-        if (mb === "ongoing") flags.has_subscription = true;
-        else if (mb === "fixed_installment") flags.has_financing = true;
+        if (mb === "ongoing") {
+          flags.has_subscription = true;
+          if (draft.subscription_has_setup_fee === true) flags.has_setup = true;
+        } else if (mb === "fixed_installment") {
+          flags.has_financing = true;
+        }
       }
       return flags;
     }
@@ -6085,6 +6114,8 @@
           services: [],
           payment_receive: null,
           multi_billing: null,
+          subscription_has_setup_fee: null,
+          subscription_setup_requires_down_payment: null,
           name: "",
         },
       };
@@ -6158,7 +6189,41 @@
           </div>
           <div class="muted" style="font-size:12px;margin-top:10px;">Ongoing: recurring billing (indefinite). Fixed project: installments / financing with a fixed total (auto-terminate when complete).</div>
         `;
-      } else {
+      } else if (stepId === PLAN_WIZARD_STEP_IDS.SUBSCRIPTION_SETUP_FEE) {
+        const cur = draft.subscription_has_setup_fee;
+        planWizardQuestion.innerHTML = `
+          <div class="plan-wizard-step-label">Step ${stepNum} / ${stepTotal}</div>
+          <div class="plan-wizard-prompt">Does this subscription have a setup fee?</div>
+          <div class="plan-wizard-yesno" style="grid-template-columns: 1fr 1fr; align-items: stretch;">
+            <button type="button" class="plan-wizard-yesno-btn ${cur === true ? "active" : ""}" data-pw-sub-setup="yes">
+              <span class="pw-choice-title">YES</span>
+              <span class="pw-choice-sub">Use this for onboarding, account creation, or initial labor costs (e.g., $500 to build the site).</span>
+            </button>
+            <button type="button" class="plan-wizard-yesno-btn ${cur === false ? "active" : ""}" data-pw-sub-setup="no">
+              <span class="pw-choice-title">NO</span>
+              <span class="pw-choice-sub">There are no upfront costs. The customer only pays the recurring subscription rate.</span>
+            </button>
+          </div>
+          <div class="muted" style="font-size:12px;margin-top:10px;">Next: recurring rate details will follow in a later step (not yet in this build).</div>
+        `;
+      } else if (stepId === PLAN_WIZARD_STEP_IDS.SUBSCRIPTION_SETUP_DOWN) {
+        const cur = draft.subscription_setup_requires_down_payment;
+        planWizardQuestion.innerHTML = `
+          <div class="plan-wizard-step-label">Step ${stepNum} / ${stepTotal}</div>
+          <div class="plan-wizard-prompt">Does this subscription setup fee require a down payment today?</div>
+          <div class="plan-wizard-yesno" style="grid-template-columns: 1fr 1fr; align-items: stretch;">
+            <button type="button" class="plan-wizard-yesno-btn ${cur === true ? "active" : ""}" data-pw-sub-down="yes">
+              <span class="pw-choice-title">YES (Down Payment)</span>
+              <span class="pw-choice-sub">You want to collect a portion now and finance the rest. (Triggers automated payment splitting.)</span>
+            </button>
+            <button type="button" class="plan-wizard-yesno-btn ${cur === false ? "active" : ""}" data-pw-sub-down="no">
+              <span class="pw-choice-title">NO (Pay in Full)</span>
+              <span class="pw-choice-sub">The customer pays the entire setup fee in one transaction at the start.</span>
+            </button>
+          </div>
+          <div class="muted" style="font-size:12px;margin-top:10px;">Amounts and splitting rules are configured in a later phase.</div>
+        `;
+      } else if (stepId === PLAN_WIZARD_STEP_IDS.PLAN_SUMMARY) {
         planWizardQuestion.innerHTML = `
           <div class="plan-wizard-step-label">Step ${stepNum} / ${stepTotal}</div>
           <div class="plan-wizard-prompt">Plan summary</div>
@@ -6171,6 +6236,8 @@
           planWizardNext.disabled = !(planWizardState.draft.name && planWizardState.draft.name.trim());
         });
         setTimeout(() => nameInput.focus(), 0);
+      } else {
+        planWizardQuestion.innerHTML = "";
       }
 
       const servicesCount = (draft.services || []).length;
@@ -6203,6 +6270,38 @@
           bText = "Fixed project (installments / financing)";
         }
         extraLi = `<li class="${bCls}"><span class="pw-mark">${bMark}</span><span>${esc(bText)}</span></li>`;
+
+        if (draft.multi_billing === "ongoing") {
+          let sfCls = "pending";
+          let sfMark = "\u2022";
+          let sfText = "Subscription setup fee: not chosen";
+          if (draft.subscription_has_setup_fee === true) {
+            sfCls = "included";
+            sfMark = "\u2713";
+            sfText = "Subscription setup fee: YES";
+          } else if (draft.subscription_has_setup_fee === false) {
+            sfCls = "included";
+            sfMark = "\u2713";
+            sfText = "Subscription setup fee: NO — recurring only";
+          }
+          extraLi += `<li class="${sfCls}"><span class="pw-mark">${sfMark}</span><span>${esc(sfText)}</span></li>`;
+
+          if (draft.subscription_has_setup_fee === true) {
+            let dpCls = "pending";
+            let dpMark = "\u2022";
+            let dpText = "Setup down payment today: not chosen";
+            if (draft.subscription_setup_requires_down_payment === true) {
+              dpCls = "included";
+              dpMark = "\u2713";
+              dpText = "Setup down payment: YES (portion now)";
+            } else if (draft.subscription_setup_requires_down_payment === false) {
+              dpCls = "included";
+              dpMark = "\u2713";
+              dpText = "Setup down payment: NO (pay in full)";
+            }
+            extraLi += `<li class="${dpCls}"><span class="pw-mark">${dpMark}</span><span>${esc(dpText)}</span></li>`;
+          }
+        }
       }
 
       planWizardChecklist.innerHTML = summaryLi + payLi + extraLi;
@@ -6217,8 +6316,17 @@
         planWizardNext.disabled = !draft.payment_receive;
       } else if (stepId === PLAN_WIZARD_STEP_IDS.BILLING_IDENTITY) {
         planWizardNext.disabled = !draft.multi_billing;
-      } else {
+      } else if (stepId === PLAN_WIZARD_STEP_IDS.SUBSCRIPTION_SETUP_FEE) {
+        planWizardNext.disabled =
+          draft.subscription_has_setup_fee !== true && draft.subscription_has_setup_fee !== false;
+      } else if (stepId === PLAN_WIZARD_STEP_IDS.SUBSCRIPTION_SETUP_DOWN) {
+        planWizardNext.disabled =
+          draft.subscription_setup_requires_down_payment !== true &&
+          draft.subscription_setup_requires_down_payment !== false;
+      } else if (stepId === PLAN_WIZARD_STEP_IDS.PLAN_SUMMARY) {
         planWizardNext.disabled = !(draft.name && draft.name.trim());
+      } else {
+        planWizardNext.disabled = true;
       }
     }
 
@@ -6237,9 +6345,34 @@
       if (billBtn && planWizardState) {
         const v = billBtn.dataset.pwBilling;
         if (v === "ongoing" || v === "fixed_installment") {
-          planWizardState.draft.multi_billing = v;
+          const d = planWizardState.draft;
+          const prev = d.multi_billing;
+          if (prev !== v) planWizardDraftClearSubscriptionBranch(d);
+          d.multi_billing = v;
           renderPlanWizard();
         }
+        return;
+      }
+      const subSetupBtn = e.target.closest("[data-pw-sub-setup]");
+      if (subSetupBtn && planWizardState) {
+        const yn = subSetupBtn.dataset.pwSubSetup;
+        const d = planWizardState.draft;
+        if (yn === "yes") {
+          d.subscription_has_setup_fee = true;
+        } else if (yn === "no") {
+          d.subscription_has_setup_fee = false;
+          d.subscription_setup_requires_down_payment = null;
+        }
+        renderPlanWizard();
+        return;
+      }
+      const subDownBtn = e.target.closest("[data-pw-sub-down]");
+      if (subDownBtn && planWizardState) {
+        const yn = subDownBtn.dataset.pwSubDown;
+        const d = planWizardState.draft;
+        if (yn === "yes") d.subscription_setup_requires_down_payment = true;
+        else if (yn === "no") d.subscription_setup_requires_down_payment = false;
+        renderPlanWizard();
       }
     });
 
@@ -6295,6 +6428,16 @@
           has_addons: false,
           wizard_payment_receive: draft.payment_receive,
           wizard_multi_billing: draft.payment_receive === "multiple" ? draft.multi_billing : null,
+          wizard_subscription_has_setup_fee:
+            draft.payment_receive === "multiple" && draft.multi_billing === "ongoing"
+              ? draft.subscription_has_setup_fee
+              : null,
+          wizard_subscription_setup_down_payment:
+            draft.payment_receive === "multiple" &&
+            draft.multi_billing === "ongoing" &&
+            draft.subscription_has_setup_fee === true
+              ? draft.subscription_setup_requires_down_payment
+              : null,
           services: parentIds,
           setup:        initTabConfig(parentIds),
           subscription: initTabConfig(parentIds),

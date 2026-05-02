@@ -627,6 +627,10 @@ alter table public.plans add column if not exists services jsonb not null defaul
 alter table public.plans add column if not exists wizard_payment_receive text;
 alter table public.plans add column if not exists wizard_multi_billing text;
 
+-- Wizard — ongoing subscription branch (nullable when path not taken)
+alter table public.plans add column if not exists wizard_subscription_has_setup_fee boolean;
+alter table public.plans add column if not exists wizard_subscription_setup_down_payment boolean;
+
 -- =============================================================
 -- Services (Plan Builder reusable services library)
 -- =============================================================
