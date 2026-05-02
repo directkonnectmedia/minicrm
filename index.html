@@ -1169,6 +1169,62 @@
       border-radius: 10px;
     }
 
+    /* Setup Fee configuration wizard shell (Plan tab editor) */
+    .modal.plan-tab-modal-default { max-width: 720px; }
+    .modal.setup-fee-wizard-shell {
+      max-width: min(1040px, 96vw);
+      width: 96vw;
+      max-height: min(92vh, 900px);
+    }
+    .modal.setup-fee-wizard-shell .step-body {
+      padding: 20px 24px 28px;
+      overflow: auto;
+    }
+    .sf-wizard-intro { font-size: 15px; line-height: 1.55; margin: 0 0 14px 0; color: #4b5563; }
+    .sf-wizard-tab-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding-bottom: 16px;
+      margin-bottom: 4px;
+      border-bottom: 2px solid #e5e7eb;
+    }
+    .sf-wizard-tab {
+      border: 2px solid #e5e7eb;
+      background: #fff;
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #374151;
+      cursor: pointer;
+      transition: border-color 120ms, background 120ms, color 120ms;
+    }
+    .sf-wizard-tab:hover { border-color: #a5b4fc; background: #f5f7ff; }
+    .sf-wizard-tab.active {
+      border-color: #4f46e5;
+      background: #4f46e5;
+      color: #fff;
+    }
+    .sf-wizard-content-pane {
+      margin-top: 22px;
+      min-height: 420px;
+      padding: 40px 32px;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #fafafa 0%, #f4f6fb 100%);
+      box-sizing: border-box;
+    }
+    .sf-wizard-placeholder-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #111827;
+      margin: 0 0 14px;
+      letter-spacing: -0.02em;
+    }
+    .sf-wizard-placeholder-text { font-size: 18px; line-height: 1.65; color: #1f2937; margin: 0 0 12px 0; }
+    .sf-wizard-placeholder-hint { font-size: 15px; line-height: 1.5; margin: 0; }
+
     /* Plan Builder right-panel mini tabs */
     .plan-tabs { display: flex; gap: 6px; border-bottom: 1px solid #e5e7eb; margin-bottom: 14px; }
     .plan-tab {
@@ -2906,7 +2962,7 @@
 
   <!-- Plan tab editor modal (per-tab "Configure" wizard) -->
   <div class="overlay" id="planTabEditorOverlay">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="planTabEditorTitle" style="max-width: 720px;">
+    <div class="modal plan-tab-modal-default" role="dialog" aria-modal="true" aria-labelledby="planTabEditorTitle">
       <div class="modal-header">
         <div class="modal-title" id="planTabEditorTitle">Configure</div>
         <button class="modal-close" id="planTabEditorClose" aria-label="Close">&times;</button>
@@ -5893,7 +5949,6 @@
       const plan = getActivePlan();
       const editor = PLAN_TAB_EDITORS[tabKey];
       if (!plan || !editor) return;
-      // Seed from tab-specific line ids (parents vs parent+addons for Add-ons).
       const ids = planLineIdsForTab(plan, tabKey);
       const draft = {};
       for (const rawId of ids) {
@@ -5901,13 +5956,22 @@
         const cfg = getPlanRowConfig(plan, tabKey, id);
         draft[id] = { state: cfg.state, price: cfg.price, label: cfg.label };
       }
-      tabEditorState = { tabKey, planId: plan.id, draft };
+      let setupActiveServiceId = null;
+      if (tabKey === "setup" && ids.length > 0) {
+        setupActiveServiceId = String(ids[0]);
+      }
+      tabEditorState = { tabKey, planId: plan.id, draft, setupActiveServiceId };
       planTabEditorStatus.textContent = "";
       planTabEditorOverlay.classList.add("open");
       renderTabEditor();
     }
 
     function closeTabEditor() {
+      const modalShell = planTabEditorOverlay && planTabEditorOverlay.querySelector(".modal");
+      if (modalShell) {
+        modalShell.classList.remove("setup-fee-wizard-shell");
+        modalShell.classList.add("plan-tab-modal-default");
+      }
       tabEditorState = null;
       planTabEditorOverlay.classList.remove("open");
     }
@@ -5918,6 +5982,13 @@
       const editor = PLAN_TAB_EDITORS[tabEditorState.tabKey];
       if (!editor) { closeTabEditor(); return; }
       planTabEditorTitle.textContent = editor.title;
+
+      const modalShell = planTabEditorOverlay.querySelector(".modal");
+      if (modalShell) {
+        const isSetupShell = tabEditorState.tabKey === "setup";
+        modalShell.classList.toggle("setup-fee-wizard-shell", isSetupShell);
+        modalShell.classList.toggle("plan-tab-modal-default", !isSetupShell);
+      }
 
       if (editor.placeholder) {
         planTabEditorBody.innerHTML = `
@@ -5930,13 +6001,47 @@
         return;
       }
 
-      // Real editors (Setup Fee, Add-ons): one row per line id for this tab.
       const ids = Object.keys(tabEditorState.draft);
       const tabKeyNow = tabEditorState.tabKey;
       const emptyMsg =
         tabKeyNow === "addons"
           ? "No Saved Services linked to this plan yet, or none have add-ons configured. Include services when creating this plan — add-ons are managed on each Saved Service."
           : "No services selected for this plan. Re-create the plan and check at least one service in step 1.";
+
+      if (tabKeyNow === "setup") {
+        if (ids.length === 0) {
+          planTabEditorBody.innerHTML = `<div class="tab-result-empty">${esc(emptyMsg)}</div>`;
+        } else {
+          let active = tabEditorState.setupActiveServiceId;
+          if (!active || !tabEditorState.draft[active]) {
+            active = ids[0];
+            tabEditorState.setupActiveServiceId = active;
+          }
+          const tabButtons = ids.map((id) => {
+            const label = getDefaultPlanRowLabel(id) || "(service)";
+            const isOn = String(id) === String(active);
+            return `<button type="button" class="sf-wizard-tab ${isOn ? "active" : ""}" role="tab" aria-selected="${isOn ? "true" : "false"}" data-setup-svc-tab="${esc(id)}">${esc(label)}</button>`;
+          }).join("");
+          const activeLabel = getDefaultPlanRowLabel(active) || "(service)";
+          planTabEditorBody.innerHTML = `
+            <p class="sf-wizard-intro">Each tab below is a Saved Service included in this plan (from Plan Creation step 1). Switch tabs to prepare per-service setup fee settings.</p>
+            <div class="sf-wizard-tab-bar" role="tablist" aria-label="Services in this plan">${tabButtons}</div>
+            <div class="sf-wizard-content-pane" role="tabpanel" aria-live="polite">
+              <h2 class="sf-wizard-placeholder-title">Setup fee — ${esc(activeLabel)}</h2>
+              <p class="sf-wizard-placeholder-text">This area will hold the configuration controls for <strong>${esc(activeLabel)}</strong>.</p>
+              <p class="sf-wizard-placeholder-hint muted">Inputs, amounts, and calculations are not part of this milestone — only navigation and layout.</p>
+            </div>`;
+        }
+        const saveLabel = `Save ${editor.title}`;
+        planTabEditorActions.innerHTML = `
+          <button class="ghost" id="planTabEditorCancel">Cancel</button>
+          <button id="planTabEditorSave" ${ids.length === 0 ? "disabled" : ""}>${esc(saveLabel)}</button>
+        `;
+        document.getElementById("planTabEditorCancel").addEventListener("click", closeTabEditor);
+        document.getElementById("planTabEditorSave").addEventListener("click", saveTabEditor);
+        return;
+      }
+
       const body = ids.length === 0
         ? `<div class="tab-result-empty">${esc(emptyMsg)}</div>`
         : `<div class="tab-editor-rows">${ids.map((id) => renderTabEditorRow(id)).join("")}</div>`;
@@ -5973,6 +6078,15 @@
     // Modal-scoped change/input listeners: keep tabEditorState.draft
     // in sync as the user edits, and re-render the row on state
     // change so the Priced row's price input appears/disappears.
+    planTabEditorBody.addEventListener("click", (e) => {
+      const t = e.target.closest("[data-setup-svc-tab]");
+      if (!t || !tabEditorState || tabEditorState.tabKey !== "setup") return;
+      const sid = t.dataset.setupSvcTab;
+      if (!sid || !tabEditorState.draft[sid]) return;
+      tabEditorState.setupActiveServiceId = String(sid);
+      renderTabEditor();
+    });
+
     planTabEditorBody.addEventListener("change", (e) => {
       const el = e.target.closest("[data-te-action]");
       if (!el || !tabEditorState) return;
