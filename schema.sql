@@ -625,9 +625,11 @@ alter table public.plans add column if not exists financing jsonb not null defau
 -- Setup tab only: logical fields (canonical storage: public.plans.setup[<service_uuid>] JSON keys):
 --   "label"                 — display string (relational name: service_label).
 --   "price"                  — billed setup total when state = priced (total_setup_amount).
---   "finance_frequency"      — text slug for the live-calculator installment cadence:
+--   "finance_frequency"      — text slug for installment cadence when payment_count > 1:
 --                              daily | weekly | biweekly | monthly | every_3_months | every_6_months | yearly.
---   "payment_count"        — integer ≥ 1 installments on the financed remainder (payment_count).
+--   "payment_count"        — integer ≥ 1 installments on the financed remainder.
+--   "payment_trigger_type" — when payment_count = 1: 'date' (due on calendar date) or 'milestone' (upon completion).
+--   "due_date_value"       — ISO date string (YYYY-MM-DD) stored as text/json when trigger = 'date' (relational: date).
 --   "state" mirrors service_display_status (priced | included | hidden).
 --   "down_payment_amount" mirrors service_down_payment_amount (decimal ≥ 0),
 --       present only when the plan wizard flagged a setup/fixed-project down payment.
@@ -637,6 +639,8 @@ alter table public.plans add column if not exists financing jsonb not null defau
 -- alter table public.plan_setup_lines add column if not exists total_setup_amount numeric(14, 2);
 -- alter table public.plan_setup_lines add column if not exists finance_frequency text not null default 'monthly';
 -- alter table public.plan_setup_lines add column if not exists payment_count integer not null default 1 check (payment_count >= 1);
+-- alter table public.plan_setup_lines add column if not exists payment_trigger_type public.setup_payment_trigger_type;
+-- alter table public.plan_setup_lines add column if not exists due_date_value date;
 
 alter table public.plans add column if not exists services jsonb not null default '[]'::jsonb;
 
@@ -659,10 +663,16 @@ exception
   when duplicate_object then null;
 end $$;
 
+do $$ begin
+  create type public.setup_payment_trigger_type as enum ('date', 'milestone');
+exception
+  when duplicate_object then null;
+end $$;
+
 -- If you normalize setup lines into relational rows (requires public.plan_setup_lines):
 -- alter table public.plan_setup_lines add column if not exists service_display_status public.service_display_status not null default 'hidden'::public.service_display_status;
 -- alter table public.plan_setup_lines add column if not exists service_down_payment_amount numeric(14, 2);
--- (service_label / total_setup_amount / finance_frequency / payment_count snippets appear above.)
+-- (service_label … payment_trigger_type / due_date_value snippets appear near the hypothetical plan_setup_lines comments above.)
 
 -- =============================================================
 -- Services (Plan Builder reusable services library)

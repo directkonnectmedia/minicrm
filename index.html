@@ -1257,7 +1257,8 @@
       background: #fff;
       color: #111827;
     }
-    .sf-field-block input.sf-field-text {
+    .sf-field-block input.sf-field-text,
+    .sf-field-block input.sf-field-date {
       width: 100%;
       box-sizing: border-box;
       padding: 12px 14px;
@@ -5971,6 +5972,74 @@
     ];
     const SETUP_FINANCE_FREQUENCY_SET = new Set(SETUP_FINANCE_FREQUENCIES.map((r) => r[0]));
 
+    /** Single-installment collection mode (when payment_count === 1). */
+    const SETUP_PAYMENT_TRIGGER_DATE = "date";
+    const SETUP_PAYMENT_TRIGGER_MILESTONE = "milestone";
+
+    /** HTML date input format (YYYY-MM-DD). */
+    function normalizeDueDateValue(raw) {
+      if (raw == null || raw === "") return null;
+      const s = String(raw).trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+      const [y, m, d] = s.split("-").map(Number);
+      if (!y || m < 1 || m > 12 || d < 1 || d > 31) return null;
+      const dt = new Date(y, m - 1, d);
+      if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+      return s;
+    }
+
+    function formatDueDateFriendly(iso) {
+      if (!iso) return "";
+      try {
+        const [y, m, d] = iso.split("-").map(Number);
+        const dt = new Date(y, m - 1, d);
+        return dt.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "short", day: "numeric" });
+      } catch (_) {
+        return iso;
+      }
+    }
+
+    /**
+     * When payment_count > 1, milestone/date fields must not apply (caller clears draft & DB keys).
+     * When payment_count === 1, default trigger is milestone.
+     */
+    function deriveSetupPaymentTriggerFields(cfg, paymentCount) {
+      if (paymentCount > 1) {
+        return { payment_trigger_type: null, due_date_value: null };
+      }
+      const pt =
+        cfg &&
+        (cfg.payment_trigger_type === SETUP_PAYMENT_TRIGGER_DATE ||
+          cfg.payment_trigger_type === SETUP_PAYMENT_TRIGGER_MILESTONE)
+          ? cfg.payment_trigger_type
+          : SETUP_PAYMENT_TRIGGER_MILESTONE;
+      const due =
+        pt === SETUP_PAYMENT_TRIGGER_DATE
+          ? normalizeDueDateValue(cfg && cfg.due_date_value != null ? cfg.due_date_value : null)
+          : null;
+      return { payment_trigger_type: pt, due_date_value: due };
+    }
+
+    function syncSetupAfterPaymentCountChange(row, prevCountParsed, nextCountParsed) {
+      if (nextCountParsed > 1) {
+        delete row.payment_trigger_type;
+        delete row.due_date_value;
+        return;
+      }
+      if (prevCountParsed > 1) {
+        row.payment_trigger_type = SETUP_PAYMENT_TRIGGER_MILESTONE;
+        delete row.due_date_value;
+        return;
+      }
+      if (
+        row.payment_trigger_type !== SETUP_PAYMENT_TRIGGER_DATE &&
+        row.payment_trigger_type !== SETUP_PAYMENT_TRIGGER_MILESTONE
+      ) {
+        row.payment_trigger_type = SETUP_PAYMENT_TRIGGER_MILESTONE;
+      }
+      if (row.payment_trigger_type !== SETUP_PAYMENT_TRIGGER_DATE) delete row.due_date_value;
+    }
+
     function setupFinanceSentencePhrase(slug) {
       const map = {
         daily: "per day",
@@ -6010,7 +6079,9 @@
         priced && totalFinite !== null ? Math.max(0, totalFinite - (down != null ? down : 0)) : null;
       const freq = SETUP_FINANCE_FREQUENCY_SET.has(dc.finance_frequency) ? dc.finance_frequency : "monthly";
       const payN = priced ? parsePaymentCount(dc.payment_count) : null;
-      let perPayment = priced && remaining !== null && payN != null && payN >= 1 ? remaining / payN : null;
+      const multi = payN != null && payN > 1;
+      let perPayment =
+        priced && remaining !== null && multi && payN >= 2 ? remaining / payN : null;
 
       if (!priced) {
         host.innerHTML = `
@@ -6023,18 +6094,50 @@
       const freqSelLabel = SETUP_FINANCE_FREQUENCIES.find((r) => r[0] === freq)?.[1] || "Monthly";
 
       let narrative = "";
+      let scheduleDetailHtml = "";
+
       if (remaining === 0 || (totalFinite === 0 && (down === 0 || down == null))) {
         narrative =
           down != null && down > 0
             ? `The customer's plan starts with ${esc(fmtMoney(down))} today. Nothing further is financed for this setup line.`
             : `Nothing is financed here yet — enter a setup fee ${showDownCtx ? "and optional down payment" : ""}.`;
-      } else if (perPayment !== null && payN !== null && payN >= 1 && remaining !== null && remaining > 0) {
+      } else if (
+        payN === 1 &&
+        remaining !== null &&
+        remaining > 0 &&
+        totalFinite !== null
+      ) {
+        const trig =
+          dc.payment_trigger_type === SETUP_PAYMENT_TRIGGER_DATE ? SETUP_PAYMENT_TRIGGER_DATE : SETUP_PAYMENT_TRIGGER_MILESTONE;
+        const dueIso = trig === SETUP_PAYMENT_TRIGGER_DATE ? normalizeDueDateValue(dc.due_date_value) : null;
+        if (trig === SETUP_PAYMENT_TRIGGER_DATE && dueIso) {
+          const friendly = formatDueDateFriendly(dueIso);
+          narrative = `Remaining balance of ${esc(fmtMoney(remaining))} to be collected on ${esc(friendly)}.`;
+          scheduleDetailHtml = `<div class="sf-calc-row"><span>Due date</span><strong>${esc(friendly)}</strong></div>`;
+        } else if (trig === SETUP_PAYMENT_TRIGGER_DATE) {
+          narrative = `Remaining balance of ${esc(fmtMoney(remaining))} — choose a collection date under Payment trigger to lock the due date in this preview.`;
+          scheduleDetailHtml = `<div class="sf-calc-row"><span>Due date</span><strong>Pending</strong></div>`;
+        } else {
+          narrative = `Remaining balance of ${esc(fmtMoney(remaining))} to be collected upon project completion.`;
+          scheduleDetailHtml = `<div class="sf-calc-row"><span>Collection</span><strong>Upon completion</strong></div>`;
+        }
+      } else if (
+        perPayment !== null &&
+        multi &&
+        payN !== null &&
+        remaining !== null &&
+        remaining > 0
+      ) {
         const perStr = esc(fmtMoney(perPayment));
         if (showDownCtx && down != null && down > 0) {
           narrative = `The customer will pay ${esc(fmtMoney(down))} today, followed by ${esc(String(payN))} payments of ${perStr} ${esc(freqSentence)}.`;
         } else {
           narrative = `The customer will pay ${esc(String(payN))} payments of ${perStr} ${esc(freqSentence)} (${esc(fmtMoney(remaining))} balance after today's costs).`;
         }
+        scheduleDetailHtml = `
+            <div class="sf-calc-row"><span>Each installment</span><strong>${esc(fmtMoney(perPayment))}</strong></div>
+            <div class="sf-calc-row"><span>Payments</span><strong>${esc(String(payN))}</strong></div>
+            <div class="sf-calc-row"><span>Frequency</span><strong>${esc(freqSelLabel)}</strong></div>`;
       }
 
       host.innerHTML = `
@@ -6052,14 +6155,7 @@
         <hr class="sf-calc-divider" />
         <div class="sf-calc-rows">
           <div class="sf-calc-row"><span>Remaining balance</span><strong>${remaining !== null ? esc(fmtMoney(remaining)) : "—"}</strong></div>
-          ${
-            perPayment !== null && payN != null && remaining !== null && remaining > 0
-              ? `
-            <div class="sf-calc-row"><span>Each installment</span><strong>${esc(fmtMoney(perPayment))}</strong></div>
-            <div class="sf-calc-row"><span>Payments</span><strong>${esc(String(payN))}</strong></div>
-            <div class="sf-calc-row"><span>Frequency</span><strong>${esc(freqSelLabel)}</strong></div>`
-              : ""
-          }
+          ${scheduleDetailHtml}
         </div>
         ${narrative ? `<p class="sf-calc-copy">${narrative}</p>` : ""}`;
     }
@@ -6068,7 +6164,8 @@
     // The tab jsonb is keyed by service id or add-on id with shape:
     //   { "<id>": { state: "priced"|"included"|"hidden" (service display / legacy),
     //               price: number (= total_setup_amount), label (= service_label string),
-    //               finance_frequency, payment_count (setup finance preview),
+    //               finance_frequency, payment_count,
+    //               payment_trigger_type ('date' | 'milestone') + due_date_value when payment_count === 1,
     //               optional down_payment_amount when plan mandates down-payment context } }
     function parseDownPaymentAmt(raw) {
       if (raw == null || raw === "") return null;
@@ -6093,6 +6190,7 @@
       const finance_frequency =
         cfg && SETUP_FINANCE_FREQUENCY_SET.has(cfg.finance_frequency) ? cfg.finance_frequency : "monthly";
       const payment_count = cfg != null && cfg.payment_count != null ? parsePaymentCount(cfg.payment_count) : 1;
+      const trig = deriveSetupPaymentTriggerFields(cfg, payment_count);
       return {
         state: (cfg && cfg.state) || "hidden",
         price: cfg && cfg.price != null ? Number(cfg.price) : 0,
@@ -6100,6 +6198,8 @@
         down_payment_amount: down,
         finance_frequency,
         payment_count,
+        payment_trigger_type: trig.payment_trigger_type,
+        due_date_value: trig.due_date_value,
       };
     }
 
@@ -6203,6 +6303,12 @@
                 down_payment_amount: cfg.down_payment_amount,
                 finance_frequency: cfg.finance_frequency,
                 payment_count: cfg.payment_count,
+                ...(parsePaymentCount(cfg.payment_count) <= 1
+                  ? {
+                      payment_trigger_type: cfg.payment_trigger_type || SETUP_PAYMENT_TRIGGER_MILESTONE,
+                      ...(cfg.due_date_value ? { due_date_value: cfg.due_date_value } : {}),
+                    }
+                  : {}),
               }
             : {}),
         };
@@ -6285,6 +6391,7 @@
               down_payment_amount: null,
               finance_frequency: "monthly",
               payment_count: 1,
+              payment_trigger_type: SETUP_PAYMENT_TRIGGER_MILESTONE,
             });
           const st = dc.state || "hidden";
           const showPriceUi = st === "priced";
@@ -6297,6 +6404,11 @@
               ? dc.finance_frequency
               : "monthly";
           const payCt = parsePaymentCount(dc.payment_count);
+          const showMulti = showPriceUi && payCt > 1;
+          const showSingleTrig = showPriceUi && payCt === 1;
+          const trig =
+            dc.payment_trigger_type === SETUP_PAYMENT_TRIGGER_DATE ? SETUP_PAYMENT_TRIGGER_DATE : SETUP_PAYMENT_TRIGGER_MILESTONE;
+          const dueInputVal = normalizeDueDateValue(dc.due_date_value) || "";
           const freqOpts = SETUP_FINANCE_FREQUENCIES.map(([slug, lbl]) => {
             const sel = freqSlug === slug ? " selected" : "";
             return `<option value="${esc(slug)}"${sel}>${esc(lbl)}</option>`;
@@ -6317,16 +6429,42 @@
                 <input type="number" class="sf-field-money" id="setupSvcTotalSetupInput" inputmode="decimal" min="0" step="0.01" placeholder="0.00" value="${esc(String(dc.price ?? 0))}" data-te-action="price" data-id="${esc(active)}">
               </div>`
             : "";
-          const financeBlock = showPriceUi
+          const freqBlock = showMulti
             ? `<div class="sf-field-block">
                 <label class="sf-field-label" for="setupSvcPayFreqSelect">Payment frequency</label>
                 <select id="setupSvcPayFreqSelect" class="sf-field-select" data-te-action="setup-finance-freq" data-id="${esc(active)}">${freqOpts}</select>
+              </div>`
+            : "";
+          const singleTriggerBlock =
+            showSingleTrig
+              ? `<div class="sf-field-block">
+                <label class="sf-field-label" for="setupSvcPayTriggerSelect">Payment trigger</label>
+                <select id="setupSvcPayTriggerSelect" class="sf-field-select" data-te-action="setup-payment-trigger" data-id="${esc(active)}">
+                  <option value="${esc(SETUP_PAYMENT_TRIGGER_DATE)}" ${trig === SETUP_PAYMENT_TRIGGER_DATE ? "selected" : ""}>Specific date — due on a calendar date</option>
+                  <option value="${esc(SETUP_PAYMENT_TRIGGER_MILESTONE)}" ${trig === SETUP_PAYMENT_TRIGGER_MILESTONE ? "selected" : ""}>Upon completion — collect when project is finished</option>
+                </select>
               </div>
+              ${
+                trig === SETUP_PAYMENT_TRIGGER_DATE
+                  ? `<div class="sf-field-block">
+                <label class="sf-field-label" for="setupSvcDueDateInput">Due date</label>
+                <input type="date" class="sf-field-date" id="setupSvcDueDateInput" data-te-action="setup-due-date" data-id="${esc(active)}" value="${esc(dueInputVal)}">
+                <p class="sf-field-hint muted">Select the exact date the remaining balance is due.</p>
+              </div>`
+                  : `<div class="sf-field-block sf-field-block-soft">
+                <p class="sf-field-hint muted">The balance will be collected manually once the project is finished.</p>
+              </div>`
+              }`
+              : "";
+          const financeBlock = showPriceUi
+            ? `
               <div class="sf-field-block">
                 <label class="sf-field-label" for="setupSvcPayCountInput">Number of payments</label>
                 <input type="number" id="setupSvcPayCountInput" class="sf-field-text" inputmode="numeric" min="1" step="1" value="${esc(String(payCt))}" data-te-action="setup-pay-count" data-id="${esc(active)}">
-                <p class="sf-field-hint muted">Remaining balance ÷ installments (shown live on the right).</p>
-              </div>`
+                <p class="sf-field-hint muted">${payCt > 1 ? `Split remaining balance across ${payCt} installments (${esc(SETUP_FINANCE_FREQUENCIES.find((r) => r[0] === freqSlug)?.[1] || "chosen")} cadence on the preview).` : "Single-payment mode: define how the remainder is timed below."}</p>
+              </div>
+              ${freqBlock}
+              ${singleTriggerBlock}`
             : "";
           planTabEditorBody.innerHTML = `
             <p class="sf-wizard-intro">Pick a Saved Service tab, tune the billing fields on the left, and watch the schedule update live on the right.</p>
@@ -6439,7 +6577,39 @@
         if (tabEditorState.tabKey !== "setup") return;
         const sid = id || tabEditorState.setupActiveServiceId;
         if (!sid || !tabEditorState.draft[sid]) return;
-        tabEditorState.draft[sid].payment_count = parsePaymentCount(el.value);
+        const row = tabEditorState.draft[sid];
+        const prev = parsePaymentCount(row.payment_count);
+        const prevMult = prev > 1;
+        const n = parsePaymentCount(el.value);
+        row.payment_count = n;
+        syncSetupAfterPaymentCountChange(row, prev, n);
+        const nextMult = n > 1;
+        if (prevMult !== nextMult) {
+          renderTabEditor();
+          return;
+        }
+        refreshSetupFeeCalculator();
+        return;
+      }
+      if (action === "setup-payment-trigger") {
+        if (tabEditorState.tabKey !== "setup") return;
+        const sid = id || tabEditorState.setupActiveServiceId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        const row = tabEditorState.draft[sid];
+        row.payment_trigger_type =
+          el.value === SETUP_PAYMENT_TRIGGER_DATE ? SETUP_PAYMENT_TRIGGER_DATE : SETUP_PAYMENT_TRIGGER_MILESTONE;
+        if (row.payment_trigger_type !== SETUP_PAYMENT_TRIGGER_DATE) delete row.due_date_value;
+        renderTabEditor();
+        return;
+      }
+      if (action === "setup-due-date") {
+        if (tabEditorState.tabKey !== "setup") return;
+        const sid = id || tabEditorState.setupActiveServiceId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        const row = tabEditorState.draft[sid];
+        const norm = normalizeDueDateValue(el.value);
+        if (norm) row.due_date_value = norm;
+        else delete row.due_date_value;
         refreshSetupFeeCalculator();
         return;
       }
@@ -6473,7 +6643,28 @@
         if (tabEditorState.tabKey !== "setup") return;
         const sid = id || tabEditorState.setupActiveServiceId;
         if (!sid || !tabEditorState.draft[sid]) return;
-        tabEditorState.draft[sid].payment_count = parsePaymentCount(el.value);
+        const row = tabEditorState.draft[sid];
+        const prev = parsePaymentCount(row.payment_count);
+        const prevMult = prev > 1;
+        const n = parsePaymentCount(el.value);
+        row.payment_count = n;
+        syncSetupAfterPaymentCountChange(row, prev, n);
+        const nextMult = n > 1;
+        if (prevMult !== nextMult) {
+          renderTabEditor();
+          return;
+        }
+        refreshSetupFeeCalculator();
+        return;
+      }
+      if (action === "setup-due-date") {
+        if (tabEditorState.tabKey !== "setup") return;
+        const sid = id || tabEditorState.setupActiveServiceId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        const row = tabEditorState.draft[sid];
+        const norm = normalizeDueDateValue(el.value);
+        if (norm) row.due_date_value = norm;
+        else delete row.due_date_value;
         refreshSetupFeeCalculator();
         return;
       }
@@ -6514,6 +6705,23 @@
             delete copy.down_payment_amount;
           } else if (copy.down_payment_amount == null || copy.down_payment_amount === "") {
             delete copy.down_payment_amount;
+          }
+          const pc = parsePaymentCount(copy.payment_count);
+          if (pc > 1) {
+            delete copy.payment_trigger_type;
+            delete copy.due_date_value;
+          } else {
+            copy.payment_trigger_type =
+              copy.payment_trigger_type === SETUP_PAYMENT_TRIGGER_DATE
+                ? SETUP_PAYMENT_TRIGGER_DATE
+                : SETUP_PAYMENT_TRIGGER_MILESTONE;
+            if (copy.payment_trigger_type !== SETUP_PAYMENT_TRIGGER_DATE) {
+              delete copy.due_date_value;
+            } else {
+              const dn = normalizeDueDateValue(copy.due_date_value);
+              if (dn) copy.due_date_value = dn;
+              else delete copy.due_date_value;
+            }
           }
           cleaned[k] = copy;
         }
@@ -7017,6 +7225,7 @@
                 down_payment_amount: null,
                 finance_frequency: "monthly",
                 payment_count: 1,
+                payment_trigger_type: SETUP_PAYMENT_TRIGGER_MILESTONE,
               };
             }
             return obj;
