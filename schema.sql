@@ -623,6 +623,10 @@ alter table public.plans add column if not exists financing jsonb not null defau
 -- Existing rows default to '[]' which renders as an empty per-service editor.
 alter table public.plans add column if not exists services jsonb not null default '[]'::jsonb;
 
+-- Plan Creation Wizard — Phase 1 payment fork (nullable for legacy rows)
+alter table public.plans add column if not exists wizard_payment_receive text;
+alter table public.plans add column if not exists wizard_multi_billing text;
+
 -- =============================================================
 -- Services (Plan Builder reusable services library)
 -- =============================================================

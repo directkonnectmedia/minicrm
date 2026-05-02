@@ -6017,17 +6017,55 @@
       }
     }
 
-    // ---- Plan wizard ----
-    // Step 1: services checklist; steps 2–n: yes/no skeleton flags except
-    // Add-ons (service-defined). Final step names the plan.
-    const PLAN_WIZARD_STEPS = [
-      { kind: "services", label: "Services" },
-      { kind: "yesno", flag: "has_one_time",     label: "One-time payment", prompt: "Does this plan include a one-time payment?" },
-      { kind: "yesno", flag: "has_setup",        label: "Setup fee",        prompt: "Does this plan include a setup fee?" },
-      { kind: "yesno", flag: "has_subscription", label: "Subscription",     prompt: "Does this plan include a subscription?" },
-      { kind: "yesno", flag: "has_financing",    label: "Financing",        prompt: "Does this plan include financing?" },
-    ];
-    const PLAN_WIZARD_TOTAL_STEPS = PLAN_WIZARD_STEPS.length + 1; // + name step
+    // ---- Plan Creation Wizard (phase 1: services → payment fork → conditional billing identity → summary) ----
+    const PLAN_WIZARD_STEP_IDS = {
+      SERVICES: "services",
+      PAYMENT_FORK: "payment_fork",
+      BILLING_IDENTITY: "billing_identity",
+      PLAN_SUMMARY: "plan_summary",
+    };
+
+    function planWizardDraftClearPaymentDerived(draft) {
+      draft.multi_billing = null;
+    }
+
+    function planWizardStepSequence(draft) {
+      const seq = [
+        PLAN_WIZARD_STEP_IDS.SERVICES,
+        PLAN_WIZARD_STEP_IDS.PAYMENT_FORK,
+      ];
+      if (draft.payment_receive === "multiple") {
+        seq.push(PLAN_WIZARD_STEP_IDS.BILLING_IDENTITY);
+      }
+      seq.push(PLAN_WIZARD_STEP_IDS.PLAN_SUMMARY);
+      return seq;
+    }
+
+    function planWizardClampSeqIndex(state) {
+      const len = planWizardStepSequence(state.draft).length;
+      if (len === 0) return;
+      if (state.seqIndex >= len) state.seqIndex = len - 1;
+      if (state.seqIndex < 0) state.seqIndex = 0;
+    }
+
+    /** Maps wizard answers onto existing Plan Builder tab booleans until later phases deepen the model */
+    function derivePlanWizardSkeletonFlags(draft) {
+      const pr = draft.payment_receive;
+      const mb = draft.multi_billing;
+      const flags = {
+        has_one_time: false,
+        has_setup: false,
+        has_subscription: false,
+        has_financing: false,
+      };
+      if (pr === "single") {
+        flags.has_one_time = true;
+      } else if (pr === "multiple") {
+        if (mb === "ongoing") flags.has_subscription = true;
+        else if (mb === "fixed_installment") flags.has_financing = true;
+      }
+      return flags;
+    }
 
     let planWizardState = null;
 
@@ -6042,20 +6080,16 @@
 
     function openPlanWizard() {
       planWizardState = {
-        step: 1,
+        seqIndex: 0,
         draft: {
           services: [],
-          has_one_time: false,
-          has_setup: false,
-          has_subscription: false,
-          has_financing: false,
+          payment_receive: null,
+          multi_billing: null,
           name: "",
         },
       };
       planWizardStatus.textContent = "";
       planWizardOverlay.classList.add("open");
-      // Make sure the services library is loaded before we render
-      // the first step (the services checklist).
       if (!servicesLoaded) {
         loadServices().then(() => { if (planWizardState) renderPlanWizard(); });
       }
@@ -6070,111 +6104,150 @@
 
     function renderPlanWizard() {
       if (!planWizardState) return;
-      const { step, draft } = planWizardState;
-      planWizardTitle.textContent = `Create Plan \u2014 Step ${step} of ${PLAN_WIZARD_TOTAL_STEPS}`;
+      planWizardClampSeqIndex(planWizardState);
+      const draft = planWizardState.draft;
+      const seq = planWizardStepSequence(draft);
+      const stepIdx = planWizardState.seqIndex;
+      const stepId = seq[stepIdx];
+      const stepNum = stepIdx + 1;
+      const stepTotal = seq.length;
 
-      // Active question pane
-      if (step >= 1 && step <= PLAN_WIZARD_STEPS.length) {
-        const def = PLAN_WIZARD_STEPS[step - 1];
-        if (def.kind === "services") {
-          const selected = new Set(draft.services || []);
-          const list = !servicesLoaded
-            ? `<div class="pw-service-empty">Loading services\u2026</div>`
-            : services.length === 0
-              ? `<div class="pw-service-empty">No services yet. Close this wizard and click "+ Create Service" on the right to add one.</div>`
-              : services.map((s) => {
-                  const checked = selected.has(s.id);
-                  return `
-                    <label class="pw-service-row ${checked ? "checked" : ""}" data-pw-service-id="${esc(s.id)}">
-                      <input type="checkbox" ${checked ? "checked" : ""} data-pw-service-checkbox="${esc(s.id)}">
-                      <span class="pw-service-name">${esc(s.name || "(untitled)")}</span>
-                    </label>`;
-                }).join("");
-          planWizardQuestion.innerHTML = `
-            <div class="plan-wizard-step-label">Step ${step} / ${PLAN_WIZARD_TOTAL_STEPS}</div>
-            <div class="plan-wizard-prompt">Which services does this plan include?</div>
-            <div class="muted" style="font-size:12px;margin-top:-6px;">Pick any from your services library. You can leave them all unchecked if this plan has no per-service granularity.</div>
-            <div class="plan-wizard-services">${list}</div>
-          `;
-        } else {
-          // yes/no step
-          const current = draft[def.flag];
-          planWizardQuestion.innerHTML = `
-            <div class="plan-wizard-step-label">Step ${step} / ${PLAN_WIZARD_TOTAL_STEPS}</div>
-            <div class="plan-wizard-prompt">${esc(def.prompt)}</div>
-            <div class="plan-wizard-yesno">
-              <button type="button" class="plan-wizard-yesno-btn ${current === true ? "active" : ""}" data-pw-answer="yes">Yes</button>
-              <button type="button" class="plan-wizard-yesno-btn ${current === false ? "active" : ""}" data-pw-answer="no">No</button>
-            </div>
-          `;
-        }
-      } else {
-        // Name step
+      planWizardTitle.textContent = `Create Plan \u2014 Step ${stepNum} of ${stepTotal}`;
+
+      if (stepId === PLAN_WIZARD_STEP_IDS.SERVICES) {
+        const selected = new Set((draft.services || []).map(String));
+        const list = !servicesLoaded
+          ? `<div class="pw-service-empty">Loading services\u2026</div>`
+          : services.length === 0
+            ? `<div class="pw-service-empty">No services yet. Close this wizard and click "+ Create Service" on the right to add one.</div>`
+            : services.map((s) => {
+                const checked = selected.has(String(s.id));
+                const ac = (s.addons || []).length;
+                const addonLine = ac ? ` \u00B7 ${ac} add-on${ac === 1 ? "" : "s"}` : "";
+                return `
+                  <label class="pw-service-row ${checked ? "checked" : ""}" data-pw-service-id="${esc(s.id)}">
+                    <input type="checkbox" ${checked ? "checked" : ""} data-pw-service-checkbox="${esc(s.id)}">
+                    <span class="pw-service-name">${esc(s.name || "(untitled)")}<span class="muted" style="font-weight:500;font-size:12px;">${addonLine}</span></span>
+                  </label>`;
+              }).join("");
         planWizardQuestion.innerHTML = `
-          <div class="plan-wizard-step-label">Step ${step} / ${PLAN_WIZARD_TOTAL_STEPS}</div>
-          <div class="plan-wizard-prompt">Name your plan.</div>
+          <div class="plan-wizard-step-label">Step ${stepNum} / ${stepTotal}</div>
+          <div class="plan-wizard-prompt">What services are included in this plan?</div>
+          <div class="muted" style="font-size:12px;margin-top:-6px;">Selections map to this plan; saved add-ons on each service are included automatically in the Add-ons tab.</div>
+          <div class="plan-wizard-services">${list}</div>
+        `;
+      } else if (stepId === PLAN_WIZARD_STEP_IDS.PAYMENT_FORK) {
+        const cur = draft.payment_receive;
+        planWizardQuestion.innerHTML = `
+          <div class="plan-wizard-step-label">Step ${stepNum} / ${stepTotal}</div>
+          <div class="plan-wizard-prompt">How would you like to receive payment for this plan?</div>
+          <div class="plan-wizard-yesno" style="grid-template-columns: 1fr 1fr;">
+            <button type="button" class="plan-wizard-yesno-btn ${cur === "single" ? "active" : ""}" data-pw-payment="single">Single Payment</button>
+            <button type="button" class="plan-wizard-yesno-btn ${cur === "multiple" ? "active" : ""}" data-pw-payment="multiple">Multiple Payments</button>
+          </div>
+          <div class="muted" style="font-size:12px;margin-top:10px;">Single payment: full payment, then plan summary. Multiple payments: next, identify subscription vs fixed project.</div>
+        `;
+      } else if (stepId === PLAN_WIZARD_STEP_IDS.BILLING_IDENTITY) {
+        const cur = draft.multi_billing;
+        planWizardQuestion.innerHTML = `
+          <div class="plan-wizard-step-label">Step ${stepNum} / ${stepTotal}</div>
+          <div class="plan-wizard-prompt">Does this plan include an Ongoing Subscription / Service?</div>
+          <div class="plan-wizard-yesno" style="grid-template-columns: 1fr 1fr;">
+            <button type="button" class="plan-wizard-yesno-btn ${cur === "ongoing" ? "active" : ""}" data-pw-billing="ongoing">YES (Ongoing)</button>
+            <button type="button" class="plan-wizard-yesno-btn ${cur === "fixed_installment" ? "active" : ""}" data-pw-billing="fixed_installment">NO (Fixed Project)</button>
+          </div>
+          <div class="muted" style="font-size:12px;margin-top:10px;">Ongoing: recurring billing (indefinite). Fixed project: installments / financing with a fixed total (auto-terminate when complete).</div>
+        `;
+      } else {
+        planWizardQuestion.innerHTML = `
+          <div class="plan-wizard-step-label">Step ${stepNum} / ${stepTotal}</div>
+          <div class="plan-wizard-prompt">Plan summary</div>
+          <div class="muted" style="font-size:12px;margin-bottom:12px;">Review the checklist, then name this plan to save.</div>
           <input type="text" id="planWizardNameInput" class="plan-wizard-name-input" placeholder="e.g. Premium Website Bundle" value="${esc(draft.name)}">
         `;
         const nameInput = document.getElementById("planWizardNameInput");
         nameInput.addEventListener("input", (e) => {
           planWizardState.draft.name = e.target.value;
-          // Live-toggle the Save Plan button so the user can submit as soon
-          // as they've typed at least one non-whitespace character.
           planWizardNext.disabled = !(planWizardState.draft.name && planWizardState.draft.name.trim());
         });
         setTimeout(() => nameInput.focus(), 0);
       }
 
-      // Live checklist: services summary on top, then tick/dash/dot per yes/no step.
       const servicesCount = (draft.services || []).length;
       const summaryLi = `<li class="summary"><span class="pw-mark">\u2261</span><span>Services: ${servicesCount} selected</span></li>`;
-      const yesnoItems = PLAN_WIZARD_STEPS.filter((d) => d.kind === "yesno").map((def) => {
-        const value = draft[def.flag];
-        let cls, mark;
-        if (value === true)       { cls = "included"; mark = "\u2713"; }
-        else if (value === false) { cls = "pending";  mark = "\u2014"; }
-        else                      { cls = "pending";  mark = "\u2022"; }
-        return `<li class="${cls}"><span class="pw-mark">${mark}</span><span>${esc(def.label)}</span></li>`;
-      }).join("");
-      planWizardChecklist.innerHTML = summaryLi + yesnoItems;
+      let payCls = "pending";
+      let payMark = "\u2022";
+      if (draft.payment_receive === "single" || draft.payment_receive === "multiple") {
+        payCls = "included";
+        payMark = "\u2713";
+      }
+      const payText = draft.payment_receive === "single"
+        ? "Payment: single (full)"
+        : draft.payment_receive === "multiple"
+          ? "Payment: multiple"
+          : "Payment: not chosen";
+      const payLi = `<li class="${payCls}"><span class="pw-mark">${payMark}</span><span>${esc(payText)}</span></li>`;
 
-      // Footer button states
-      planWizardBack.disabled = step === 1;
-      const isLast = step === PLAN_WIZARD_TOTAL_STEPS;
-      planWizardNext.textContent = isLast ? "Save Plan" : "Next";
-      // Next is disabled on yes/no steps until an answer is picked, on the
-      // name step until a non-empty name is entered, and always enabled on
-      // the services step (zero selections allowed).
-      if (step <= PLAN_WIZARD_STEPS.length) {
-        const def = PLAN_WIZARD_STEPS[step - 1];
-        if (def.kind === "services") {
-          planWizardNext.disabled = false;
-        } else {
-          planWizardNext.disabled = draft[def.flag] !== true && draft[def.flag] !== false;
+      let extraLi = "";
+      if (draft.payment_receive === "multiple") {
+        let bCls = "pending";
+        let bMark = "\u2022";
+        let bText = "Subscription vs project: not chosen";
+        if (draft.multi_billing === "ongoing") {
+          bCls = "included";
+          bMark = "\u2713";
+          bText = "Ongoing subscription (recurring)";
+        } else if (draft.multi_billing === "fixed_installment") {
+          bCls = "included";
+          bMark = "\u2713";
+          bText = "Fixed project (installments / financing)";
         }
+        extraLi = `<li class="${bCls}"><span class="pw-mark">${bMark}</span><span>${esc(bText)}</span></li>`;
+      }
+
+      planWizardChecklist.innerHTML = summaryLi + payLi + extraLi;
+
+      planWizardBack.disabled = stepIdx === 0;
+      const isLast = stepId === PLAN_WIZARD_STEP_IDS.PLAN_SUMMARY;
+      planWizardNext.textContent = isLast ? "Save Plan" : "Next";
+
+      if (stepId === PLAN_WIZARD_STEP_IDS.SERVICES) {
+        planWizardNext.disabled = false;
+      } else if (stepId === PLAN_WIZARD_STEP_IDS.PAYMENT_FORK) {
+        planWizardNext.disabled = !draft.payment_receive;
+      } else if (stepId === PLAN_WIZARD_STEP_IDS.BILLING_IDENTITY) {
+        planWizardNext.disabled = !draft.multi_billing;
       } else {
         planWizardNext.disabled = !(draft.name && draft.name.trim());
       }
     }
 
-    // Yes/No clicks inside the wizard question pane
     planWizardQuestion.addEventListener("click", (e) => {
-      const btn = e.target.closest("[data-pw-answer]");
-      if (!btn || !planWizardState) return;
-      const { step } = planWizardState;
-      if (step < 1 || step > PLAN_WIZARD_STEPS.length) return;
-      const def = PLAN_WIZARD_STEPS[step - 1];
-      if (def.kind !== "yesno") return;
-      planWizardState.draft[def.flag] = btn.dataset.pwAnswer === "yes";
-      renderPlanWizard();
+      const payBtn = e.target.closest("[data-pw-payment]");
+      if (payBtn && planWizardState) {
+        const v = payBtn.dataset.pwPayment;
+        if (v === "single" || v === "multiple") {
+          planWizardState.draft.payment_receive = v;
+          if (v === "single") planWizardDraftClearPaymentDerived(planWizardState.draft);
+          renderPlanWizard();
+        }
+        return;
+      }
+      const billBtn = e.target.closest("[data-pw-billing]");
+      if (billBtn && planWizardState) {
+        const v = billBtn.dataset.pwBilling;
+        if (v === "ongoing" || v === "fixed_installment") {
+          planWizardState.draft.multi_billing = v;
+          renderPlanWizard();
+        }
+      }
     });
 
-    // Services-checkbox toggles inside the wizard question pane
     planWizardQuestion.addEventListener("change", (e) => {
       const cb = e.target.closest("[data-pw-service-checkbox]");
       if (!cb || !planWizardState) return;
       const id = cb.dataset.pwServiceCheckbox;
-      const set = new Set(planWizardState.draft.services || []);
+      const set = new Set((planWizardState.draft.services || []).map(String));
       if (cb.checked) set.add(id); else set.delete(id);
       planWizardState.draft.services = Array.from(set);
       renderPlanWizard();
@@ -6182,26 +6255,30 @@
 
     planWizardBack.addEventListener("click", () => {
       if (!planWizardState) return;
-      if (planWizardState.step > 1) {
-        planWizardState.step -= 1;
+      if (planWizardState.seqIndex > 0) {
+        planWizardState.seqIndex -= 1;
+        planWizardClampSeqIndex(planWizardState);
         renderPlanWizard();
       }
     });
 
     planWizardNext.addEventListener("click", async () => {
       if (!planWizardState) return;
-      const { step } = planWizardState;
-      if (step < PLAN_WIZARD_TOTAL_STEPS) {
-        planWizardState.step += 1;
+      const draft = planWizardState.draft;
+      const seq = planWizardStepSequence(draft);
+      const stepId = seq[planWizardState.seqIndex];
+      const isLast = stepId === PLAN_WIZARD_STEP_IDS.PLAN_SUMMARY;
+      if (!isLast) {
+        planWizardState.seqIndex += 1;
+        planWizardClampSeqIndex(planWizardState);
         renderPlanWizard();
         return;
       }
-      // Save
       planWizardNext.disabled = true;
       planWizardStatus.textContent = "Saving...";
       try {
         await loadServices();
-        const draft = planWizardState.draft;
+        const sk = derivePlanWizardSkeletonFlags(draft);
         const parentIds = (draft.services || []).map((id) => String(id));
         const addonLineIds = collectPlanLineIds(parentIds);
         const initTabConfig = (ids) => {
@@ -6214,11 +6291,10 @@
         };
         const row = {
           name: (draft.name || "").trim(),
-          has_one_time: !!draft.has_one_time,
-          has_setup: !!draft.has_setup,
-          has_subscription: !!draft.has_subscription,
-          has_financing: !!draft.has_financing,
+          ...sk,
           has_addons: false,
+          wizard_payment_receive: draft.payment_receive,
+          wizard_multi_billing: draft.payment_receive === "multiple" ? draft.multi_billing : null,
           services: parentIds,
           setup:        initTabConfig(parentIds),
           subscription: initTabConfig(parentIds),
