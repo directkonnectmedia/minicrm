@@ -6028,13 +6028,14 @@
       }
     }
 
-    // ---- Plan Creation Wizard (phase 1+ subscription branch screens) ----
+    // ---- Plan Creation Wizard (subscription branch vs fixed project branch separated) ----
     const PLAN_WIZARD_STEP_IDS = {
       SERVICES: "services",
       PAYMENT_FORK: "payment_fork",
       BILLING_IDENTITY: "billing_identity",
       SUBSCRIPTION_SETUP_FEE: "subscription_setup_fee",
       SUBSCRIPTION_SETUP_DOWN: "subscription_setup_down",
+      FIXED_PROJECT_DOWN: "fixed_project_down",
       PLAN_SUMMARY: "plan_summary",
     };
 
@@ -6043,9 +6044,14 @@
       draft.subscription_setup_requires_down_payment = null;
     }
 
+    function planWizardDraftClearFixedProjectBranch(draft) {
+      draft.fixed_project_requires_down_payment = null;
+    }
+
     function planWizardDraftClearPaymentDerived(draft) {
       draft.multi_billing = null;
       planWizardDraftClearSubscriptionBranch(draft);
+      planWizardDraftClearFixedProjectBranch(draft);
     }
 
     function planWizardStepSequence(draft) {
@@ -6060,6 +6066,9 @@
           if (draft.subscription_has_setup_fee === true) {
             seq.push(PLAN_WIZARD_STEP_IDS.SUBSCRIPTION_SETUP_DOWN);
           }
+        }
+        if (draft.multi_billing === "fixed_installment") {
+          seq.push(PLAN_WIZARD_STEP_IDS.FIXED_PROJECT_DOWN);
         }
       }
       seq.push(PLAN_WIZARD_STEP_IDS.PLAN_SUMMARY);
@@ -6116,6 +6125,7 @@
           multi_billing: null,
           subscription_has_setup_fee: null,
           subscription_setup_requires_down_payment: null,
+          fixed_project_requires_down_payment: null,
           name: "",
         },
       };
@@ -6223,6 +6233,23 @@
           </div>
           <div class="muted" style="font-size:12px;margin-top:10px;">Amounts and splitting rules are configured in a later phase.</div>
         `;
+      } else if (stepId === PLAN_WIZARD_STEP_IDS.FIXED_PROJECT_DOWN) {
+        const cur = draft.fixed_project_requires_down_payment;
+        planWizardQuestion.innerHTML = `
+          <div class="plan-wizard-step-label">Step ${stepNum} / ${stepTotal}</div>
+          <div class="plan-wizard-prompt">Does this fixed project require a down payment today?</div>
+          <div class="plan-wizard-yesno" style="grid-template-columns: 1fr 1fr; align-items: stretch;">
+            <button type="button" class="plan-wizard-yesno-btn ${cur === true ? "active" : ""}" data-pw-fixed-down="yes">
+              <span class="pw-choice-title">YES (Down Payment)</span>
+              <span class="pw-choice-sub">Collect a portion now. The remaining project balance will move to &quot;Finance Mode&quot;.</span>
+            </button>
+            <button type="button" class="plan-wizard-yesno-btn ${cur === false ? "active" : ""}" data-pw-fixed-down="no">
+              <span class="pw-choice-title">NO (Full Finance)</span>
+              <span class="pw-choice-sub">No money is required today. The entire project total will be split into scheduled payments.</span>
+            </button>
+          </div>
+          <div class="muted" style="font-size:12px;margin-top:10px;">Amounts and schedules are wired in a later phase.</div>
+        `;
       } else if (stepId === PLAN_WIZARD_STEP_IDS.PLAN_SUMMARY) {
         planWizardQuestion.innerHTML = `
           <div class="plan-wizard-step-label">Step ${stepNum} / ${stepTotal}</div>
@@ -6302,6 +6329,22 @@
             extraLi += `<li class="${dpCls}"><span class="pw-mark">${dpMark}</span><span>${esc(dpText)}</span></li>`;
           }
         }
+
+        if (draft.multi_billing === "fixed_installment") {
+          let fpCls = "pending";
+          let fpMark = "\u2022";
+          let fpText = "Fixed project — down payment today: not chosen";
+          if (draft.fixed_project_requires_down_payment === true) {
+            fpCls = "included";
+            fpMark = "\u2713";
+            fpText = "Fixed project: YES — portion now (+ finance remainder)";
+          } else if (draft.fixed_project_requires_down_payment === false) {
+            fpCls = "included";
+            fpMark = "\u2713";
+            fpText = "Fixed project: NO — 0% down, fully scheduled";
+          }
+          extraLi += `<li class="${fpCls}"><span class="pw-mark">${fpMark}</span><span>${esc(fpText)}</span></li>`;
+        }
       }
 
       planWizardChecklist.innerHTML = summaryLi + payLi + extraLi;
@@ -6323,6 +6366,10 @@
         planWizardNext.disabled =
           draft.subscription_setup_requires_down_payment !== true &&
           draft.subscription_setup_requires_down_payment !== false;
+      } else if (stepId === PLAN_WIZARD_STEP_IDS.FIXED_PROJECT_DOWN) {
+        planWizardNext.disabled =
+          draft.fixed_project_requires_down_payment !== true &&
+          draft.fixed_project_requires_down_payment !== false;
       } else if (stepId === PLAN_WIZARD_STEP_IDS.PLAN_SUMMARY) {
         planWizardNext.disabled = !(draft.name && draft.name.trim());
       } else {
@@ -6347,7 +6394,10 @@
         if (v === "ongoing" || v === "fixed_installment") {
           const d = planWizardState.draft;
           const prev = d.multi_billing;
-          if (prev !== v) planWizardDraftClearSubscriptionBranch(d);
+          if (prev !== v) {
+            if (v === "ongoing") planWizardDraftClearFixedProjectBranch(d);
+            if (v === "fixed_installment") planWizardDraftClearSubscriptionBranch(d);
+          }
           d.multi_billing = v;
           renderPlanWizard();
         }
@@ -6372,6 +6422,15 @@
         const d = planWizardState.draft;
         if (yn === "yes") d.subscription_setup_requires_down_payment = true;
         else if (yn === "no") d.subscription_setup_requires_down_payment = false;
+        renderPlanWizard();
+        return;
+      }
+      const fixedDownBtn = e.target.closest("[data-pw-fixed-down]");
+      if (fixedDownBtn && planWizardState) {
+        const yn = fixedDownBtn.dataset.pwFixedDown;
+        const d = planWizardState.draft;
+        if (yn === "yes") d.fixed_project_requires_down_payment = true;
+        else if (yn === "no") d.fixed_project_requires_down_payment = false;
         renderPlanWizard();
       }
     });
@@ -6437,6 +6496,10 @@
             draft.multi_billing === "ongoing" &&
             draft.subscription_has_setup_fee === true
               ? draft.subscription_setup_requires_down_payment
+              : null,
+          wizard_fixed_project_requires_down_payment:
+            draft.payment_receive === "multiple" && draft.multi_billing === "fixed_installment"
+              ? draft.fixed_project_requires_down_payment
               : null,
           services: parentIds,
           setup:        initTabConfig(parentIds),

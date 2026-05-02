@@ -631,6 +631,9 @@ alter table public.plans add column if not exists wizard_multi_billing text;
 alter table public.plans add column if not exists wizard_subscription_has_setup_fee boolean;
 alter table public.plans add column if not exists wizard_subscription_setup_down_payment boolean;
 
+-- Wizard — fixed project branch (multiple + NO Fixed Project path)
+alter table public.plans add column if not exists wizard_fixed_project_requires_down_payment boolean;
+
 -- =============================================================
 -- Services (Plan Builder reusable services library)
 -- =============================================================
