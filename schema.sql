@@ -621,6 +621,11 @@ alter table public.plans add column if not exists financing jsonb not null defau
 --                        "price": 0,
 --                        "label": "Display label" } }
 -- Existing rows default to '[]' which renders as an empty per-service editor.
+--
+-- Setup tab only: logical fields (same semantics as relational column names below):
+--   "state" mirrors service_display_status (priced | included | hidden).
+--   "down_payment_amount" mirrors service_down_payment_amount (decimal ≥ 0),
+--       present only when the plan wizard flagged a setup/fixed-project down payment.
 alter table public.plans add column if not exists services jsonb not null default '[]'::jsonb;
 
 -- Plan Creation Wizard — Phase 1 payment fork (nullable for legacy rows)
@@ -633,6 +638,18 @@ alter table public.plans add column if not exists wizard_subscription_setup_down
 
 -- Wizard — fixed project branch (multiple + NO Fixed Project path)
 alter table public.plans add column if not exists wizard_fixed_project_requires_down_payment boolean;
+
+-- Optional enum for documentation, CHECK constraints, or a future normalized table.
+-- (Current app stores status + amount inside public.plans.setup jsonb per service id.)
+do $$ begin
+  create type public.service_display_status as enum ('priced', 'included', 'hidden');
+exception
+  when duplicate_object then null;
+end $$;
+
+-- If you split per-service setup rows into a relational table (not used by current app):
+-- alter table public.plan_setup_lines add column if not exists service_display_status public.service_display_status not null default 'hidden'::public.service_display_status;
+-- alter table public.plan_setup_lines add column if not exists service_down_payment_amount numeric(14, 2);
 
 -- =============================================================
 -- Services (Plan Builder reusable services library)

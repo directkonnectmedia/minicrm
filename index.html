@@ -1224,6 +1224,45 @@
     }
     .sf-wizard-placeholder-text { font-size: 18px; line-height: 1.65; color: #1f2937; margin: 0 0 12px 0; }
     .sf-wizard-placeholder-hint { font-size: 15px; line-height: 1.5; margin: 0; }
+    .sf-context-banner {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: #92400e;
+      background: linear-gradient(90deg, #fef3c7 0%, #fde68a 100%);
+      border: 2px solid #f59e0b;
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 24px;
+    }
+    .sf-field-block { margin-bottom: 22px; max-width: 420px; }
+    .sf-field-block label.sf-field-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #4b5563;
+      margin-bottom: 8px;
+    }
+    .sf-field-block select.sf-field-select,
+    .sf-field-block input.sf-field-money {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px 14px;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 16px;
+      background: #fff;
+      color: #111827;
+    }
+    .sf-field-block select.sf-field-select { cursor: pointer; }
+    .sf-field-block input.sf-field-money {
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+    .sf-field-hint { font-size: 13px; color: #6b7280; margin-top: 8px; line-height: 1.45; }
 
     /* Plan Builder right-panel mini tabs */
     .plan-tabs { display: flex; gap: 6px; border-bottom: 1px solid #e5e7eb; margin-bottom: 14px; }
@@ -5851,15 +5890,34 @@
 
     // Per-line rows inside an active plan tab body.
     // The tab jsonb is keyed by service id or add-on id with shape:
-    //   { "<id>": { state: "hidden"|"included"|"priced", price: number, label: string } }
+    //   { "<id>": { state: "priced"|"included"|"hidden" (service display / legacy),
+    //               price: number, label: string,
+    //               optional down_payment_amount when plan mandates down-payment context } }
+    function parseDownPaymentAmt(raw) {
+      if (raw == null || raw === "") return null;
+      const n = Number(raw);
+      return Number.isFinite(n) && n >= 0 ? n : null;
+    }
+
+    /** Plan Creation Wizard: subscription setup down payment YES, OR fixed-project down YES */
+    function planShowsDownPaymentContext(plan) {
+      if (!plan) return false;
+      if (plan.wizard_subscription_setup_down_payment === true) return true;
+      if (plan.wizard_fixed_project_requires_down_payment === true) return true;
+      return false;
+    }
+
     function getPlanRowConfig(plan, tabKey, lineId) {
       const key = String(lineId);
       const tabObj = (plan && plan[tabKey]) || {};
       const cfg = (tabObj && typeof tabObj === "object" && !Array.isArray(tabObj)) ? tabObj[key] : null;
+      const down =
+        cfg && cfg.down_payment_amount != null ? parseDownPaymentAmt(cfg.down_payment_amount) : null;
       return {
         state: (cfg && cfg.state) || "hidden",
         price: cfg && cfg.price != null ? Number(cfg.price) : 0,
         label: (cfg && typeof cfg.label === "string" && cfg.label) ? cfg.label : getDefaultPlanRowLabel(key),
+        down_payment_amount: down,
       };
     }
 
@@ -5954,7 +6012,12 @@
       for (const rawId of ids) {
         const id = String(rawId);
         const cfg = getPlanRowConfig(plan, tabKey, id);
-        draft[id] = { state: cfg.state, price: cfg.price, label: cfg.label };
+        draft[id] = {
+          state: cfg.state,
+          price: cfg.price,
+          label: cfg.label,
+          ...(tabKey === "setup" ? { down_payment_amount: cfg.down_payment_amount } : {}),
+        };
       }
       let setupActiveServiceId = null;
       if (tabKey === "setup" && ids.length > 0) {
@@ -6023,13 +6086,51 @@
             return `<button type="button" class="sf-wizard-tab ${isOn ? "active" : ""}" role="tab" aria-selected="${isOn ? "true" : "false"}" data-setup-svc-tab="${esc(id)}">${esc(label)}</button>`;
           }).join("");
           const activeLabel = getDefaultPlanRowLabel(active) || "(service)";
+          const planForCtx = plans.find((p) => String(p.id) === String(tabEditorState.planId));
+          const showDownCtx = planShowsDownPaymentContext(planForCtx);
+          const dc = tabEditorState.draft[active] || { state: "hidden", price: 0, label: "", down_payment_amount: null };
+          const st = dc.state || "hidden";
+          const showPriceUi = st === "priced";
+          const downVal =
+            dc.down_payment_amount != null && dc.down_payment_amount !== ""
+              ? String(dc.down_payment_amount)
+              : "";
+          const bannerHtml = showDownCtx
+            ? `<div class="sf-context-banner" role="status">Down Payment Required</div>`
+            : "";
+          const downBlock = showDownCtx
+            ? `<div class="sf-field-block">
+                <label class="sf-field-label" for="setupSvcDownPaymentInput">How much is the down payment?</label>
+                <input type="number" class="sf-field-money" id="setupSvcDownPaymentInput" inputmode="decimal" min="0" step="0.01" placeholder="0.00" value="${esc(downVal)}" data-te-action="setup-down" data-id="${esc(active)}">
+                <p class="sf-field-hint muted">Collected at signing for plans that include a setup down payment.</p>
+              </div>`
+            : "";
+          const priceBlock = showPriceUi
+            ? `<div class="sf-field-block">
+                <label class="sf-field-label" for="setupSvcPriceInput">Setup fee amount</label>
+                <input type="number" class="sf-field-money" id="setupSvcPriceInput" inputmode="decimal" min="0" step="0.01" placeholder="0.00" value="${esc(String(dc.price ?? 0))}" data-te-action="price" data-id="${esc(active)}">
+              </div>`
+            : "";
           planTabEditorBody.innerHTML = `
-            <p class="sf-wizard-intro">Each tab below is a Saved Service included in this plan (from Plan Creation step 1). Switch tabs to prepare per-service setup fee settings.</p>
+            <p class="sf-wizard-intro">Each tab below is a Saved Service included in this plan (from Plan Creation step 1). Switch tabs to configure how this setup fee appears.</p>
             <div class="sf-wizard-tab-bar" role="tablist" aria-label="Services in this plan">${tabButtons}</div>
             <div class="sf-wizard-content-pane" role="tabpanel" aria-live="polite">
+              ${bannerHtml}
               <h2 class="sf-wizard-placeholder-title">Setup fee — ${esc(activeLabel)}</h2>
-              <p class="sf-wizard-placeholder-text">This area will hold the configuration controls for <strong>${esc(activeLabel)}</strong>.</p>
-              <p class="sf-wizard-placeholder-hint muted">Inputs, amounts, and calculations are not part of this milestone — only navigation and layout.</p>
+              <div class="sf-field-block">
+                <label class="sf-field-label" for="setupSvcStatusSelect">Service status</label>
+                <select id="setupSvcStatusSelect" class="sf-field-select" data-te-action="state" data-id="${esc(active)}">
+                  <option value="priced" ${st === "priced" ? "selected" : ""}>Priced — Standard billing applies.</option>
+                  <option value="included" ${st === "included" ? "selected" : ""}>Included — No line-item cost (shown as included).</option>
+                  <option value="hidden" ${st === "hidden" ? "selected" : ""}>Don't display — Hide from customer-facing proposal.</option>
+                </select>
+              </div>
+              ${downBlock}
+              <div class="sf-field-block">
+                <label class="sf-field-label" for="setupSvcDisplayLabelInput">Display label</label>
+                <input type="text" id="setupSvcDisplayLabelInput" data-te-action="label" data-id="${esc(active)}" value="${esc(dc.label || "")}" placeholder="Display label">
+              </div>
+              ${priceBlock}
             </div>`;
         }
         const saveLabel = `Save ${editor.title}`;
@@ -6092,6 +6193,13 @@
       if (!el || !tabEditorState) return;
       const id = el.dataset.id;
       const action = el.dataset.teAction;
+      if (action === "setup-down") {
+        if (tabEditorState.tabKey !== "setup") return;
+        const sid = id || tabEditorState.setupActiveServiceId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        tabEditorState.draft[sid].down_payment_amount = parseDownPaymentAmt(el.value);
+        return;
+      }
       if (!tabEditorState.draft[id]) return;
       if (action === "state") {
         tabEditorState.draft[id].state = el.value;
@@ -6108,6 +6216,13 @@
       if (!el || !tabEditorState) return;
       const id = el.dataset.id;
       const action = el.dataset.teAction;
+      if (action === "setup-down") {
+        if (tabEditorState.tabKey !== "setup") return;
+        const sid = id || tabEditorState.setupActiveServiceId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        tabEditorState.draft[sid].down_payment_amount = parseDownPaymentAmt(el.value);
+        return;
+      }
       if (!tabEditorState.draft[id]) return;
       if (action === "label") {
         tabEditorState.draft[id].label = el.value;
@@ -6128,7 +6243,26 @@
       const prevTab = (plan[tabKey] && typeof plan[tabKey] === "object" && !Array.isArray(plan[tabKey])) ? plan[tabKey] : {};
       // Merge draft into a fresh tab object so we keep any keys that
       // weren't part of the editor (none today, but future-proof).
-      const nextTab = { ...prevTab, ...draft };
+      let nextTab = { ...prevTab, ...draft };
+      if (tabKey === "setup") {
+        const showCtx = planShowsDownPaymentContext(plan);
+        const cleaned = {};
+        for (const k of Object.keys(nextTab)) {
+          const row = nextTab[k];
+          if (!row || typeof row !== "object") {
+            cleaned[k] = row;
+            continue;
+          }
+          const copy = { ...row };
+          if (!showCtx) {
+            delete copy.down_payment_amount;
+          } else if (copy.down_payment_amount == null || copy.down_payment_amount === "") {
+            delete copy.down_payment_amount;
+          }
+          cleaned[k] = copy;
+        }
+        nextTab = cleaned;
+      }
       try {
         const { error } = await sb.from("plans").update({ [tabKey]: nextTab }).eq("id", planId);
         if (error) throw error;
@@ -6616,7 +6750,19 @@
               ? draft.fixed_project_requires_down_payment
               : null,
           services: parentIds,
-          setup:        initTabConfig(parentIds),
+          setup: (() => {
+            const obj = {};
+            for (const raw of parentIds) {
+              const id = String(raw);
+              obj[id] = {
+                state: "hidden",
+                price: 0,
+                label: getDefaultPlanRowLabel(id),
+                down_payment_amount: null,
+              };
+            }
+            return obj;
+          })(),
           subscription: initTabConfig(parentIds),
           one_time:     initTabConfig(parentIds),
           financing:    initTabConfig(parentIds),
