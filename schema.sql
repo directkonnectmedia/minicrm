@@ -631,14 +631,16 @@ alter table public.plans add column if not exists financing jsonb not null defau
 --   "payment_trigger_type" — when payment_count = 1: 'date' (due on calendar date) or 'milestone' (upon completion).
 --   "due_date_value"       — ISO date string (YYYY-MM-DD) stored as text/json when trigger = 'date' (relational: date).
 --   "state" mirrors service_display_status (priced | included | hidden).
+--   "is_down_payment_active_for_service" — when plan-level down is required: false = pay-in-full for this line; omit or true = allow down amount.
 --   "down_payment_amount" mirrors service_down_payment_amount (decimal ≥ 0),
---       present only when the plan wizard flagged a setup/fixed-project down payment.
+--       only when plan wizard flagged down payment AND this service keeps down active.
 
 -- Hypothetical normalized table example (requires creating public.plan_setup_lines first):
 -- alter table public.plan_setup_lines add column if not exists service_label text;
 -- alter table public.plan_setup_lines add column if not exists total_setup_amount numeric(14, 2);
 -- alter table public.plan_setup_lines add column if not exists finance_frequency text not null default 'monthly';
 -- alter table public.plan_setup_lines add column if not exists payment_count integer not null default 1 check (payment_count >= 1);
+-- alter table public.plan_setup_lines add column if not exists is_down_payment_active_for_service boolean not null default true;
 -- alter table public.plan_setup_lines add column if not exists payment_trigger_type public.setup_payment_trigger_type;
 -- alter table public.plan_setup_lines add column if not exists due_date_value date;
 
