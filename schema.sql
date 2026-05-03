@@ -635,6 +635,18 @@ alter table public.plans add column if not exists financing jsonb not null defau
 --   "down_payment_amount" mirrors service_down_payment_amount (decimal ≥ 0),
 --       only when plan wizard flagged down payment AND this service keeps down active.
 
+-- Subscription tab (canonical keys on public.plans.subscription[<service_uuid>] JSON):
+--   "label", "state" ("priced" | "included" | "hidden"), "price"
+--       — recurring amount when Priced is stored on both subscription_rate and price for compatibility.
+--   "subscription_rate" numeric — recurring billed amount when state = priced.
+--   "subscription_frequency" text slug matching setup cadence:
+--       daily | weekly | biweekly | monthly | every_3_months | every_6_months | yearly.
+-- Older rows may set finance_frequency alone; readers accept it as fallback.
+--
+-- Hypothetical normalized subscription line example (would require plan_subscription_lines table):
+-- alter table public.plan_subscription_lines add column if not exists subscription_rate numeric(14, 2);
+-- alter table public.plan_subscription_lines add column if not exists subscription_frequency text not null default 'monthly';
+
 -- Hypothetical normalized table example (requires creating public.plan_setup_lines first):
 -- alter table public.plan_setup_lines add column if not exists service_label text;
 -- alter table public.plan_setup_lines add column if not exists total_setup_amount numeric(14, 2);

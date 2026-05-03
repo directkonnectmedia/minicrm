@@ -1408,6 +1408,29 @@
       font-weight: 500;
     }
     .sf-calc-muted { font-size: 14px; color: #6b7280; line-height: 1.45; margin: 0; }
+    .sf-recurring-total-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+    .sf-recurring-total-badge {
+      display: inline-block;
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-size: 15px;
+      font-weight: 800;
+      color: #1e1b4b;
+      background: linear-gradient(135deg, #fff 0%, #eef2ff 100%);
+      border: 2px solid #818cf8;
+      box-shadow: 0 4px 14px rgba(67, 56, 202, 0.15);
+    }
+    .sf-recurring-total-sub {
+      font-size: 14px;
+      font-weight: 700;
+      color: #4338ca;
+    }
     @media (max-width: 760px) {
       .sf-split { grid-template-columns: 1fr; }
       .sf-split-right { position: relative; top: 0; }
@@ -5840,7 +5863,7 @@
     const PLAN_TAB_EDITORS = {
       one_time:     { title: "One-Time Payment", ctaLabel: "Configure One-Time",     placeholder: true },
       setup:        { title: "Setup Fee",        ctaLabel: "Configure Setup Fee",    placeholder: false },
-      subscription: { title: "Subscription",     ctaLabel: "Configure Subscription", placeholder: true },
+      subscription: { title: "Subscription",     ctaLabel: "Configure Subscription", placeholder: false },
       addons:       { title: "Add-Ons",          ctaLabel: "Configure Add-Ons",      placeholder: false },
       financing:    { title: "Financing",        ctaLabel: "Configure Financing",   placeholder: true },
     };
@@ -6140,7 +6163,7 @@
       if (!tabEditorState || tabEditorState.tabKey !== "setup") return;
       const host = document.getElementById("setupFeeCalcInner");
       if (!host) return;
-      const active = tabEditorState.setupActiveServiceId;
+      const active = tabEditorState.wizardActiveSvcId;
       const planForCtx = plans.find((p) => String(p.id) === String(tabEditorState.planId));
       const showDownCtx = planShowsDownPaymentContext(planForCtx);
       const dc = (active && tabEditorState.draft[active]) || {};
@@ -6314,10 +6337,103 @@
       return "";
     }
 
+    function subscriptionFrequencyFriendlyLabel(slug) {
+      return SETUP_FINANCE_FREQUENCIES.find((r) => r[0] === slug)?.[1] || "Monthly";
+    }
+
+    function subscriptionBillingFrequencyPhrase(slug) {
+      const map = {
+        daily: "each day",
+        weekly: "each week",
+        biweekly: "every two weeks",
+        monthly: "each month",
+        every_3_months: "every 3 months",
+        every_6_months: "every 6 months",
+        yearly: "each year",
+      };
+      return map[slug] || "each billing period";
+    }
+
+    function subscriptionCommitmentSentence(amount, slug) {
+      return `The customer will be billed ${fmtMoney(amount)} ${subscriptionBillingFrequencyPhrase(slug)}, starting from the subscription start date.`;
+    }
+
+    function formatSubscriptionTermsLine(plan, cfg) {
+      if (!cfg) return "";
+      if (cfg.state === "included") return "Subscription: Included";
+      if (cfg.state !== "priced") return "";
+      const slug =
+        cfg.subscription_frequency && SETUP_FINANCE_FREQUENCY_SET.has(cfg.subscription_frequency)
+          ? cfg.subscription_frequency
+          : cfg.finance_frequency && SETUP_FINANCE_FREQUENCY_SET.has(cfg.finance_frequency)
+            ? cfg.finance_frequency
+            : "monthly";
+      const rate =
+        cfg.subscription_rate != null && Number.isFinite(Number(cfg.subscription_rate))
+          ? Number(cfg.subscription_rate)
+          : Number(cfg.price) || 0;
+      return `Subscription: ${fmtMoney(rate)} / ${subscriptionFrequencyFriendlyLabel(slug)}`;
+    }
+
+    function refreshSubscriptionCalculator() {
+      if (!tabEditorState || tabEditorState.tabKey !== "subscription") return;
+      const host = document.getElementById("subscriptionCalcInner");
+      if (!host) return;
+      const active = tabEditorState.wizardActiveSvcId;
+      const dc = (active && tabEditorState.draft[active]) || {};
+      const st = dc.state || "hidden";
+      const priced = st === "priced";
+      if (!priced) {
+        host.innerHTML = `
+          <h3 class="sf-calc-heading">Live preview</h3>
+          <p class="sf-calc-muted">Select <strong>Priced</strong> to preview the ongoing recurring charge.</p>`;
+        return;
+      }
+      const slugRaw = dc.subscription_frequency;
+      const slug =
+        typeof slugRaw === "string" && SETUP_FINANCE_FREQUENCY_SET.has(slugRaw) ? slugRaw : "monthly";
+      const amtRaw = dc.subscription_rate != null ? Number(dc.subscription_rate) : Number(dc.price);
+      const amt = Number.isFinite(amtRaw) && amtRaw >= 0 ? amtRaw : 0;
+      const sentence = subscriptionCommitmentSentence(amt, slug);
+      host.innerHTML = `
+        <h3 class="sf-calc-heading">Subscription live preview</h3>
+        <div class="sf-recurring-total-wrap">
+          <span class="sf-recurring-total-badge">Recurring total ${esc(fmtMoney(amt))}</span>
+          <span class="sf-recurring-total-sub">${esc(subscriptionFrequencyFriendlyLabel(slug))}</span>
+        </div>
+        <p class="sf-calc-copy" style="margin-top:14px">${esc(sentence)}</p>`;
+    }
+
     function getPlanRowConfig(plan, tabKey, lineId) {
       const key = String(lineId);
       const tabObj = (plan && plan[tabKey]) || {};
       const cfg = (tabObj && typeof tabObj === "object" && !Array.isArray(tabObj)) ? tabObj[key] : null;
+
+      if (tabKey === "subscription") {
+        const legacy = cfg && cfg.price != null ? Number(cfg.price) : 0;
+        const sr0 = cfg && cfg.subscription_rate != null ? Number(cfg.subscription_rate) : NaN;
+        const subscription_rate = Number.isFinite(sr0) ? sr0 : Number.isFinite(legacy) ? legacy : 0;
+        const subscription_frequency =
+          cfg && SETUP_FINANCE_FREQUENCY_SET.has(cfg.subscription_frequency)
+            ? cfg.subscription_frequency
+            : cfg && SETUP_FINANCE_FREQUENCY_SET.has(cfg.finance_frequency)
+              ? cfg.finance_frequency
+              : "monthly";
+        return {
+          state: (cfg && cfg.state) || "hidden",
+          price: subscription_rate,
+          subscription_rate,
+          subscription_frequency,
+          label: (cfg && typeof cfg.label === "string" && cfg.label) ? cfg.label : getDefaultPlanRowLabel(key),
+          down_payment_amount: null,
+          finance_frequency: subscription_frequency,
+          payment_count: 1,
+          payment_trigger_type: null,
+          due_date_value: null,
+          is_down_payment_active_for_service: undefined,
+        };
+      }
+
       const down =
         cfg && cfg.down_payment_amount != null ? parseDownPaymentAmt(cfg.down_payment_amount) : null;
       const finance_frequency =
@@ -6375,6 +6491,29 @@
           const priceSnippet =
             cfg.state === "priced"
               ? `<span class="tab-result-value">${esc(fmtMoney(cfg.price))}</span>`
+              : "";
+          return `
+          <div class="tab-result-row tab-result-row-setup">
+            <div class="tab-result-row-setup-top">
+              <div>
+                <span class="tab-result-label">${esc(cfg.label || "(unnamed)")}</span>
+                <span class="tab-result-status-pill">${esc(statusLabel)}</span>
+              </div>
+              ${priceSnippet}
+            </div>
+            <div class="tab-result-terms">
+              <span class="tab-terms-badge">Terms</span>
+              <span class="tab-terms-text">${termsLine ? esc(termsLine) : "—"}</span>
+            </div>
+          </div>`;
+        }
+        if (tabDef.key === "subscription") {
+          const statusLabel =
+            cfg.state === "priced" ? "Priced" : cfg.state === "included" ? "Included" : "Hidden";
+          const termsLine = formatSubscriptionTermsLine(plan, cfg);
+          const priceSnippet =
+            cfg.state === "priced"
+              ? `<span class="tab-result-value">${esc(fmtMoney(Number(cfg.subscription_rate != null ? cfg.subscription_rate : cfg.price) || 0))}</span>`
               : "";
           return `
           <div class="tab-result-row tab-result-row-setup">
@@ -6474,13 +6613,25 @@
                   : {}),
               }
             : {}),
+          ...(tabKey === "subscription"
+            ? {
+                subscription_rate:
+                  cfg.subscription_rate != null && Number.isFinite(Number(cfg.subscription_rate))
+                    ? Number(cfg.subscription_rate)
+                    : Number(cfg.price) || 0,
+                subscription_frequency:
+                  cfg.subscription_frequency && SETUP_FINANCE_FREQUENCY_SET.has(cfg.subscription_frequency)
+                    ? cfg.subscription_frequency
+                    : "monthly",
+              }
+            : {}),
         };
       }
-      let setupActiveServiceId = null;
-      if (tabKey === "setup" && ids.length > 0) {
-        setupActiveServiceId = String(ids[0]);
+      let wizardActiveSvcId = null;
+      if ((tabKey === "setup" || tabKey === "subscription") && ids.length > 0) {
+        wizardActiveSvcId = String(ids[0]);
       }
-      tabEditorState = { tabKey, planId: plan.id, draft, setupActiveServiceId };
+      tabEditorState = { tabKey, planId: plan.id, draft, wizardActiveSvcId };
       planTabEditorStatus.textContent = "";
       planTabEditorOverlay.classList.add("open");
       renderTabEditor();
@@ -6505,9 +6656,10 @@
 
       const modalShell = planTabEditorOverlay.querySelector(".modal");
       if (modalShell) {
-        const isSetupShell = tabEditorState.tabKey === "setup";
-        modalShell.classList.toggle("setup-fee-wizard-shell", isSetupShell);
-        modalShell.classList.toggle("plan-tab-modal-default", !isSetupShell);
+        const isWizardWideShell =
+          tabEditorState.tabKey === "setup" || tabEditorState.tabKey === "subscription";
+        modalShell.classList.toggle("setup-fee-wizard-shell", isWizardWideShell);
+        modalShell.classList.toggle("plan-tab-modal-default", !isWizardWideShell);
       }
 
       if (editor.placeholder) {
@@ -6528,21 +6680,86 @@
           ? "No Saved Services linked to this plan yet, or none have add-ons configured. Include services when creating this plan — add-ons are managed on each Saved Service."
           : "No services selected for this plan. Re-create the plan and check at least one service in step 1.";
 
-      if (tabKeyNow === "setup") {
+      if (tabKeyNow === "setup" || tabKeyNow === "subscription") {
         if (ids.length === 0) {
           planTabEditorBody.innerHTML = `<div class="tab-result-empty">${esc(emptyMsg)}</div>`;
         } else {
-          let active = tabEditorState.setupActiveServiceId;
+          let active = tabEditorState.wizardActiveSvcId;
           if (!active || !tabEditorState.draft[active]) {
             active = ids[0];
-            tabEditorState.setupActiveServiceId = active;
+            tabEditorState.wizardActiveSvcId = active;
           }
           const tabButtons = ids.map((id) => {
             const label = getDefaultPlanRowLabel(id) || "(service)";
             const isOn = String(id) === String(active);
-            return `<button type="button" class="sf-wizard-tab ${isOn ? "active" : ""}" role="tab" aria-selected="${isOn ? "true" : "false"}" data-setup-svc-tab="${esc(id)}">${esc(label)}</button>`;
+            return `<button type="button" class="sf-wizard-tab ${isOn ? "active" : ""}" role="tab" aria-selected="${isOn ? "true" : "false"}" data-wizard-svc-tab="${esc(id)}">${esc(label)}</button>`;
           }).join("");
           const activeLabel = getDefaultPlanRowLabel(active) || "(service)";
+          if (tabKeyNow === "subscription") {
+            const dc =
+              tabEditorState.draft[active] ||
+              ({
+                state: "hidden",
+                price: 0,
+                subscription_rate: 0,
+                subscription_frequency: "monthly",
+                label: activeLabel,
+              });
+            const st = dc.state || "hidden";
+            const showPriceUi = st === "priced";
+            const subFreqSlug =
+              typeof dc.subscription_frequency === "string" && SETUP_FINANCE_FREQUENCY_SET.has(dc.subscription_frequency)
+                ? dc.subscription_frequency
+                : "monthly";
+            const subFreqOpts = SETUP_FINANCE_FREQUENCIES.map(([slug, lbl]) => {
+              const sel = subFreqSlug === slug ? " selected" : "";
+              return `<option value="${esc(slug)}"${sel}>${esc(lbl)}</option>`;
+            }).join("");
+            const rateDisplay =
+              dc.subscription_rate != null && Number.isFinite(Number(dc.subscription_rate))
+                ? Number(dc.subscription_rate)
+                : Number(dc.price) || 0;
+            const recurringPriceBlock = showPriceUi
+              ? `<div class="sf-field-block">
+                <label class="sf-field-label" for="subSvcRateInput">Recurring rate</label>
+                <input type="number" class="sf-field-money" id="subSvcRateInput" inputmode="decimal" min="0" step="0.01" placeholder="0.00" value="${esc(String(rateDisplay))}" data-te-action="subscription-rate" data-id="${esc(active)}">
+              </div>`
+              : "";
+            const subFreqField = showPriceUi
+              ? `<div class="sf-field-block">
+                <label class="sf-field-label" for="subSvcFreqSelect">Billing frequency</label>
+                <select id="subSvcFreqSelect" class="sf-field-select" data-te-action="subscription-freq" data-id="${esc(active)}">${subFreqOpts}</select>
+              </div>`
+              : "";
+            planTabEditorBody.innerHTML = `
+            <p class="sf-wizard-intro">Pick a Saved Service tab, tune recurring billing on the left, and preview the recurring commitment live on the right.</p>
+            <div class="sf-wizard-tab-bar" role="tablist" aria-label="Services in this plan">${tabButtons}</div>
+            <div class="sf-wizard-content-pane" role="tabpanel" aria-live="polite">
+              <h2 class="sf-wizard-placeholder-title">Subscription — ${esc(activeLabel)}</h2>
+              <div class="sf-split">
+                <div class="sf-split-left">
+                  <div class="sf-field-block">
+                    <label class="sf-field-label" for="subSvcDisplayLabelInput">Service label</label>
+                    <input type="text" class="sf-field-text" id="subSvcDisplayLabelInput" data-te-action="label" data-id="${esc(active)}" value="${esc(dc.label || "")}" placeholder="${esc(activeLabel)}">
+                  </div>
+                  <div class="sf-field-block">
+                    <label class="sf-field-label" for="subSvcStatusSelect">Service status</label>
+                    <select id="subSvcStatusSelect" class="sf-field-select" data-te-action="state" data-id="${esc(active)}">
+                      <option value="priced" ${st === "priced" ? "selected" : ""}>Priced — recurring amount applies.</option>
+                      <option value="included" ${st === "included" ? "selected" : ""}>Included — shown as included (no billed amount).</option>
+                      <option value="hidden" ${st === "hidden" ? "selected" : ""}>Don't display — hide from proposal.</option>
+                    </select>
+                  </div>
+                  ${recurringPriceBlock}
+                  ${subFreqField}
+                </div>
+                <aside class="sf-split-right" aria-live="polite">
+                  <div id="subscriptionCalcInner"></div>
+                </aside>
+              </div>
+            </div>`;
+            refreshSubscriptionCalculator();
+          } else {
           const planForCtx = plans.find((p) => String(p.id) === String(tabEditorState.planId));
           const showDownCtx = planShowsDownPaymentContext(planForCtx);
           const dc =
@@ -6674,6 +6891,7 @@
               </div>
             </div>`;
           refreshSetupFeeCalculator();
+          }
         }
         const saveLabel = `Save ${editor.title}`;
         planTabEditorActions.innerHTML = `
@@ -6722,11 +6940,11 @@
     // in sync as the user edits, and re-render the row on state
     // change so the Priced row's price input appears/disappears.
     planTabEditorBody.addEventListener("click", (e) => {
-      const t = e.target.closest("[data-setup-svc-tab]");
-      if (!t || !tabEditorState || tabEditorState.tabKey !== "setup") return;
-      const sid = t.dataset.setupSvcTab;
+      const t = e.target.closest("[data-wizard-svc-tab]");
+      if (!t || !tabEditorState || (tabEditorState.tabKey !== "setup" && tabEditorState.tabKey !== "subscription")) return;
+      const sid = t.dataset.wizardSvcTab;
       if (!sid || !tabEditorState.draft[sid]) return;
-      tabEditorState.setupActiveServiceId = String(sid);
+      tabEditorState.wizardActiveSvcId = String(sid);
       renderTabEditor();
     });
 
@@ -6737,7 +6955,7 @@
       const action = el.dataset.teAction;
       if (action === "setup-down-toggle") {
         if (tabEditorState.tabKey !== "setup") return;
-        const sid = id || tabEditorState.setupActiveServiceId;
+        const sid = id || tabEditorState.wizardActiveSvcId;
         if (!sid || !tabEditorState.draft[sid]) return;
         const row = tabEditorState.draft[sid];
         row.is_down_payment_active_for_service = !!el.checked;
@@ -6747,7 +6965,7 @@
       }
       if (action === "setup-down") {
         if (tabEditorState.tabKey !== "setup") return;
-        const sid = id || tabEditorState.setupActiveServiceId;
+        const sid = id || tabEditorState.wizardActiveSvcId;
         if (!sid || !tabEditorState.draft[sid]) return;
         tabEditorState.draft[sid].down_payment_amount = parseDownPaymentAmt(el.value);
         refreshSetupFeeCalculator();
@@ -6755,7 +6973,7 @@
       }
       if (action === "setup-finance-freq") {
         if (tabEditorState.tabKey !== "setup") return;
-        const sid = id || tabEditorState.setupActiveServiceId;
+        const sid = id || tabEditorState.wizardActiveSvcId;
         if (!sid || !tabEditorState.draft[sid]) return;
         tabEditorState.draft[sid].finance_frequency = el.value;
         refreshSetupFeeCalculator();
@@ -6763,7 +6981,7 @@
       }
       if (action === "setup-pay-count") {
         if (tabEditorState.tabKey !== "setup") return;
-        const sid = id || tabEditorState.setupActiveServiceId;
+        const sid = id || tabEditorState.wizardActiveSvcId;
         if (!sid || !tabEditorState.draft[sid]) return;
         const row = tabEditorState.draft[sid];
         const prev = parsePaymentCount(row.payment_count);
@@ -6781,7 +6999,7 @@
       }
       if (action === "setup-payment-trigger") {
         if (tabEditorState.tabKey !== "setup") return;
-        const sid = id || tabEditorState.setupActiveServiceId;
+        const sid = id || tabEditorState.wizardActiveSvcId;
         if (!sid || !tabEditorState.draft[sid]) return;
         const row = tabEditorState.draft[sid];
         row.payment_trigger_type =
@@ -6792,7 +7010,7 @@
       }
       if (action === "setup-due-date") {
         if (tabEditorState.tabKey !== "setup") return;
-        const sid = id || tabEditorState.setupActiveServiceId;
+        const sid = id || tabEditorState.wizardActiveSvcId;
         if (!sid || !tabEditorState.draft[sid]) return;
         const row = tabEditorState.draft[sid];
         const norm = normalizeDueDateValue(el.value);
@@ -6801,17 +7019,39 @@
         refreshSetupFeeCalculator();
         return;
       }
+      if (action === "subscription-freq") {
+        if (tabEditorState.tabKey !== "subscription") return;
+        const sid = id || tabEditorState.wizardActiveSvcId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        tabEditorState.draft[sid].subscription_frequency =
+          typeof el.value === "string" && SETUP_FINANCE_FREQUENCY_SET.has(el.value) ? el.value : "monthly";
+        refreshSubscriptionCalculator();
+        return;
+      }
+      if (action === "subscription-rate") {
+        if (tabEditorState.tabKey !== "subscription") return;
+        const sid = id || tabEditorState.wizardActiveSvcId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        const row = tabEditorState.draft[sid];
+        const num = parseFloat(el.value);
+        const n = Number.isFinite(num) && num >= 0 ? num : 0;
+        row.subscription_rate = n;
+        row.price = n;
+        refreshSubscriptionCalculator();
+        return;
+      }
       if (!tabEditorState.draft[id]) return;
       if (action === "state") {
         tabEditorState.draft[id].state = el.value;
         renderTabEditor();
       } else if (action === "label") {
         tabEditorState.draft[id].label = el.value;
-        refreshSetupFeeCalculator();
+        if (tabEditorState.tabKey === "setup") refreshSetupFeeCalculator();
+        else if (tabEditorState.tabKey === "subscription") refreshSubscriptionCalculator();
       } else if (action === "price") {
         const num = parseFloat(el.value);
         tabEditorState.draft[id].price = Number.isFinite(num) ? num : 0;
-        refreshSetupFeeCalculator();
+        if (tabEditorState.tabKey === "setup") refreshSetupFeeCalculator();
       }
     });
     planTabEditorBody.addEventListener("input", (e) => {
@@ -6821,7 +7061,7 @@
       const action = el.dataset.teAction;
       if (action === "setup-down") {
         if (tabEditorState.tabKey !== "setup") return;
-        const sid = id || tabEditorState.setupActiveServiceId;
+        const sid = id || tabEditorState.wizardActiveSvcId;
         if (!sid || !tabEditorState.draft[sid]) return;
         tabEditorState.draft[sid].down_payment_amount = parseDownPaymentAmt(el.value);
         refreshSetupFeeCalculator();
@@ -6829,7 +7069,7 @@
       }
       if (action === "setup-pay-count") {
         if (tabEditorState.tabKey !== "setup") return;
-        const sid = id || tabEditorState.setupActiveServiceId;
+        const sid = id || tabEditorState.wizardActiveSvcId;
         if (!sid || !tabEditorState.draft[sid]) return;
         const row = tabEditorState.draft[sid];
         const prev = parsePaymentCount(row.payment_count);
@@ -6847,7 +7087,7 @@
       }
       if (action === "setup-due-date") {
         if (tabEditorState.tabKey !== "setup") return;
-        const sid = id || tabEditorState.setupActiveServiceId;
+        const sid = id || tabEditorState.wizardActiveSvcId;
         if (!sid || !tabEditorState.draft[sid]) return;
         const row = tabEditorState.draft[sid];
         const norm = normalizeDueDateValue(el.value);
@@ -6856,14 +7096,27 @@
         refreshSetupFeeCalculator();
         return;
       }
+      if (action === "subscription-rate") {
+        if (tabEditorState.tabKey !== "subscription") return;
+        const sid = id || tabEditorState.wizardActiveSvcId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        const row = tabEditorState.draft[sid];
+        const num = parseFloat(el.value);
+        const n = Number.isFinite(num) && num >= 0 ? num : 0;
+        row.subscription_rate = n;
+        row.price = n;
+        refreshSubscriptionCalculator();
+        return;
+      }
       if (!tabEditorState.draft[id]) return;
       if (action === "label") {
         tabEditorState.draft[id].label = el.value;
-        refreshSetupFeeCalculator();
+        if (tabEditorState.tabKey === "setup") refreshSetupFeeCalculator();
+        else if (tabEditorState.tabKey === "subscription") refreshSubscriptionCalculator();
       } else if (action === "price") {
         const num = parseFloat(el.value);
         tabEditorState.draft[id].price = Number.isFinite(num) ? num : 0;
-        refreshSetupFeeCalculator();
+        if (tabEditorState.tabKey === "setup") refreshSetupFeeCalculator();
       }
     });
 
@@ -6916,6 +7169,41 @@
               if (dn) copy.due_date_value = dn;
               else delete copy.due_date_value;
             }
+          }
+          cleaned[k] = copy;
+        }
+        nextTab = cleaned;
+      }
+      if (tabKey === "subscription") {
+        const cleaned = {};
+        for (const k of Object.keys(nextTab)) {
+          const row = nextTab[k];
+          if (!row || typeof row !== "object") {
+            cleaned[k] = row;
+            continue;
+          }
+          const copy = { ...row };
+          delete copy.down_payment_amount;
+          delete copy.is_down_payment_active_for_service;
+          delete copy.payment_count;
+          delete copy.payment_trigger_type;
+          delete copy.due_date_value;
+          delete copy.finance_frequency;
+          if (copy.state === "priced") {
+            const rateSrc =
+              copy.subscription_rate != null && Number.isFinite(Number(copy.subscription_rate))
+                ? Number(copy.subscription_rate)
+                : Number(copy.price);
+            const n = Number.isFinite(rateSrc) && rateSrc >= 0 ? rateSrc : 0;
+            copy.subscription_rate = n;
+            copy.price = n;
+            copy.subscription_frequency = SETUP_FINANCE_FREQUENCY_SET.has(copy.subscription_frequency)
+              ? copy.subscription_frequency
+              : "monthly";
+          } else {
+            delete copy.subscription_rate;
+            delete copy.subscription_frequency;
+            copy.price = 0;
           }
           cleaned[k] = copy;
         }
@@ -7424,7 +7712,20 @@
             }
             return obj;
           })(),
-          subscription: initTabConfig(parentIds),
+          subscription: (() => {
+            const obj = {};
+            for (const raw of parentIds) {
+              const id = String(raw);
+              obj[id] = {
+                state: "hidden",
+                price: 0,
+                label: getDefaultPlanRowLabel(id),
+                subscription_rate: 0,
+                subscription_frequency: "monthly",
+              };
+            }
+            return obj;
+          })(),
           one_time:     initTabConfig(parentIds),
           financing:    initTabConfig(parentIds),
           addons:       initTabConfig(addonLineIds),
