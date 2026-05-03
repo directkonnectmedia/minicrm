@@ -1431,6 +1431,34 @@
       font-weight: 700;
       color: #4338ca;
     }
+    .sf-addon-tier-label {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #6b7280;
+      margin: 4px 0 10px;
+    }
+    .sf-wizard-tab.sf-wizard-tab-sub {
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+    .tab-result-addon-bundle {
+      margin-bottom: 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: #fafafa;
+    }
+    .tab-result-addon-parent {
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 8px;
+    }
+    .tab-addon-nest-ul { margin: 0; padding-left: 18px; color: #374151; font-size: 14px; line-height: 1.45; }
+    .tab-addon-nest-li { margin-bottom: 4px; }
+    .addon-mode-row { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 8px; }
+    .addon-mode-row label { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; cursor: pointer; }
     @media (max-width: 760px) {
       .sf-split { grid-template-columns: 1fr; }
       .sf-split-right { position: relative; top: 0; }
@@ -5893,7 +5921,7 @@
     /** Line ids shown in editors & tab panels: parents only vs parent+child add-ons. */
     function planLineIdsForTab(plan, tabKey) {
       const parents = getPlanParentServiceIds(plan);
-      if (tabKey === "addons") return collectPlanLineIds(parents);
+      if (tabKey === "addons") return collectAddonOnlyLineIds(parents);
       return parents;
     }
 
@@ -5964,6 +5992,23 @@
           out.push(id);
           seen.add(id);
         }
+        const svc = services.find((s) => String(s.id) === id);
+        for (const a of (svc && svc.addons) || []) {
+          const aid = String(a.id);
+          if (!seen.has(aid)) {
+            out.push(aid);
+            seen.add(aid);
+          }
+        }
+      }
+      return out;
+    }
+
+    function collectAddonOnlyLineIds(selectedServiceIds) {
+      const out = [];
+      const seen = new Set();
+      for (const rawId of selectedServiceIds || []) {
+        const id = String(rawId);
         const svc = services.find((s) => String(s.id) === id);
         for (const a of (svc && svc.addons) || []) {
           const aid = String(a.id);
@@ -6404,10 +6449,170 @@
         <p class="sf-calc-copy" style="margin-top:14px">${esc(sentence)}</p>`;
     }
 
+    function formatAddonNestLine(cfg) {
+      if (!cfg) return "";
+      const lbl = cfg.label || "(add-on)";
+      const modeTag = cfg.addon_billing_mode === "recurring" ? "Recurring" : "One-time";
+      if (cfg.state === "included") return `+ ${lbl}: Included (${modeTag})`;
+      if (cfg.state !== "priced") return "";
+      if (cfg.addon_billing_mode === "recurring") {
+        const slug =
+          cfg.subscription_frequency && SETUP_FINANCE_FREQUENCY_SET.has(cfg.subscription_frequency)
+            ? cfg.subscription_frequency
+            : "monthly";
+        const rate =
+          cfg.subscription_rate != null && Number.isFinite(Number(cfg.subscription_rate))
+            ? Number(cfg.subscription_rate)
+            : Number(cfg.price) || 0;
+        return `+ ${lbl}: ${fmtMoney(rate)} / ${subscriptionFrequencyFriendlyLabel(slug)} (${modeTag})`;
+      }
+      return `+ ${lbl}: ${fmtMoney(Number(cfg.price) || 0)} (${modeTag})`;
+    }
+
+    function refreshAddonConfigurator() {
+      if (!tabEditorState || tabEditorState.tabKey !== "addons") return;
+      const host = document.getElementById("addonCalcInner");
+      if (!host) return;
+      const aid = tabEditorState.addonWizardAddonId;
+      const planForCtx = plans.find((p) => String(p.id) === String(tabEditorState.planId));
+      const dc = (aid && tabEditorState.draft[aid]) || {};
+      const st = dc.state || "hidden";
+      const priced = st === "priced";
+      const mode = dc.addon_billing_mode === "recurring" ? "recurring" : "one_time";
+
+      if (!priced) {
+        host.innerHTML = `
+          <h3 class="sf-calc-heading">Live calculator</h3>
+          <p class="sf-calc-muted">Select <strong>Priced</strong> on this add-on to preview totals and schedule.</p>`;
+        return;
+      }
+
+      if (mode === "recurring") {
+        const slugRaw = dc.subscription_frequency;
+        const slug =
+          typeof slugRaw === "string" && SETUP_FINANCE_FREQUENCY_SET.has(slugRaw) ? slugRaw : "monthly";
+        const amtRaw = dc.subscription_rate != null ? Number(dc.subscription_rate) : Number(dc.price);
+        const amt = Number.isFinite(amtRaw) && amtRaw >= 0 ? amtRaw : 0;
+        const sentence = subscriptionCommitmentSentence(amt, slug);
+        const cfgForTerms = aid
+          ? getPlanRowConfig(planForCtx, "addons", aid)
+          : { state: "priced", addon_billing_mode: "recurring", subscription_frequency: slug, subscription_rate: amt };
+        const termsPlain = cfgForTerms ? formatSubscriptionTermsLine(planForCtx, cfgForTerms) : "";
+        host.innerHTML = `
+        <h3 class="sf-calc-heading">Add-on · recurring preview</h3>
+        <div class="sf-recurring-total-wrap">
+          <span class="sf-recurring-total-badge">Recurring total ${esc(fmtMoney(amt))}</span>
+          <span class="sf-recurring-total-sub">${esc(subscriptionFrequencyFriendlyLabel(slug))}</span>
+        </div>
+        <p class="sf-calc-copy" style="margin-top:14px">${esc(sentence)}</p>
+        ${termsPlain ? `<p class="sf-calc-copy">${esc(termsPlain)}</p>` : ""}`;
+        return;
+      }
+
+      const freq = SETUP_FINANCE_FREQUENCY_SET.has(dc.finance_frequency) ? dc.finance_frequency : "monthly";
+      const totalFinite =
+        dc.price != null ? (Number.isFinite(Number(dc.price)) ? Math.max(0, Number(dc.price)) : 0) : 0;
+      const remaining = totalFinite;
+      const payN = parsePaymentCount(dc.payment_count);
+      const multi = payN > 1;
+      const perPayment = multi && remaining > 0 && payN >= 2 ? remaining / payN : null;
+      const freqSelLabel = SETUP_FINANCE_FREQUENCIES.find((r) => r[0] === freq)?.[1] || "Monthly";
+
+      let scheduleDetailHtml = "";
+      if (payN === 1 && remaining > 0) {
+        const trig =
+          dc.payment_trigger_type === SETUP_PAYMENT_TRIGGER_DATE
+            ? SETUP_PAYMENT_TRIGGER_DATE
+            : SETUP_PAYMENT_TRIGGER_MILESTONE;
+        const dueIso = trig === SETUP_PAYMENT_TRIGGER_DATE ? normalizeDueDateValue(dc.due_date_value) : null;
+        if (trig === SETUP_PAYMENT_TRIGGER_DATE && dueIso) {
+          scheduleDetailHtml = `<div class="sf-calc-row"><span>Due date</span><strong>${esc(
+            formatDueDateFriendly(dueIso),
+          )}</strong></div>`;
+        } else if (trig === SETUP_PAYMENT_TRIGGER_DATE) {
+          scheduleDetailHtml = `<div class="sf-calc-row"><span>Due date</span><strong>Pending</strong></div>`;
+        } else {
+          scheduleDetailHtml = `<div class="sf-calc-row"><span>Collection</span><strong>Upon completion</strong></div>`;
+        }
+      } else if (perPayment !== null && multi && remaining > 0) {
+        scheduleDetailHtml = `
+            <div class="sf-calc-row"><span>Each installment</span><strong>${esc(fmtMoney(perPayment))}</strong></div>
+            <div class="sf-calc-row"><span>Payments</span><strong>${esc(String(payN))}</strong></div>
+            <div class="sf-calc-row"><span>Frequency</span><strong>${esc(freqSelLabel)}</strong></div>`;
+      }
+
+      const termsCfg = {
+        ...dc,
+        state: "priced",
+        is_down_payment_active_for_service: false,
+      };
+      const termsPlain = planForCtx ? buildSetupFeeTermsSummaryText(planForCtx, termsCfg) : "";
+
+      host.innerHTML = `
+        <h3 class="sf-calc-heading">Add-on · one-time calculator</h3>
+        <div class="sf-calc-rows">
+          <div class="sf-calc-row"><span>Total fee</span><strong>${esc(fmtMoney(totalFinite))}</strong></div>
+        </div>
+        <hr class="sf-calc-divider" />
+        <div class="sf-calc-rows">
+          <div class="sf-calc-row"><span>Financed remainder</span><strong>${
+            remaining > 0 ? esc(fmtMoney(remaining)) : "—"
+          }</strong></div>
+          ${scheduleDetailHtml}
+        </div>
+        ${termsPlain ? `<p class="sf-calc-copy">${esc(termsPlain)}</p>` : ""}`;
+    }
+
     function getPlanRowConfig(plan, tabKey, lineId) {
       const key = String(lineId);
       const tabObj = (plan && plan[tabKey]) || {};
       const cfg = (tabObj && typeof tabObj === "object" && !Array.isArray(tabObj)) ? tabObj[key] : null;
+
+      if (tabKey === "addons") {
+        const modeRaw = cfg && cfg.addon_billing_mode === "recurring" ? "recurring" : "one_time";
+        const labelDefault = getDefaultPlanRowLabel(key);
+        if (modeRaw === "recurring") {
+          const legacy = cfg && cfg.price != null ? Number(cfg.price) : 0;
+          const sr0 = cfg && cfg.subscription_rate != null ? Number(cfg.subscription_rate) : NaN;
+          const subscription_rate = Number.isFinite(sr0) ? sr0 : Number.isFinite(legacy) ? legacy : 0;
+          const subscription_frequency =
+            cfg && SETUP_FINANCE_FREQUENCY_SET.has(cfg.subscription_frequency)
+              ? cfg.subscription_frequency
+              : cfg && SETUP_FINANCE_FREQUENCY_SET.has(cfg.finance_frequency)
+                ? cfg.finance_frequency
+                : "monthly";
+          return {
+            addon_billing_mode: "recurring",
+            state: (cfg && cfg.state) || "hidden",
+            price: subscription_rate,
+            subscription_rate,
+            subscription_frequency,
+            label: cfg && typeof cfg.label === "string" && cfg.label ? cfg.label : labelDefault,
+            down_payment_amount: null,
+            finance_frequency: subscription_frequency,
+            payment_count: 1,
+            payment_trigger_type: null,
+            due_date_value: null,
+            is_down_payment_active_for_service: false,
+          };
+        }
+        const finance_frequency =
+          cfg && SETUP_FINANCE_FREQUENCY_SET.has(cfg.finance_frequency) ? cfg.finance_frequency : "monthly";
+        const payment_count = cfg != null && cfg.payment_count != null ? parsePaymentCount(cfg.payment_count) : 1;
+        const trig = deriveSetupPaymentTriggerFields(cfg, payment_count);
+        return {
+          addon_billing_mode: "one_time",
+          state: (cfg && cfg.state) || "hidden",
+          price: cfg && cfg.price != null ? Number(cfg.price) : 0,
+          label: cfg && typeof cfg.label === "string" && cfg.label ? cfg.label : labelDefault,
+          down_payment_amount: null,
+          finance_frequency,
+          payment_count,
+          payment_trigger_type: trig.payment_trigger_type,
+          due_date_value: trig.due_date_value,
+          is_down_payment_active_for_service: false,
+        };
+      }
 
       if (tabKey === "subscription") {
         const legacy = cfg && cfg.price != null ? Number(cfg.price) : 0;
@@ -6476,6 +6681,32 @@
             ? "No Saved Services linked to this plan yet. Include services in Step 1 when you create a plan — add-ons configured on each Saved Service appear here automatically."
             : "No services selected for this plan. Re-create the plan and check at least one service in step 1 to populate this section.";
         return `${cta}<div class="tab-result-empty">${esc(hint)}</div>`;
+      }
+      if (tabDef.key === "addons") {
+        const parents = getPlanParentServiceIds(plan);
+        const blocks = [];
+        for (const pid of parents) {
+          const svc = services.find((s) => String(s.id) === String(pid));
+          const parentName = svc ? svc.name || "(service)" : "(service)";
+          const addonIdsForParent = collectAddonOnlyLineIds([pid]);
+          const lines = addonIdsForParent
+            .map((aid) => getPlanRowConfig(plan, "addons", aid))
+            .filter((cfg) => cfg.state !== "hidden")
+            .map((cfg) => formatAddonNestLine(cfg))
+            .filter((t) => t && String(t).trim())
+            .map((t) => `<li class="tab-addon-nest-li">${esc(t)}</li>`)
+            .join("");
+          if (!lines) continue;
+          blocks.push(`
+            <div class="tab-result-addon-bundle">
+              <div class="tab-result-addon-parent">${esc(parentName)}</div>
+              <ul class="tab-addon-nest-ul">${lines}</ul>
+            </div>`);
+        }
+        if (blocks.length === 0) {
+          return `${cta}<div class="tab-result-empty">Nothing configured yet. Open the editor and mark add-ons Priced or Included.</div>`;
+        }
+        return `${cta}<div class="tab-results tab-results-addon-groups">${blocks.join("")}</div>`;
       }
       const visible = ids
         .map((id) => ({ id: String(id), cfg: getPlanRowConfig(plan, tabDef.key, id) }))
@@ -6625,13 +6856,54 @@
                     : "monthly",
               }
             : {}),
+          ...(tabKey === "addons"
+            ? {
+                addon_billing_mode: cfg.addon_billing_mode === "recurring" ? "recurring" : "one_time",
+                ...(cfg.addon_billing_mode === "recurring"
+                  ? {
+                      subscription_rate:
+                        cfg.subscription_rate != null && Number.isFinite(Number(cfg.subscription_rate))
+                          ? Number(cfg.subscription_rate)
+                          : Number(cfg.price) || 0,
+                      subscription_frequency:
+                        cfg.subscription_frequency && SETUP_FINANCE_FREQUENCY_SET.has(cfg.subscription_frequency)
+                          ? cfg.subscription_frequency
+                          : "monthly",
+                    }
+                  : {
+                      finance_frequency: cfg.finance_frequency,
+                      payment_count: cfg.payment_count,
+                      ...(parsePaymentCount(cfg.payment_count) <= 1
+                        ? {
+                            payment_trigger_type: cfg.payment_trigger_type || SETUP_PAYMENT_TRIGGER_MILESTONE,
+                            ...(cfg.due_date_value ? { due_date_value: cfg.due_date_value } : {}),
+                          }
+                        : {}),
+                    }),
+              }
+            : {}),
         };
       }
       let wizardActiveSvcId = null;
       if ((tabKey === "setup" || tabKey === "subscription") && ids.length > 0) {
         wizardActiveSvcId = String(ids[0]);
       }
-      tabEditorState = { tabKey, planId: plan.id, draft, wizardActiveSvcId };
+      let addonWizardParentId = null;
+      let addonWizardAddonId = null;
+      if (tabKey === "addons") {
+        const parents = getPlanParentServiceIds(plan);
+        outer: for (const pid of parents) {
+          const svc = services.find((s) => String(s.id) === String(pid));
+          for (const a of (svc && svc.addons) || []) {
+            const aid = String(a.id);
+            if (!draft[aid]) continue;
+            addonWizardParentId = String(pid);
+            addonWizardAddonId = aid;
+            break outer;
+          }
+        }
+      }
+      tabEditorState = { tabKey, planId: plan.id, draft, wizardActiveSvcId, addonWizardParentId, addonWizardAddonId };
       planTabEditorStatus.textContent = "";
       planTabEditorOverlay.classList.add("open");
       renderTabEditor();
@@ -6657,7 +6929,9 @@
       const modalShell = planTabEditorOverlay.querySelector(".modal");
       if (modalShell) {
         const isWizardWideShell =
-          tabEditorState.tabKey === "setup" || tabEditorState.tabKey === "subscription";
+          tabEditorState.tabKey === "setup" ||
+          tabEditorState.tabKey === "subscription" ||
+          tabEditorState.tabKey === "addons";
         modalShell.classList.toggle("setup-fee-wizard-shell", isWizardWideShell);
         modalShell.classList.toggle("plan-tab-modal-default", !isWizardWideShell);
       }
@@ -6903,6 +7177,224 @@
         return;
       }
 
+      if (tabKeyNow === "addons") {
+        if (ids.length === 0) {
+          planTabEditorBody.innerHTML = `<div class="tab-result-empty">${esc(emptyMsg)}</div>`;
+        } else {
+          const planObj = plans.find((p) => String(p.id) === String(tabEditorState.planId));
+          const draft = tabEditorState.draft;
+          const addonIdSet = new Set(ids.map(String));
+          function subAddonsFor(pid) {
+            const svc = services.find((s) => String(s.id) === String(pid));
+            return ((svc && svc.addons) || []).filter((a) => addonIdSet.has(String(a.id)));
+          }
+          const parents = planObj ? getPlanParentServiceIds(planObj) : [];
+          let parentId = tabEditorState.addonWizardParentId;
+          let subList = parentId ? subAddonsFor(parentId) : [];
+          if (!parentId || !subList.length) {
+            parentId = null;
+            for (const p of parents) {
+              const sa = subAddonsFor(p);
+              if (sa.length) {
+                parentId = String(p);
+                subList = sa;
+                break;
+              }
+            }
+          }
+          tabEditorState.addonWizardParentId = parentId;
+          let activeAid = tabEditorState.addonWizardAddonId;
+          if (activeAid && !subList.some((a) => String(a.id) === String(activeAid))) activeAid = null;
+          if (!activeAid && subList.length) activeAid = String(subList[0].id);
+          tabEditorState.addonWizardAddonId = activeAid;
+
+          const parentTabButtons = parents
+            .map((pid) => {
+              const svc = services.find((s) => String(s.id) === String(pid));
+              const lbl = esc(svc ? svc.name || "(service)" : "(service)");
+              const subCt = subAddonsFor(pid).length;
+              const isOn = String(pid) === String(parentId);
+              if (subCt === 0) {
+                return `<button type="button" class="sf-wizard-tab" disabled style="opacity:0.45;cursor:not-allowed" title="No add-ons on this service">${lbl}</button>`;
+              }
+              return `<button type="button" class="sf-wizard-tab ${isOn ? "active" : ""}" role="tab" aria-selected="${isOn ? "true" : "false"}" data-addon-parent-tab="${esc(pid)}">${lbl}</button>`;
+            })
+            .join("");
+
+          const subTabButtons = subList
+            .map((a) => {
+              const aid = String(a.id);
+              const isOn = String(aid) === String(activeAid);
+              return `<button type="button" class="sf-wizard-tab sf-wizard-tab-sub ${isOn ? "active" : ""}" role="tab" aria-selected="${isOn ? "true" : "false"}" data-addon-sub-tab="${esc(aid)}">${esc(a.name || "(add-on)")}</button>`;
+            })
+            .join("");
+
+          let leftCol = "";
+          const rightCol = `<div id="addonCalcInner"></div>`;
+          if (!activeAid) {
+            leftCol =
+              '<div class="tab-result-empty" style="border:none;background:transparent;padding:20px 0;">Select an add-on tab above to configure pricing.</div>';
+          } else {
+            const dc =
+              draft[activeAid] ||
+              ({
+                state: "hidden",
+                price: 0,
+                label: getDefaultPlanRowLabel(activeAid),
+                addon_billing_mode: "one_time",
+                finance_frequency: "monthly",
+                payment_count: 1,
+                payment_trigger_type: SETUP_PAYMENT_TRIGGER_MILESTONE,
+                subscription_rate: 0,
+                subscription_frequency: "monthly",
+              });
+            const st = dc.state || "hidden";
+            const showPriceUi = st === "priced";
+            const mode = dc.addon_billing_mode === "recurring" ? "recurring" : "one_time";
+            const activeLabel = getDefaultPlanRowLabel(activeAid) || "(add-on)";
+            const freqSlugOt =
+              typeof dc.finance_frequency === "string" && SETUP_FINANCE_FREQUENCY_SET.has(dc.finance_frequency)
+                ? dc.finance_frequency
+                : "monthly";
+            const freqOptsOt = SETUP_FINANCE_FREQUENCIES.map(([slug, lbl]) => {
+              const sel = freqSlugOt === slug ? " selected" : "";
+              return `<option value="${esc(slug)}"${sel}>${esc(lbl)}</option>`;
+            }).join("");
+            const payCt = parsePaymentCount(dc.payment_count);
+            const showMulti = showPriceUi && mode === "one_time" && payCt > 1;
+            const showSingleTrig = showPriceUi && mode === "one_time" && payCt === 1;
+            const trig =
+              dc.payment_trigger_type === SETUP_PAYMENT_TRIGGER_DATE
+                ? SETUP_PAYMENT_TRIGGER_DATE
+                : SETUP_PAYMENT_TRIGGER_MILESTONE;
+            const dueInputVal = normalizeDueDateValue(dc.due_date_value) || "";
+            const freqBlock = showMulti
+              ? `<div class="sf-field-block">
+                <label class="sf-field-label" for="addonOtPayFreqSelect">Payment frequency</label>
+                <select id="addonOtPayFreqSelect" class="sf-field-select" data-te-action="addon-setup-finance-freq" data-id="${esc(activeAid)}">${freqOptsOt}</select>
+              </div>`
+              : "";
+            const singleTriggerBlock =
+              showSingleTrig
+                ? `<div class="sf-field-block">
+                <label class="sf-field-label" for="addonOtPayTriggerSelect">Payment trigger</label>
+                <select id="addonOtPayTriggerSelect" class="sf-field-select" data-te-action="addon-setup-payment-trigger" data-id="${esc(activeAid)}">
+                  <option value="${esc(SETUP_PAYMENT_TRIGGER_DATE)}" ${trig === SETUP_PAYMENT_TRIGGER_DATE ? "selected" : ""}>Specific date — due on a calendar date</option>
+                  <option value="${esc(SETUP_PAYMENT_TRIGGER_MILESTONE)}" ${trig === SETUP_PAYMENT_TRIGGER_MILESTONE ? "selected" : ""}>Upon completion — collect when work is finished</option>
+                </select>
+              </div>
+              ${
+                trig === SETUP_PAYMENT_TRIGGER_DATE
+                  ? `<div class="sf-field-block">
+                <label class="sf-field-label" for="addonOtDueDateInput">Due date</label>
+                <input type="date" class="sf-field-date" id="addonOtDueDateInput" data-te-action="addon-setup-due-date" data-id="${esc(activeAid)}" value="${esc(dueInputVal)}">
+              </div>`
+                  : `<div class="sf-field-block sf-field-block-soft">
+                <p class="sf-field-hint muted">Balance collected when the related work is complete.</p>
+              </div>`
+              }`
+                : "";
+            const financeBlockOt =
+              showPriceUi && mode === "one_time"
+                ? `
+              <div class="sf-field-block">
+                <label class="sf-field-label" for="addonOtPayCountInput">Number of payments</label>
+                <input type="number" id="addonOtPayCountInput" class="sf-field-text" inputmode="numeric" min="1" step="1" value="${esc(String(payCt))}" data-te-action="addon-setup-pay-count" data-id="${esc(activeAid)}">
+              </div>
+              ${freqBlock}
+              ${singleTriggerBlock}`
+                : "";
+
+            const otPriceBlock =
+              showPriceUi && mode === "one_time"
+                ? `<div class="sf-field-block">
+                <label class="sf-field-label" for="addonOtTotalInput">One-time fee amount</label>
+                <input type="number" class="sf-field-money" id="addonOtTotalInput" inputmode="decimal" min="0" step="0.01" placeholder="0.00" value="${esc(String(dc.price ?? 0))}" data-te-action="addon-one-time-price" data-id="${esc(activeAid)}">
+              </div>`
+                : "";
+
+            const subFreqSlug =
+              typeof dc.subscription_frequency === "string" && SETUP_FINANCE_FREQUENCY_SET.has(dc.subscription_frequency)
+                ? dc.subscription_frequency
+                : "monthly";
+            const subFreqOpts = SETUP_FINANCE_FREQUENCIES.map(([slug, lbl]) => {
+              const sel = subFreqSlug === slug ? " selected" : "";
+              return `<option value="${esc(slug)}"${sel}>${esc(lbl)}</option>`;
+            }).join("");
+            const rateDisplay =
+              dc.subscription_rate != null && Number.isFinite(Number(dc.subscription_rate))
+                ? Number(dc.subscription_rate)
+                : Number(dc.price) || 0;
+            const recPriceBlock =
+              showPriceUi && mode === "recurring"
+                ? `<div class="sf-field-block">
+                <label class="sf-field-label" for="addonSubRateInput">Recurring rate</label>
+                <input type="number" class="sf-field-money" id="addonSubRateInput" inputmode="decimal" min="0" step="0.01" placeholder="0.00" value="${esc(String(rateDisplay))}" data-te-action="addon-sub-rate" data-id="${esc(activeAid)}">
+              </div>`
+                : "";
+            const recFreqBlock =
+              showPriceUi && mode === "recurring"
+                ? `<div class="sf-field-block">
+                <label class="sf-field-label" for="addonSubFreqSelect">Billing frequency</label>
+                <select id="addonSubFreqSelect" class="sf-field-select" data-te-action="addon-sub-freq" data-id="${esc(activeAid)}">${subFreqOpts}</select>
+              </div>`
+                : "";
+
+            leftCol = `
+                <div class="sf-field-block">
+                  <label class="sf-field-label" for="addonDisplayLabelInput">Add-on label</label>
+                  <input type="text" class="sf-field-text" id="addonDisplayLabelInput" data-te-action="label" data-id="${esc(activeAid)}" value="${esc(dc.label || "")}" placeholder="${esc(activeLabel)}">
+                </div>
+                <div class="sf-field-block">
+                  <label class="sf-field-label" for="addonStatusSelect">Status</label>
+                  <select id="addonStatusSelect" class="sf-field-select" data-te-action="state" data-id="${esc(activeAid)}">
+                    <option value="priced" ${st === "priced" ? "selected" : ""}>Priced</option>
+                    <option value="included" ${st === "included" ? "selected" : ""}>Included</option>
+                    <option value="hidden" ${st === "hidden" ? "selected" : ""}>Don't display</option>
+                  </select>
+                </div>
+                <div class="sf-field-block">
+                  <span class="sf-field-label" style="display:block;margin-bottom:10px">Fee type</span>
+                  <div class="addon-mode-row">
+                    <label>
+                      <input type="radio" name="addonBillModePick" value="one_time" data-te-action="addon-billing-mode" data-id="${esc(activeAid)}" ${mode === "one_time" ? "checked" : ""} />
+                      One-time fee
+                    </label>
+                    <label>
+                      <input type="radio" name="addonBillModePick" value="recurring" data-te-action="addon-billing-mode" data-id="${esc(activeAid)}" ${mode === "recurring" ? "checked" : ""} />
+                      Recurring
+                    </label>
+                  </div>
+                </div>
+                ${mode === "one_time" ? `${otPriceBlock}${financeBlockOt}` : `${recPriceBlock}${recFreqBlock}`}
+              `;
+          }
+
+          planTabEditorBody.innerHTML = `
+            <p class="sf-wizard-intro">Choose a parent service, then an add-on. Pick one-time or recurring billing and watch the calculator update.</p>
+            <div class="sf-addon-tier-label">Parent services in this plan</div>
+            <div class="sf-wizard-tab-bar" role="tablist" aria-label="Parent services">${parentTabButtons}</div>
+            <div class="sf-addon-tier-label">Add-ons for this service</div>
+            <div class="sf-wizard-tab-bar" role="tablist" aria-label="Add-ons">${subTabButtons || `<span class="muted" style="padding:8px 4px;">No add-ons defined for this service — use Saved Services to add them.</span>`}</div>
+            <div class="sf-wizard-content-pane" role="tabpanel" aria-live="polite">
+              <h2 class="sf-wizard-placeholder-title">Add-on configuration</h2>
+              <div class="sf-split">
+                <div class="sf-split-left">${leftCol}</div>
+                <aside class="sf-split-right" aria-live="polite">${rightCol}</aside>
+              </div>
+            </div>`;
+          refreshAddonConfigurator();
+        }
+        const saveLabel = `Save ${editor.title}`;
+        planTabEditorActions.innerHTML = `
+          <button class="ghost" id="planTabEditorCancel">Cancel</button>
+          <button id="planTabEditorSave" ${ids.length === 0 ? "disabled" : ""}>${esc(saveLabel)}</button>
+        `;
+        document.getElementById("planTabEditorCancel").addEventListener("click", closeTabEditor);
+        document.getElementById("planTabEditorSave").addEventListener("click", saveTabEditor);
+        return;
+      }
+
       const body = ids.length === 0
         ? `<div class="tab-result-empty">${esc(emptyMsg)}</div>`
         : `<div class="tab-editor-rows">${ids.map((id) => renderTabEditorRow(id)).join("")}</div>`;
@@ -6940,6 +7432,27 @@
     // in sync as the user edits, and re-render the row on state
     // change so the Priced row's price input appears/disappears.
     planTabEditorBody.addEventListener("click", (e) => {
+      const pa = e.target.closest("[data-addon-parent-tab]");
+      if (pa && tabEditorState && tabEditorState.tabKey === "addons") {
+        const pid = pa.dataset.addonParentTab;
+        if (!pid) return;
+        tabEditorState.addonWizardParentId = String(pid);
+        const addonKeys = Object.keys(tabEditorState.draft);
+        const addonIdSet = new Set(addonKeys.map(String));
+        const svc = services.find((s) => String(s.id) === String(pid));
+        const first = ((svc && svc.addons) || []).find((a) => addonIdSet.has(String(a.id)));
+        tabEditorState.addonWizardAddonId = first ? String(first.id) : null;
+        renderTabEditor();
+        return;
+      }
+      const sa = e.target.closest("[data-addon-sub-tab]");
+      if (sa && tabEditorState && tabEditorState.tabKey === "addons") {
+        const aid = sa.dataset.addonSubTab;
+        if (!aid || !tabEditorState.draft[aid]) return;
+        tabEditorState.addonWizardAddonId = String(aid);
+        renderTabEditor();
+        return;
+      }
       const t = e.target.closest("[data-wizard-svc-tab]");
       if (!t || !tabEditorState || (tabEditorState.tabKey !== "setup" && tabEditorState.tabKey !== "subscription")) return;
       const sid = t.dataset.wizardSvcTab;
@@ -7040,6 +7553,125 @@
         refreshSubscriptionCalculator();
         return;
       }
+      if (action === "addon-billing-mode") {
+        if (tabEditorState.tabKey !== "addons") return;
+        const sid = id || tabEditorState.addonWizardAddonId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        const row = tabEditorState.draft[sid];
+        const nextMode = el.value === "recurring" ? "recurring" : "one_time";
+        row.addon_billing_mode = nextMode;
+        if (nextMode === "recurring") {
+          const basePrice = Number(row.price) || 0;
+          const sr =
+            row.subscription_rate != null && Number.isFinite(Number(row.subscription_rate))
+              ? Number(row.subscription_rate)
+              : basePrice;
+          row.subscription_rate = Number.isFinite(sr) && sr >= 0 ? sr : 0;
+          row.subscription_frequency =
+            typeof row.subscription_frequency === "string" && SETUP_FINANCE_FREQUENCY_SET.has(row.subscription_frequency)
+              ? row.subscription_frequency
+              : typeof row.finance_frequency === "string" && SETUP_FINANCE_FREQUENCY_SET.has(row.finance_frequency)
+                ? row.finance_frequency
+                : "monthly";
+          row.price = row.subscription_rate;
+          row.finance_frequency = row.subscription_frequency;
+          row.payment_count = 1;
+          delete row.payment_trigger_type;
+          delete row.due_date_value;
+        } else {
+          delete row.subscription_rate;
+          delete row.subscription_frequency;
+          const lump = Number(row.price) || 0;
+          row.price = lump;
+          row.finance_frequency =
+            typeof row.finance_frequency === "string" && SETUP_FINANCE_FREQUENCY_SET.has(row.finance_frequency)
+              ? row.finance_frequency
+              : "monthly";
+          row.payment_count = parsePaymentCount(row.payment_count);
+          row.payment_trigger_type = SETUP_PAYMENT_TRIGGER_MILESTONE;
+          delete row.due_date_value;
+        }
+        renderTabEditor();
+        return;
+      }
+      if (action === "addon-setup-finance-freq") {
+        if (tabEditorState.tabKey !== "addons") return;
+        const sid = id || tabEditorState.addonWizardAddonId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        tabEditorState.draft[sid].finance_frequency = SETUP_FINANCE_FREQUENCY_SET.has(el.value) ? el.value : "monthly";
+        refreshAddonConfigurator();
+        return;
+      }
+      if (action === "addon-setup-pay-count") {
+        if (tabEditorState.tabKey !== "addons") return;
+        const sid = id || tabEditorState.addonWizardAddonId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        const row = tabEditorState.draft[sid];
+        const prev = parsePaymentCount(row.payment_count);
+        const prevMult = prev > 1;
+        const n = parsePaymentCount(el.value);
+        row.payment_count = n;
+        syncSetupAfterPaymentCountChange(row, prev, n);
+        const nextMult = n > 1;
+        if (prevMult !== nextMult) {
+          renderTabEditor();
+          return;
+        }
+        refreshAddonConfigurator();
+        return;
+      }
+      if (action === "addon-setup-payment-trigger") {
+        if (tabEditorState.tabKey !== "addons") return;
+        const sid = id || tabEditorState.addonWizardAddonId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        const row = tabEditorState.draft[sid];
+        row.payment_trigger_type =
+          el.value === SETUP_PAYMENT_TRIGGER_DATE ? SETUP_PAYMENT_TRIGGER_DATE : SETUP_PAYMENT_TRIGGER_MILESTONE;
+        if (row.payment_trigger_type !== SETUP_PAYMENT_TRIGGER_DATE) delete row.due_date_value;
+        renderTabEditor();
+        return;
+      }
+      if (action === "addon-setup-due-date") {
+        if (tabEditorState.tabKey !== "addons") return;
+        const sid = id || tabEditorState.addonWizardAddonId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        const row = tabEditorState.draft[sid];
+        const norm = normalizeDueDateValue(el.value);
+        if (norm) row.due_date_value = norm;
+        else delete row.due_date_value;
+        refreshAddonConfigurator();
+        return;
+      }
+      if (action === "addon-one-time-price") {
+        if (tabEditorState.tabKey !== "addons") return;
+        const sid = id || tabEditorState.addonWizardAddonId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        const num = parseFloat(el.value);
+        tabEditorState.draft[sid].price = Number.isFinite(num) && num >= 0 ? num : 0;
+        refreshAddonConfigurator();
+        return;
+      }
+      if (action === "addon-sub-freq") {
+        if (tabEditorState.tabKey !== "addons") return;
+        const sid = id || tabEditorState.addonWizardAddonId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        tabEditorState.draft[sid].subscription_frequency =
+          typeof el.value === "string" && SETUP_FINANCE_FREQUENCY_SET.has(el.value) ? el.value : "monthly";
+        refreshAddonConfigurator();
+        return;
+      }
+      if (action === "addon-sub-rate") {
+        if (tabEditorState.tabKey !== "addons") return;
+        const sid = id || tabEditorState.addonWizardAddonId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        const row = tabEditorState.draft[sid];
+        const num = parseFloat(el.value);
+        const n = Number.isFinite(num) && num >= 0 ? num : 0;
+        row.subscription_rate = n;
+        row.price = n;
+        refreshAddonConfigurator();
+        return;
+      }
       if (!tabEditorState.draft[id]) return;
       if (action === "state") {
         tabEditorState.draft[id].state = el.value;
@@ -7048,10 +7680,12 @@
         tabEditorState.draft[id].label = el.value;
         if (tabEditorState.tabKey === "setup") refreshSetupFeeCalculator();
         else if (tabEditorState.tabKey === "subscription") refreshSubscriptionCalculator();
+        else if (tabEditorState.tabKey === "addons") refreshAddonConfigurator();
       } else if (action === "price") {
         const num = parseFloat(el.value);
         tabEditorState.draft[id].price = Number.isFinite(num) ? num : 0;
         if (tabEditorState.tabKey === "setup") refreshSetupFeeCalculator();
+        else if (tabEditorState.tabKey === "addons") refreshAddonConfigurator();
       }
     });
     planTabEditorBody.addEventListener("input", (e) => {
@@ -7108,15 +7742,67 @@
         refreshSubscriptionCalculator();
         return;
       }
+      if (action === "addon-setup-pay-count") {
+        if (tabEditorState.tabKey !== "addons") return;
+        const sid = id || tabEditorState.addonWizardAddonId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        const row = tabEditorState.draft[sid];
+        const prev = parsePaymentCount(row.payment_count);
+        const prevMult = prev > 1;
+        const n = parsePaymentCount(el.value);
+        row.payment_count = n;
+        syncSetupAfterPaymentCountChange(row, prev, n);
+        const nextMult = n > 1;
+        if (prevMult !== nextMult) {
+          renderTabEditor();
+          return;
+        }
+        refreshAddonConfigurator();
+        return;
+      }
+      if (action === "addon-setup-due-date") {
+        if (tabEditorState.tabKey !== "addons") return;
+        const sid = id || tabEditorState.addonWizardAddonId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        const row = tabEditorState.draft[sid];
+        const norm = normalizeDueDateValue(el.value);
+        if (norm) row.due_date_value = norm;
+        else delete row.due_date_value;
+        refreshAddonConfigurator();
+        return;
+      }
+      if (action === "addon-one-time-price") {
+        if (tabEditorState.tabKey !== "addons") return;
+        const sid = id || tabEditorState.addonWizardAddonId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        const num = parseFloat(el.value);
+        tabEditorState.draft[sid].price = Number.isFinite(num) && num >= 0 ? num : 0;
+        refreshAddonConfigurator();
+        return;
+      }
+      if (action === "addon-sub-rate") {
+        if (tabEditorState.tabKey !== "addons") return;
+        const sid = id || tabEditorState.addonWizardAddonId;
+        if (!sid || !tabEditorState.draft[sid]) return;
+        const row = tabEditorState.draft[sid];
+        const num = parseFloat(el.value);
+        const n = Number.isFinite(num) && num >= 0 ? num : 0;
+        row.subscription_rate = n;
+        row.price = n;
+        refreshAddonConfigurator();
+        return;
+      }
       if (!tabEditorState.draft[id]) return;
       if (action === "label") {
         tabEditorState.draft[id].label = el.value;
         if (tabEditorState.tabKey === "setup") refreshSetupFeeCalculator();
         else if (tabEditorState.tabKey === "subscription") refreshSubscriptionCalculator();
+        else if (tabEditorState.tabKey === "addons") refreshAddonConfigurator();
       } else if (action === "price") {
         const num = parseFloat(el.value);
         tabEditorState.draft[id].price = Number.isFinite(num) ? num : 0;
         if (tabEditorState.tabKey === "setup") refreshSetupFeeCalculator();
+        else if (tabEditorState.tabKey === "addons") refreshAddonConfigurator();
       }
     });
 
@@ -7204,6 +7890,85 @@
             delete copy.subscription_rate;
             delete copy.subscription_frequency;
             copy.price = 0;
+          }
+          cleaned[k] = copy;
+        }
+        nextTab = cleaned;
+      }
+      if (tabKey === "addons") {
+        const parentIds = getPlanParentServiceIds(plan);
+        const parentSet = new Set(parentIds.map(String));
+        for (const pk of [...Object.keys(nextTab)]) {
+          if (parentSet.has(String(pk))) delete nextTab[pk];
+        }
+        const cleaned = {};
+        for (const k of Object.keys(nextTab)) {
+          const row = nextTab[k];
+          if (!row || typeof row !== "object") {
+            cleaned[k] = row;
+            continue;
+          }
+          const copy = { ...row };
+          delete copy.down_payment_amount;
+          delete copy.is_down_payment_active_for_service;
+          copy.addon_billing_mode = copy.addon_billing_mode === "recurring" ? "recurring" : "one_time";
+
+          if (copy.addon_billing_mode === "recurring") {
+            if (copy.state === "priced") {
+              const rateSrc =
+                copy.subscription_rate != null && Number.isFinite(Number(copy.subscription_rate))
+                  ? Number(copy.subscription_rate)
+                  : Number(copy.price);
+              const n = Number.isFinite(rateSrc) && rateSrc >= 0 ? rateSrc : 0;
+              copy.subscription_rate = n;
+              copy.price = n;
+              copy.subscription_frequency = SETUP_FINANCE_FREQUENCY_SET.has(copy.subscription_frequency)
+                ? copy.subscription_frequency
+                : "monthly";
+              copy.finance_frequency = copy.subscription_frequency;
+              copy.payment_count = 1;
+              delete copy.payment_trigger_type;
+              delete copy.due_date_value;
+            } else {
+              delete copy.subscription_rate;
+              delete copy.subscription_frequency;
+              copy.price = 0;
+              delete copy.finance_frequency;
+              delete copy.payment_count;
+              delete copy.payment_trigger_type;
+              delete copy.due_date_value;
+            }
+          } else {
+            delete copy.subscription_rate;
+            delete copy.subscription_frequency;
+            if (!SETUP_FINANCE_FREQUENCY_SET.has(copy.finance_frequency)) copy.finance_frequency = "monthly";
+            if (copy.state === "priced") {
+              copy.price =
+                Number.isFinite(Number(copy.price)) && Number(copy.price) >= 0 ? Number(copy.price) : 0;
+              const pc = parsePaymentCount(copy.payment_count);
+              copy.payment_count = pc;
+              if (pc > 1) {
+                delete copy.payment_trigger_type;
+                delete copy.due_date_value;
+              } else {
+                copy.payment_trigger_type =
+                  copy.payment_trigger_type === SETUP_PAYMENT_TRIGGER_DATE
+                    ? SETUP_PAYMENT_TRIGGER_DATE
+                    : SETUP_PAYMENT_TRIGGER_MILESTONE;
+                if (copy.payment_trigger_type !== SETUP_PAYMENT_TRIGGER_DATE) {
+                  delete copy.due_date_value;
+                } else {
+                  const dn = normalizeDueDateValue(copy.due_date_value);
+                  if (dn) copy.due_date_value = dn;
+                  else delete copy.due_date_value;
+                }
+              }
+            } else {
+              copy.price = 0;
+              delete copy.payment_trigger_type;
+              delete copy.due_date_value;
+              copy.payment_count = 1;
+            }
           }
           cleaned[k] = copy;
         }
@@ -7666,7 +8431,7 @@
         await loadServices();
         const sk = derivePlanWizardSkeletonFlags(draft);
         const parentIds = (draft.services || []).map((id) => String(id));
-        const addonLineIds = collectPlanLineIds(parentIds);
+        const addonSeedIds = collectAddonOnlyLineIds(parentIds);
         const initTabConfig = (ids) => {
           const obj = {};
           for (const raw of ids) {
@@ -7728,7 +8493,22 @@
           })(),
           one_time:     initTabConfig(parentIds),
           financing:    initTabConfig(parentIds),
-          addons:       initTabConfig(addonLineIds),
+          addons: (() => {
+            const obj = {};
+            for (const aid of addonSeedIds) {
+              const id = String(aid);
+              obj[id] = {
+                state: "hidden",
+                price: 0,
+                label: getDefaultPlanRowLabel(id),
+                addon_billing_mode: "one_time",
+                finance_frequency: "monthly",
+                payment_count: 1,
+                payment_trigger_type: SETUP_PAYMENT_TRIGGER_MILESTONE,
+              };
+            }
+            return obj;
+          })(),
         };
         const { data: inserted, error } = await sb.from("plans").insert(row).select().single();
         if (error) throw error;
