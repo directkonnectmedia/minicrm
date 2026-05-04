@@ -3389,7 +3389,7 @@
         </section>
         <section data-inv-diag-step="4" hidden>
           <p class="inv-diag-stage-label">Rhythm setup</p>
-          <p class="invoice-wiz-hint" style="margin-top:0;">Set billing anchors for <strong>finance</strong> (yellow — remaining setup/installments) and <strong>subscription</strong> (red). Due-today / deposit lines (blue) are not included.</p>
+          <p class="invoice-wiz-hint" style="margin-top:0;">Set billing anchors for <strong>finance</strong> (yellow) only when there are <strong>multiple</strong> financed payments (2+ installments or 2+ balance-due chunks). A <strong>single</strong> setup/lump payment skips yellow. <strong>Subscription</strong> (red) is unchanged. Due-today lines (blue) are never included.</p>
           <div id="invDiagRhythmMount"></div>
           <div class="inv-diag-actions">
             <button type="button" class="ghost" id="invDiagRhythmBack">Back</button>
@@ -7069,6 +7069,39 @@
       return `${v}th`;
     }
 
+    /** Largest "of N" from descriptions like "Installment k of N" (plan-generated rows). */
+    function getMaxInstallmentScheduleTotal(line_items) {
+      let maxN = 0;
+      for (const li of line_items || []) {
+        const desc = String(li.description || "");
+        const m = desc.match(/installment\s+\d+\s+of\s+(\d+)/i);
+        if (m) {
+          const n = parseInt(m[1], 10);
+          if (Number.isFinite(n)) maxN = Math.max(maxN, n);
+        }
+      }
+      return maxN;
+    }
+
+    function countBalanceDueNonRecurringLines(line_items) {
+      return (line_items || []).filter((li) => {
+        if (/recurring/i.test(li.description || "")) return false;
+        const pill = String(li.status_pill || "").trim().toUpperCase();
+        return pill === "BALANCE DUE" || pill === "OVERDUE";
+      }).length;
+    }
+
+    /**
+     * Finance (yellow) rhythm only when there are multiple financed payments.
+     * Single setup/lump or "Installment … of 1" → skip yellow; subscription (red) unchanged.
+     */
+    function shouldIncludeFinanceRhythmCard(line_items) {
+      const scheduleTotal = getMaxInstallmentScheduleTotal(line_items);
+      if (scheduleTotal >= 2) return true;
+      if (scheduleTotal === 1) return false;
+      return countBalanceDueNonRecurringLines(line_items) >= 2;
+    }
+
     /**
      * Yellow (finance / balance-due non-recurring) and Red (subscription) rhythm cards only — excludes blue (due today).
      */
@@ -7076,7 +7109,7 @@
       const facts = extractInvoiceTemplateDiagnosticFacts(line_items);
       const cards = [];
 
-      if (facts.balanceRemainingTotal > 0) {
+      if (facts.balanceRemainingTotal > 0 && shouldIncludeFinanceRhythmCard(line_items)) {
         const yellowLines = (line_items || []).filter((li) => {
           if (/recurring/i.test(li.description || "")) return false;
           const pill = String(li.status_pill || "").trim().toUpperCase();
@@ -11664,7 +11697,7 @@
 
       if (cards.length === 0) {
         mount.innerHTML =
-          `<p class="inv-diag-empty-note">No finance balance or subscription rhythm to configure for this template. You can continue — due-today (blue) lines are excluded here.</p>`;
+          `<p class="inv-diag-empty-note">No rhythm UI needed: either there is no subscription, or finance is a <strong>single</strong> payment (yellow does not apply). If you expected yellow, ensure the template has 2+ installments (e.g. &quot;Installment … of N&quot; with N ≥ 2) or multiple balance-due setup lines.</p>`;
         refreshRhythmNextEnabled();
         return;
       }
