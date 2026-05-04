@@ -3159,6 +3159,25 @@
     </div>
   </div>
 
+  <!-- Invoice template: pick Plan Builder plan before drafting line items -->
+  <div class="overlay" id="invoiceTemplatePlanPickOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="invoiceTemplatePlanPickTitle" style="max-width: 520px;">
+      <div class="modal-header">
+        <div class="modal-title" id="invoiceTemplatePlanPickTitle">Choose a plan</div>
+        <button type="button" class="modal-close" id="invoiceTemplatePlanPickClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="step-body">
+        <p class="muted" style="font-size:14px;line-height:1.5;margin:0 0 12px 0;">
+          Invoice templates are generated from a Plan Builder library entry. Pick the plan to mirror setup, recurring, and add-on lines (you can fine-tune rows afterward).
+        </p>
+        <div id="invoiceTemplatePlanPickList"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="ghost" id="invoiceTemplatePlanPickCancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Invoice Template Editor modal (single-pane; templates have no per-client data) -->
   <div class="overlay" id="invoiceTemplateEditorOverlay">
     <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="invoiceTemplateEditorTitle">
@@ -3176,7 +3195,7 @@
           </div>
 
           <div class="inv-section-title">Line items</div>
-          <p class="invoice-wiz-hint">Define the standard rows for this invoice template. Amounts can be left as 0 and filled in when generating an invoice for a specific client.</p>
+          <p class="invoice-wiz-hint">Generated from the selected Plan Builder template. Edit amounts or copy as needed — use + Add line item for manual rows.</p>
 
           <table class="inv-line-items">
             <thead>
@@ -5985,6 +6004,10 @@
           ? `Tier: ${contractTemplateLabel(c.contract_template) || "None"}`
           : "";
       const customInvoiceTpl = c && c.invoice && c.invoice.custom ? c.invoice.custom : null;
+      const customTplPlanName =
+        customInvoiceTpl && customInvoiceTpl.plan_id
+          ? plans.find((p) => String(p.id) === String(customInvoiceTpl.plan_id))?.name || null
+          : null;
 
       const clientCard = c
         ? `<div class="cb-client-card">
@@ -6006,7 +6029,7 @@
             ${customInvoiceTpl
               ? `<button class="cb-tmpl-item ${isInvoiceTplActive("custom", "custom") ? "active" : ""}" data-ib-action="select-invoice-template-custom">
                    <div class="cb-tmpl-name">${esc(customInvoiceTpl.name || "Custom invoice template")}</div>
-                   <div class="cb-tmpl-meta">Saved ${customInvoiceTpl.saved_at ? esc(formatDateTime(customInvoiceTpl.saved_at)) : ""}</div>
+                   <div class="cb-tmpl-meta">${customTplPlanName ? `Plan: ${esc(customTplPlanName)} · ` : ""}Saved ${customInvoiceTpl.saved_at ? esc(formatDateTime(customInvoiceTpl.saved_at)) : ""}</div>
                  </button>`
               : `<div class="cb-tmpl-empty">No custom invoice template yet.</div>`}
           </div>`
@@ -6017,12 +6040,16 @@
           <div class="cb-tmpl-section-title">Universal</div>
           ${universalInvoiceTemplates.length === 0
             ? `<div class="cb-tmpl-empty">No universal invoice templates yet.</div>`
-            : universalInvoiceTemplates.map((t) => `
+            : universalInvoiceTemplates.map((t) => {
+                const univPlanName = t.plan_id
+                  ? plans.find((p) => String(p.id) === String(t.plan_id))?.name || null
+                  : null;
+                return `
                 <button class="cb-tmpl-item ${isInvoiceTplActive("universal", t.id) ? "active" : ""}" data-ib-action="select-invoice-template-universal" data-id="${esc(t.id)}">
                   <div class="cb-tmpl-name">${esc(t.name || "(untitled)")}</div>
-                  <div class="cb-tmpl-meta">Saved ${t.created_at ? esc(formatDateTime(t.created_at)) : ""}</div>
-                </button>
-              `).join("")}
+                  <div class="cb-tmpl-meta">${univPlanName ? `Plan: ${esc(univPlanName)} · ` : ""}Saved ${t.created_at ? esc(formatDateTime(t.created_at)) : ""}</div>
+                </button>`;
+              }).join("")}
         </div>`;
 
       const invoicesSection = `
@@ -6065,6 +6092,8 @@
         return;
       }
       const it = activeInvoiceTemplate;
+      const tplPlanName =
+        it.plan_id ? plans.find((p) => String(p.id) === String(it.plan_id))?.name || null : null;
       const badge = it.source === "custom" ? "Custom" : "Universal";
       const lineRows = (it.line_items || []).map((li) => `
         <tr>
@@ -6082,6 +6111,7 @@
           <div class="cb-middle-name">${esc(it.name || "(untitled)")}</div>
           <span class="cb-tmpl-badge cb-badge-invoice-template">Invoice Template - ${esc(badge)}</span>
         </div>
+        ${tplPlanName ? `<div class="muted" style="padding:0 20px 8px;font-size:13px;">Plan Builder: <strong>${esc(tplPlanName)}</strong></div>` : ""}
         <div style="padding:16px 20px;">
           <div class="inv-section-title" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#0B5394;margin-bottom:8px;">Line items</div>
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -6129,6 +6159,14 @@
           <div class="builder-mapping-row">
             <div class="builder-mapping-key" style="font-weight:600;color:#374151;">Name</div>
             <div class="builder-mapping-value">${esc(it.name || "(untitled)")}</div>
+          </div>
+          <div class="builder-mapping-row">
+            <div class="builder-mapping-key" style="font-weight:600;color:#374151;">Plan Builder</div>
+            <div class="builder-mapping-value">${
+              it.plan_id
+                ? esc(plans.find((p) => String(p.id) === String(it.plan_id))?.name || it.plan_id)
+                : "—"
+            }</div>
           </div>
           <div class="builder-mapping-row">
             <div class="builder-mapping-key" style="font-weight:600;color:#374151;">Line items</div>
@@ -7213,6 +7251,153 @@
       );
 
       return `<div class="plan-breakdown-panel">${blocks.join("")}</div>`;
+    }
+
+    function expandSetupLineToInvoiceRows(plan, cfg, label) {
+      if (cfg.state === "included") {
+        return [
+          {
+            description: `${label} — Setup`,
+            subtitle: buildSetupFeeTermsSummaryText(plan, cfg) || "Included — no separate charge.",
+            status_pill: "DUE TODAY",
+            amount: 0,
+          },
+        ];
+      }
+      if (cfg.state !== "priced") return [];
+
+      const totalSetup = Number(cfg.price) || 0;
+      const globDown = planShowsDownPaymentContext(plan);
+      const downActive = setupServiceDownPaymentActive(plan, cfg);
+      const downRaw = globDown && downActive ? parseDownPaymentAmt(cfg.down_payment_amount) : null;
+      const down = downRaw != null && downRaw >= 0 ? downRaw : null;
+      const remaining = Math.max(0, totalSetup - (down != null ? down : 0));
+      const payN = parsePaymentCount(cfg.payment_count);
+      const multi = payN > 1;
+      const freq = SETUP_FINANCE_FREQUENCY_SET.has(cfg.finance_frequency) ? cfg.finance_frequency : "monthly";
+      const freqSentence = setupFinanceSentencePhrase(freq);
+      const perPayment = multi && remaining > 0 && payN >= 2 ? remaining / payN : null;
+
+      const rows = [];
+      if (down != null && down > 0 && globDown && downActive) {
+        rows.push({
+          description: `${label} — Down payment`,
+          subtitle: "Collected today toward setup fee.",
+          status_pill: "DUE TODAY",
+          amount: down,
+        });
+      }
+
+      if (remaining <= 0) return rows;
+
+      if (payN === 1) {
+        rows.push({
+          description: `${label} — Setup`,
+          subtitle: buildSetupFeeTermsSummaryText(plan, cfg),
+          status_pill: "BALANCE DUE",
+          amount: remaining,
+        });
+        return rows;
+      }
+
+      if (multi && perPayment != null && remaining > 0) {
+        for (let k = 1; k <= payN; k++) {
+          rows.push({
+            description: `${label} — Installment ${k} of ${payN}`,
+            subtitle: `${fmtMoney(perPayment)} ${freqSentence}`,
+            status_pill: k === 1 ? "DUE TODAY" : "BALANCE DUE",
+            amount: perPayment,
+          });
+        }
+        return rows;
+      }
+
+      rows.push({
+        description: `${label} — Setup`,
+        subtitle: buildSetupFeeTermsSummaryText(plan, cfg),
+        status_pill: "DUE TODAY",
+        amount: remaining,
+      });
+      return rows;
+    }
+
+    function expandSubscriptionLineToInvoiceRows(plan, cfg, label) {
+      if (cfg.state === "included") {
+        return [
+          {
+            description: `${label} — Recurring`,
+            subtitle: formatSubscriptionTermsLine(plan, cfg) || "Included — no recurring charge.",
+            status_pill: "BALANCE DUE",
+            amount: 0,
+          },
+        ];
+      }
+      if (cfg.state !== "priced") return [];
+      const rate =
+        cfg.subscription_rate != null && Number.isFinite(Number(cfg.subscription_rate))
+          ? Number(cfg.subscription_rate)
+          : Number(cfg.price) || 0;
+      return [
+        {
+          description: `${label} — Recurring`,
+          subtitle: formatSubscriptionTermsLine(plan, cfg),
+          status_pill: "BALANCE DUE",
+          amount: rate,
+        },
+      ];
+    }
+
+    function buildInvoiceTemplateTermsHtmlFromPlan(plan) {
+      if (!plan) return INVOICE_DEFAULTS.terms_html;
+      const setupT = computePlanSetupPricingTotal(plan);
+      const subT = computePlanSubscriptionMonthlyTotal(plan);
+      const head = `<p><strong>Plan:</strong> ${esc(plan.name || "")} · <strong>Priced setup subtotal:</strong> ${esc(fmtCurrency(setupT))} · <strong>Priced recurring subtotal (per period):</strong> ${esc(fmtCurrency(subT))}.</p>`;
+      return `${head}\n${INVOICE_DEFAULTS.terms_html}`;
+    }
+
+    /** Full invoice template draft from Plan Builder (line_items + terms). */
+    function buildInvoiceTemplateBlobFromPlan(plan) {
+      const parents = getPlanParentServiceIds(plan);
+      const addonIds = collectAddonOnlyLineIds(parents);
+      const line_items = [];
+
+      for (const pid of parents) {
+        const cfg = getPlanRowConfig(plan, "setup", pid);
+        if (cfg.state === "hidden") continue;
+        const svc = services.find((s) => String(s.id) === String(pid));
+        const title = svc ? svc.name || cfg.label || "Service" : cfg.label || "Service";
+        line_items.push(...expandSetupLineToInvoiceRows(plan, cfg, title));
+      }
+      for (const aid of addonIds) {
+        const cfg = getPlanRowConfig(plan, "addon_setup", aid);
+        if (cfg.state === "hidden") continue;
+        const adTitle = cfg.label || getDefaultPlanRowLabel(aid) || "Add-on";
+        line_items.push(...expandSetupLineToInvoiceRows(plan, cfg, `Add-on: ${adTitle}`));
+      }
+      for (const pid of parents) {
+        const cfg = getPlanRowConfig(plan, "subscription", pid);
+        if (cfg.state === "hidden") continue;
+        const svc = services.find((s) => String(s.id) === String(pid));
+        const title = svc ? svc.name || cfg.label || "Service" : cfg.label || "Service";
+        line_items.push(...expandSubscriptionLineToInvoiceRows(plan, cfg, title));
+      }
+      for (const aid of addonIds) {
+        const cfg = getPlanRowConfig(plan, "addon_subscription", aid);
+        if (cfg.state === "hidden") continue;
+        const adTitle = cfg.label || getDefaultPlanRowLabel(aid) || "Add-on";
+        line_items.push(...expandSubscriptionLineToInvoiceRows(plan, cfg, `Add-on: ${adTitle}`));
+      }
+
+      if (line_items.length === 0) {
+        line_items.push({
+          description: `${plan.name || "Plan"} — No billable lines yet`,
+          subtitle: "Add priced or included lines in Plan Builder, then create this template again.",
+          status_pill: "DUE TODAY",
+          amount: 0,
+        });
+      }
+
+      return { line_items, terms_html: buildInvoiceTemplateTermsHtmlFromPlan(plan) };
     }
 
     function buildDefaultInvoiceLineItemsFromPlan(c) {
@@ -10263,7 +10448,7 @@
         line_items: lineItems,
         terms_html: terms,
         stripe_payment_link: "",
-        source_template: tpl ? { source: tpl.source, id: tpl.id, name: tpl.name } : null,
+        source_template: tpl ? { source: tpl.source, id: tpl.id, name: tpl.name, plan_id: tpl.plan_id || null } : null,
       };
       wizardStep = 1;
       hydrateInvoiceEditor();
@@ -10689,24 +10874,62 @@
     const invTplSaveUniversal= document.getElementById("invTplSaveUniversal");
     const invTplSaveError    = document.getElementById("invTplSaveError");
 
-    function openInvoiceTemplateEditor() {
-      // Templates do NOT require a client (universal templates are global),
-      // but if a client is loaded the Custom save option becomes available.
+    function closeInvoiceTemplatePlanPicker() {
+      const ov = document.getElementById("invoiceTemplatePlanPickOverlay");
+      if (ov) ov.classList.remove("open");
+    }
+
+    async function openInvoiceTemplatePlanPicker() {
+      const ov = document.getElementById("invoiceTemplatePlanPickOverlay");
+      const listEl = document.getElementById("invoiceTemplatePlanPickList");
+      if (!ov || !listEl) return;
+      if (!plansLoaded) await loadPlans();
+      if (!plans.length) {
+        alert("Create at least one plan in Plan Builder before starting an invoice template.");
+        return;
+      }
+      listEl.innerHTML = plans
+        .map(
+          (p) => `
+        <button type="button" class="add-tier-plan-row" data-inv-plan-id="${esc(p.id)}">
+          <span class="add-tier-plan-name">${esc(p.name || "(unnamed plan)")}</span>
+        </button>`,
+        )
+        .join("");
+      ov.classList.add("open");
+    }
+
+    function openInvoiceTemplateEditorWithPlan(planId) {
+      const plan = plans.find((x) => String(x.id) === String(planId));
+      if (!plan) {
+        alert("Plan not found.");
+        return;
+      }
+      closeInvoiceTemplatePlanPicker();
+      const blob = buildInvoiceTemplateBlobFromPlan(plan);
       invoiceTemplateEditorState = {
-        name: "",
-        line_items: [
-          { description: "Website Design & Development \u2013 Deposit",       subtitle: "Initial 50% payment to begin project.",                  status_pill: "DUE TODAY",   amount: 0 },
-          { description: "Website Design & Development \u2013 Final Balance", subtitle: "Remaining 50% due upon project completion / launch.", status_pill: "BALANCE DUE", amount: 0 },
-        ],
-        terms_html: INVOICE_DEFAULTS.terms_html,
+        plan_id: plan.id,
+        source_plan_name: plan.name || "",
+        name: `${plan.name || "Plan"} — Invoice`,
+        line_items: blob.line_items,
+        terms_html: blob.terms_html,
       };
       hydrateInvoiceTemplateEditor();
+      const ttl = document.getElementById("invoiceTemplateEditorTitle");
+      if (ttl) ttl.textContent = "New invoice template (from plan)";
       invTplStatus.textContent = "";
       invoiceTemplateEditorOverlay.classList.add("open");
     }
+
+    function openInvoiceTemplateEditor() {
+      openInvoiceTemplatePlanPicker();
+    }
     function closeInvoiceTemplateEditor() {
+      closeInvoiceTemplatePlanPicker();
       invoiceTemplateEditorOverlay.classList.remove("open");
       invTplStatus.textContent = "";
+      const ttl = document.getElementById("invoiceTemplateEditorTitle");
+      if (ttl) ttl.textContent = "New Invoice Template";
     }
 
     function hydrateInvoiceTemplateEditor() {
@@ -10773,6 +10996,10 @@
     // Save button -> open the Custom/Universal save-choice modal
     invTplSave.addEventListener("click", () => {
       if (!invoiceTemplateEditorState) return;
+      if (!invoiceTemplateEditorState.plan_id) {
+        alert("Select a Plan Builder plan first (close and use + New Invoice Template again).");
+        return;
+      }
       if (invoiceTemplateEditorState.line_items.length === 0) {
         alert("Add at least one line item before saving the template.");
         return;
@@ -10802,6 +11029,7 @@
       const name = (s.name || "").trim() || "Custom Invoice Template";
       const customPayload = {
         name,
+        plan_id: s.plan_id || null,
         line_items: s.line_items,
         terms_html: s.terms_html,
         saved_at: new Date().toISOString(),
@@ -10814,7 +11042,14 @@
       try { await addSystemNote(allClients[idx], "client", `Custom invoice template saved: ${name}`); } catch {}
       // Set this freshly-saved template as the active selection so the
       // user can immediately click "Generate Invoice" on the right pane.
-      activeInvoiceTemplate = { source: "custom", id: "custom", name, line_items: customPayload.line_items, terms_html: customPayload.terms_html };
+      activeInvoiceTemplate = {
+        source: "custom",
+        id: "custom",
+        name,
+        plan_id: customPayload.plan_id,
+        line_items: customPayload.line_items,
+        terms_html: customPayload.terms_html,
+      };
       invoiceTemplateEditorState = null;
       closeInvTplSave();
       renderInvoiceBuilder();
@@ -10827,12 +11062,24 @@
       const name = (s.name || "").trim();
       if (!name) { invTplSaveError.textContent = "Universal templates require a name."; return; }
       const { data, error } = await sb.from("invoice_templates")
-        .insert({ name, line_items: s.line_items, terms_html: s.terms_html })
+        .insert({
+          name,
+          line_items: s.line_items,
+          terms_html: s.terms_html,
+          plan_id: s.plan_id || null,
+        })
         .select()
         .single();
       if (error) { invTplSaveError.textContent = "Save failed: " + error.message; return; }
       universalInvoiceTemplates = [...universalInvoiceTemplates, data].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-      activeInvoiceTemplate = { source: "universal", id: data.id, name: data.name, line_items: data.line_items, terms_html: data.terms_html };
+      activeInvoiceTemplate = {
+        source: "universal",
+        id: data.id,
+        name: data.name,
+        plan_id: data.plan_id || null,
+        line_items: data.line_items,
+        terms_html: data.terms_html,
+      };
       invoiceTemplateEditorState = null;
       closeInvTplSave();
       renderInvoiceBuilder();
@@ -10949,6 +11196,7 @@
           source: "custom",
           id: "custom",
           name: tpl.name || "Custom Invoice Template",
+          plan_id: tpl.plan_id || null,
           line_items: tpl.line_items || [],
           terms_html: tpl.terms_html || "",
         };
@@ -10961,6 +11209,7 @@
           source: "universal",
           id: row.id,
           name: row.name || "(untitled)",
+          plan_id: row.plan_id || null,
           line_items: row.line_items || [],
           terms_html: row.terms_html || "",
         };
@@ -11640,6 +11889,23 @@
     if (addTierModalClose) addTierModalClose.addEventListener("click", closeAddTierModal);
     if (addTierModalCancel) addTierModalCancel.addEventListener("click", closeAddTierModal);
 
+    const invoiceTemplatePlanPickOverlay = document.getElementById("invoiceTemplatePlanPickOverlay");
+    const invoiceTemplatePlanPickClose = document.getElementById("invoiceTemplatePlanPickClose");
+    const invoiceTemplatePlanPickCancel = document.getElementById("invoiceTemplatePlanPickCancel");
+    if (invoiceTemplatePlanPickOverlay) {
+      dismissOnBackdropClick(invoiceTemplatePlanPickOverlay, closeInvoiceTemplatePlanPicker);
+      invoiceTemplatePlanPickOverlay.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-inv-plan-id]");
+        if (!btn) return;
+        const pid = btn.getAttribute("data-inv-plan-id");
+        if (!pid) return;
+        e.preventDefault();
+        openInvoiceTemplateEditorWithPlan(pid);
+      });
+    }
+    if (invoiceTemplatePlanPickClose) invoiceTemplatePlanPickClose.addEventListener("click", closeInvoiceTemplatePlanPicker);
+    if (invoiceTemplatePlanPickCancel) invoiceTemplatePlanPickCancel.addEventListener("click", closeInvoiceTemplatePlanPicker);
+
     document.getElementById("filterApply").addEventListener("click", applyFilterFromModal);
     document.getElementById("filterReset").addEventListener("click", resetFiltersModal);
     document.getElementById("clearFilters").addEventListener("click", clearAllFilters);
@@ -11652,6 +11918,7 @@
         else if (filterOverlay.classList.contains("open")) closeFilterModal();
         else if (wizardOverlay.classList.contains("open")) closeWizard();
         else if (addTierModalOverlay && addTierModalOverlay.classList.contains("open")) closeAddTierModal();
+        else if (invoiceTemplatePlanPickOverlay && invoiceTemplatePlanPickOverlay.classList.contains("open")) closeInvoiceTemplatePlanPicker();
         else if (detailOverlay.classList.contains("open")) closeDetail();
       }
       if (e.key === "Enter" && wizardOverlay.classList.contains("open") && e.target.tagName !== "TEXTAREA" && e.target !== noteInput) {

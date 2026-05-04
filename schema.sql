@@ -572,6 +572,9 @@ create trigger invoice_templates_set_updated_at
   before update on public.invoice_templates
   for each row execute function public.set_updated_at();
 
+alter table public.invoice_templates add column if not exists plan_id uuid references public.plans(id) on delete set null;
+create index if not exists invoice_templates_plan_id_idx on public.invoice_templates (plan_id);
+
 -- =============================================================
 -- Plans (Plan Builder skeleton wizard)
 -- =============================================================
