@@ -806,6 +806,78 @@
     .inv-diag-red { background: #fee2e2; border-color: #ef4444; color: #7f1d1d; }
     .inv-diag-empty-note { font-size: 13px; color: #6b7280; font-style: italic; }
 
+    /* Invoice plan wizard — rhythm setup (frequency chameleon) */
+    .inv-rhythm-card {
+      padding: 16px 18px;
+      border-radius: 12px;
+      margin-bottom: 14px;
+      border: 2px solid transparent;
+      font-size: 15px;
+      line-height: 1.55;
+      color: #111827;
+    }
+    .inv-rhythm-box-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      opacity: 0.88;
+    }
+    .inv-rhythm-sentence { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .inv-rhythm-sentence-row { gap: 10px; }
+    .inv-rhythm-month-select {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 2px solid rgba(0,0,0,0.12);
+      font-size: 15px;
+      font-family: inherit;
+      font-weight: 600;
+      background: #fff;
+      min-width: 120px;
+      cursor: pointer;
+    }
+    .inv-rhythm-month-select:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79,70,229,0.2); }
+    .inv-rhythm-wday-strip { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+    .inv-rhythm-wday {
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 2px solid rgba(0,0,0,0.12);
+      background: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      color: #374151;
+      transition: background 120ms, border-color 120ms, color 120ms;
+    }
+    .inv-rhythm-wday:hover { background: rgba(255,255,255,0.75); border-color: rgba(0,0,0,0.22); }
+    .inv-rhythm-wday.active {
+      border-color: #111827;
+      background: #111827;
+      color: #fff;
+    }
+    .inv-diag-yellow .inv-rhythm-wday.active {
+      border-color: #854d0e;
+      background: #ca8a04;
+      color: #fff;
+    }
+    .inv-diag-red .inv-rhythm-wday.active {
+      border-color: #991b1b;
+      background: #dc2626;
+      color: #fff;
+    }
+    .inv-diag-rhythm-preview {
+      font-size: 12px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 14px;
+      overflow-x: auto;
+      max-height: 220px;
+      margin: 0 0 12px;
+    }
+
     .crm-ib-toast.crm-ib-toast-visible {
       opacity: 1;
       transform: translateX(-50%) translateY(0);
@@ -3311,7 +3383,26 @@
           <p class="inv-diag-stage-label">Human-form verification</p>
           <div id="invDiagGallery" class="inv-diag-gallery"></div>
           <div class="inv-diag-actions">
-            <button type="button" id="invDiagCloseFinal">Close</button>
+            <button type="button" class="ghost" id="invDiagCloseFinal">Close</button>
+            <button type="button" id="invDiagVerificationNext">Next</button>
+          </div>
+        </section>
+        <section data-inv-diag-step="4" hidden>
+          <p class="inv-diag-stage-label">Rhythm setup</p>
+          <p class="invoice-wiz-hint" style="margin-top:0;">Set billing anchors for <strong>finance</strong> (yellow — remaining setup/installments) and <strong>subscription</strong> (red). Due-today / deposit lines (blue) are not included.</p>
+          <div id="invDiagRhythmMount"></div>
+          <div class="inv-diag-actions">
+            <button type="button" class="ghost" id="invDiagRhythmBack">Back</button>
+            <button type="button" id="invDiagRhythmNext" disabled>Next</button>
+          </div>
+        </section>
+        <section data-inv-diag-step="5" hidden>
+          <p class="inv-diag-stage-label">The available slots dispatcher</p>
+          <p class="invoice-wiz-hint" style="margin-top:0;">Part 2: starting calendar dates will be generated from the rhythm rules below.</p>
+          <pre id="invDiagDispatcherPreview" class="inv-diag-rhythm-preview"></pre>
+          <div class="inv-diag-actions">
+            <button type="button" class="ghost" id="invDiagDispatcherBack">Back</button>
+            <button type="button" id="invDiagDispatcherDone">Close</button>
           </div>
         </section>
       </div>
@@ -6957,6 +7048,76 @@
         }
       }
       return { dueNowTotal, balanceRemainingTotal, subscriptions };
+    }
+
+    /** UI bucket for rhythm sentence (prompt covers daily / weekly / biweekly / monthly). */
+    function rhythmUIBucketFromSlug(slug) {
+      if (slug === "daily") return "daily";
+      if (slug === "weekly") return "weekly";
+      if (slug === "biweekly") return "biweekly";
+      return "monthly";
+    }
+
+    function ordinalDayOfMonth(n) {
+      const v = Math.floor(Number(n));
+      if (!Number.isFinite(v) || v < 1 || v > 28) return `${n}`;
+      const j = v % 10;
+      const k = v % 100;
+      if (j === 1 && k !== 11) return `${v}st`;
+      if (j === 2 && k !== 12) return `${v}nd`;
+      if (j === 3 && k !== 13) return `${v}rd`;
+      return `${v}th`;
+    }
+
+    /**
+     * Yellow (finance / balance-due non-recurring) and Red (subscription) rhythm cards only — excludes blue (due today).
+     */
+    function extractRhythmCardsFromLineItems(line_items) {
+      const facts = extractInvoiceTemplateDiagnosticFacts(line_items);
+      const cards = [];
+
+      if (facts.balanceRemainingTotal > 0) {
+        const yellowLines = (line_items || []).filter((li) => {
+          if (/recurring/i.test(li.description || "")) return false;
+          const pill = String(li.status_pill || "").trim().toUpperCase();
+          return pill === "BALANCE DUE" || pill === "OVERDUE";
+        });
+        let freqSlug = "monthly";
+        const instLine = yellowLines.find((li) => /installment/i.test((li.description || "").toLowerCase()));
+        if (instLine) freqSlug = extractFrequencySlugFromInvoiceSubtitle(instLine.subtitle || "");
+        else if (yellowLines[0]) freqSlug = extractFrequencySlugFromInvoiceSubtitle(yellowLines[0].subtitle || "");
+
+        cards.push({
+          id: "yellow",
+          role: "finance",
+          frequencySlug: freqSlug,
+          uiBucket: rhythmUIBucketFromSlug(freqSlug),
+          totalRemaining: facts.balanceRemainingTotal,
+          lines: yellowLines,
+        });
+      }
+
+      const recurringLines = (line_items || []).filter((li) => /recurring/i.test(li.description || ""));
+      if (recurringLines.length > 0) {
+        const byFreq = new Map();
+        for (const li of recurringLines) {
+          const slug = extractFrequencySlugFromInvoiceSubtitle(li.subtitle || "");
+          if (!byFreq.has(slug)) byFreq.set(slug, []);
+          byFreq.get(slug).push(li);
+        }
+        for (const [slug, lines] of byFreq) {
+          const safeId = `red_${slug}`.replace(/[^a-z0-9_]/gi, "_");
+          cards.push({
+            id: safeId,
+            role: "subscription",
+            frequencySlug: slug,
+            uiBucket: rhythmUIBucketFromSlug(slug),
+            lines,
+          });
+        }
+      }
+
+      return cards;
     }
 
     function subscriptionBillingFrequencyPhrase(slug) {
@@ -11355,13 +11516,20 @@
     });
 
     // ============================================================
-    // INVOICE PLAN DIAGNOSTIC WIZARD (3-stage: template → scan → verify)
+    // INVOICE PLAN DIAGNOSTIC WIZARD (template → scan → verify → rhythm → dispatcher)
     // ============================================================
     const invoiceDiagnosticWizardOverlay = document.getElementById("invoiceDiagnosticWizardOverlay");
     const invoiceDiagnosticWizardClose = document.getElementById("invoiceDiagnosticWizardClose");
     const invDiagCancel = document.getElementById("invDiagCancel");
     const invDiagAnalyze = document.getElementById("invDiagAnalyze");
     const invDiagCloseFinal = document.getElementById("invDiagCloseFinal");
+    const invDiagVerificationNext = document.getElementById("invDiagVerificationNext");
+    const invDiagRhythmNext = document.getElementById("invDiagRhythmNext");
+    const invDiagRhythmBack = document.getElementById("invDiagRhythmBack");
+    const invDiagDispatcherBack = document.getElementById("invDiagDispatcherBack");
+    const invDiagDispatcherDone = document.getElementById("invDiagDispatcherDone");
+
+    const INV_RHYTHM_WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
     let invoiceDiagWizardSession = null;
 
@@ -11378,7 +11546,12 @@
       setInvoiceDiagStep(1);
       const feed = document.getElementById("invDiagFeed");
       if (feed) feed.innerHTML = "";
+      const rhythmMount = document.getElementById("invDiagRhythmMount");
+      if (rhythmMount) rhythmMount.innerHTML = "";
+      const dispatcherPre = document.getElementById("invDiagDispatcherPreview");
+      if (dispatcherPre) dispatcherPre.textContent = "";
       if (invDiagAnalyze) invDiagAnalyze.disabled = true;
+      if (invDiagRhythmNext) invDiagRhythmNext.disabled = true;
       invoiceDiagnosticWizardOverlay.querySelectorAll('input[name="invDiagTplSelect"]').forEach((r) => {
         r.checked = false;
       });
@@ -11452,6 +11625,196 @@
       ].join("");
     }
 
+    function refreshRhythmNextEnabled() {
+      const btn = document.getElementById("invDiagRhythmNext");
+      if (!btn || !invoiceDiagWizardSession) return;
+      const cards = invoiceDiagWizardSession.rhythmCards || [];
+      if (cards.length === 0) {
+        btn.disabled = false;
+        return;
+      }
+      for (const card of cards) {
+        const root = invoiceDiagnosticWizardOverlay.querySelector(`[data-rhythm-card-id="${card.id}"]`);
+        if (!root) {
+          btn.disabled = true;
+          return;
+        }
+        const bucket = card.uiBucket;
+        if (bucket === "daily") continue;
+        if (bucket === "monthly") {
+          const sel = root.querySelector(".inv-rhythm-month-select");
+          if (!sel || sel.value === "") {
+            btn.disabled = true;
+            return;
+          }
+        } else if (bucket === "weekly" || bucket === "biweekly") {
+          if (!root.querySelector(".inv-rhythm-wday.active")) {
+            btn.disabled = true;
+            return;
+          }
+        }
+      }
+      btn.disabled = false;
+    }
+
+    function renderRhythmSetupStage() {
+      const mount = document.getElementById("invDiagRhythmMount");
+      if (!mount) return;
+      const cards = invoiceDiagWizardSession?.rhythmCards || [];
+
+      if (cards.length === 0) {
+        mount.innerHTML =
+          `<p class="inv-diag-empty-note">No finance balance or subscription rhythm to configure for this template. You can continue — due-today (blue) lines are excluded here.</p>`;
+        refreshRhythmNextEnabled();
+        return;
+      }
+
+      let html = "";
+      for (const card of cards) {
+        const bucket = card.uiBucket;
+        const labelWord = card.role === "finance" ? "Finance" : "Subscription";
+        const boxClass =
+          card.role === "finance" ? "inv-rhythm-card inv-diag-yellow" : "inv-rhythm-card inv-diag-red";
+        const freqHint =
+          bucket === "monthly" && card.frequencySlug !== "monthly"
+            ? ` <span class="muted" style="font-size:12px;font-weight:400;">(template: ${esc(subscriptionFrequencyFriendlyLabel(card.frequencySlug))} — pick a day of month)</span>`
+            : "";
+
+        if (bucket === "daily") {
+          html += `
+<div class="${boxClass}" data-rhythm-card-id="${esc(card.id)}">
+  <div class="inv-rhythm-box-title">${esc(labelWord)} rhythm</div>
+  <p class="inv-rhythm-sentence">I want to be paid <strong>every single day</strong> for the ${esc(labelWord)} portion.</p>
+</div>`;
+        } else if (bucket === "monthly") {
+          const opts = Array.from({ length: 28 }, (_, i) => i + 1)
+            .map((d) => `<option value="${d}">${esc(ordinalDayOfMonth(d))}</option>`)
+            .join("");
+          html += `
+<div class="${boxClass}" data-rhythm-card-id="${esc(card.id)}">
+  <div class="inv-rhythm-box-title">${esc(labelWord)} rhythm${freqHint}</div>
+  <p class="inv-rhythm-sentence inv-rhythm-sentence-row">I want to be paid on the
+    <select class="inv-rhythm-month-select" aria-label="Day of month (${esc(labelWord)})">
+      <option value="" disabled selected>Choose…</option>
+      ${opts}
+    </select>
+    of every month for the ${esc(labelWord)} portion.
+  </p>
+</div>`;
+        } else if (bucket === "weekly") {
+          const btns = INV_RHYTHM_WEEKDAYS.map(
+            (d) =>
+              `<button type="button" class="inv-rhythm-wday" data-weekday="${esc(d)}">${esc(d.slice(0, 3))}</button>`,
+          ).join("");
+          html += `
+<div class="${boxClass}" data-rhythm-card-id="${esc(card.id)}">
+  <div class="inv-rhythm-box-title">${esc(labelWord)} rhythm</div>
+  <p class="inv-rhythm-sentence inv-rhythm-sentence-row">I want to be paid every
+    <span class="inv-rhythm-wday-strip">${btns}</span>
+    of the week for the ${esc(labelWord)} portion.
+  </p>
+</div>`;
+        } else if (bucket === "biweekly") {
+          const btns = INV_RHYTHM_WEEKDAYS.map(
+            (d) =>
+              `<button type="button" class="inv-rhythm-wday" data-weekday="${esc(d)}">${esc(d.slice(0, 3))}</button>`,
+          ).join("");
+          html += `
+<div class="${boxClass}" data-rhythm-card-id="${esc(card.id)}">
+  <div class="inv-rhythm-box-title">${esc(labelWord)} rhythm</div>
+  <p class="inv-rhythm-sentence inv-rhythm-sentence-row">I want to be paid every other
+    <span class="inv-rhythm-wday-strip">${btns}</span>
+    for the ${esc(labelWord)} portion.
+  </p>
+</div>`;
+        }
+      }
+
+      mount.innerHTML = html;
+      refreshRhythmNextEnabled();
+    }
+
+    /** Saved when leaving rhythm setup (hand-off to dispatcher / Part 2). */
+    function collectRhythmRuleObject() {
+      const cards = invoiceDiagWizardSession?.rhythmCards || [];
+      const rule = {
+        yellow_anchor: null,
+        red_anchor: null,
+        finance: null,
+        subscriptions: [],
+        captured_at: new Date().toISOString(),
+      };
+
+      for (const card of cards) {
+        const root = invoiceDiagnosticWizardOverlay.querySelector(`[data-rhythm-card-id="${card.id}"]`);
+        if (!root) continue;
+        const bucket = card.uiBucket;
+        let anchor = null;
+        const detail = {
+          card_id: card.id,
+          role: card.role,
+          ui_bucket: bucket,
+          frequency_slug: card.frequencySlug,
+        };
+
+        if (bucket === "daily") {
+          anchor = "daily";
+          detail.type = "daily";
+        } else if (bucket === "monthly") {
+          const sel = root.querySelector(".inv-rhythm-month-select");
+          const v = sel ? parseInt(sel.value, 10) : NaN;
+          if (!Number.isFinite(v) || v < 1 || v > 28) continue;
+          anchor = ordinalDayOfMonth(v);
+          detail.type = "monthly";
+          detail.day_of_month = v;
+        } else if (bucket === "weekly" || bucket === "biweekly") {
+          const active = root.querySelector(".inv-rhythm-wday.active");
+          if (!active) continue;
+          anchor = active.getAttribute("data-weekday") || "";
+          detail.type = bucket === "weekly" ? "weekly" : "biweekly";
+          detail.weekday = anchor;
+        }
+
+        if (card.role === "finance") {
+          rule.yellow_anchor = anchor;
+          detail.anchor = anchor;
+          rule.finance = detail;
+        } else {
+          detail.anchor = anchor;
+          rule.subscriptions.push(detail);
+          if (!rule.red_anchor) rule.red_anchor = anchor;
+        }
+      }
+
+      return rule;
+    }
+
+    function goToRhythmSetupFromVerification() {
+      if (!invoiceDiagWizardSession?.analyzedTemplate?.line_items) return;
+      invoiceDiagWizardSession.stage = "rhythm_setup";
+      invoiceDiagWizardSession.rhythmCards = extractRhythmCardsFromLineItems(invoiceDiagWizardSession.analyzedTemplate.line_items);
+      renderRhythmSetupStage();
+      setInvoiceDiagStep(4);
+    }
+
+    function goToDispatcherFromRhythm(rhythmRule) {
+      invoiceDiagWizardSession.stage = "dispatcher";
+      invoiceDiagWizardSession.Rhythm_Rule = rhythmRule;
+      invoiceDiagWizardSession.rhythmRule = rhythmRule;
+      const previewPayload = {
+        Rhythm_Rule: rhythmRule,
+        yellow_anchor: rhythmRule.yellow_anchor,
+        red_anchor: rhythmRule.red_anchor,
+        client_id: invoiceDiagWizardSession?.clientId || null,
+        client_name: invoiceDiagWizardSession?.clientName || null,
+        template_name: invoiceDiagWizardSession?.analyzedTemplate?.name || null,
+      };
+      invoiceDiagWizardSession.dispatcherPreviewPayload = previewPayload;
+      const pre = document.getElementById("invDiagDispatcherPreview");
+      if (pre) pre.textContent = JSON.stringify(previewPayload, null, 2);
+      setInvoiceDiagStep(5);
+    }
+
     async function openInvoiceDiagnosticWizard(clientId, clientName) {
       if (!invoiceDiagnosticWizardOverlay) return;
       if (!universalInvoiceTemplatesLoaded) await loadUniversalInvoiceTemplates();
@@ -11492,6 +11855,14 @@
       const facts = extractInvoiceTemplateDiagnosticFacts(tpl ? tpl.line_items : []);
       const sentences = buildInvoiceDiagnosticHumanSentences(clientName, facts);
       renderInvoiceDiagGallery(sentences);
+      if (invoiceDiagWizardSession && tpl) {
+        invoiceDiagWizardSession.stage = "verification";
+        invoiceDiagWizardSession.analyzedTemplate = {
+          name: tpl.name || "",
+          line_items: tpl.line_items || [],
+        };
+        invoiceDiagWizardSession.analysisFacts = facts;
+      }
       setInvoiceDiagStep(3);
     }
 
@@ -11499,6 +11870,15 @@
       invoiceDiagnosticWizardOverlay.addEventListener("change", (e) => {
         const t = e.target;
         if (t && t.name === "invDiagTplSelect" && invDiagAnalyze) invDiagAnalyze.disabled = false;
+        if (t && t.classList && t.classList.contains("inv-rhythm-month-select")) refreshRhythmNextEnabled();
+      });
+      invoiceDiagnosticWizardOverlay.addEventListener("click", (e) => {
+        const w = e.target.closest(".inv-rhythm-wday");
+        if (!w || !invoiceDiagnosticWizardOverlay.contains(w)) return;
+        const strip = w.closest(".inv-rhythm-wday-strip");
+        if (strip) strip.querySelectorAll(".inv-rhythm-wday").forEach((b) => b.classList.remove("active"));
+        w.classList.add("active");
+        refreshRhythmNextEnabled();
       });
     }
     if (invDiagAnalyze) {
@@ -11517,6 +11897,29 @@
     if (invDiagCancel) invDiagCancel.addEventListener("click", closeInvoiceDiagnosticWizard);
     if (invoiceDiagnosticWizardClose) invoiceDiagnosticWizardClose.addEventListener("click", closeInvoiceDiagnosticWizard);
     if (invDiagCloseFinal) invDiagCloseFinal.addEventListener("click", closeInvoiceDiagnosticWizard);
+    if (invDiagVerificationNext) invDiagVerificationNext.addEventListener("click", () => goToRhythmSetupFromVerification());
+    if (invDiagRhythmBack) {
+      invDiagRhythmBack.addEventListener("click", () => {
+        if (invoiceDiagWizardSession) invoiceDiagWizardSession.stage = "verification";
+        setInvoiceDiagStep(3);
+      });
+    }
+    if (invDiagRhythmNext) {
+      invDiagRhythmNext.addEventListener("click", () => {
+        refreshRhythmNextEnabled();
+        if (invDiagRhythmNext.disabled) return;
+        const rhythmRule = collectRhythmRuleObject();
+        goToDispatcherFromRhythm(rhythmRule);
+      });
+    }
+    if (invDiagDispatcherBack) {
+      invDiagDispatcherBack.addEventListener("click", () => {
+        if (invoiceDiagWizardSession) invoiceDiagWizardSession.stage = "rhythm_setup";
+        renderRhythmSetupStage();
+        setInvoiceDiagStep(4);
+      });
+    }
+    if (invDiagDispatcherDone) invDiagDispatcherDone.addEventListener("click", closeInvoiceDiagnosticWizard);
 
     // ---- Saved invoice preview (view + manual mark-as-paid escape hatch) ----
     function closeInvoicePreview() {
