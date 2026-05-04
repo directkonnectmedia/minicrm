@@ -691,11 +691,18 @@
       margin-bottom: 8px;
       cursor: pointer;
       background: #fff;
+      color: #111827;
       font-family: inherit;
+      font-size: 14px;
     }
     .add-tier-plan-row:hover {
       border-color: #a5b4fc;
       background: #f5f7ff;
+      color: #111827;
+    }
+    .add-tier-plan-name {
+      color: inherit;
+      font-weight: 600;
     }
     .cb-new-tmpl-btn {
       width: 100%;
@@ -5517,7 +5524,7 @@
     // ---- Contract Details tab ----
     function renderContractDetailsTab(c) {
       const tpl = getContractTemplate(c);
-      const fp = getFocusedPlanForClient(c);
+      const receiptPlan = getEffectivePlanForClient(c);
       const linkedRows = clientPlansForClient(c.id);
       const email = (c.email || "").trim();
       const portalSection = email
@@ -5575,7 +5582,11 @@
                 .map((row) => {
                   const p = plans.find((x) => String(x.id) === String(row.plan_id));
                   const name = p ? p.name || "Plan" : "Plan (missing)";
-                  const isFocus = c.focus_plan_id && String(c.focus_plan_id) === String(row.plan_id);
+                  const isFocus =
+                    (c.focus_plan_id && String(c.focus_plan_id) === String(row.plan_id)) ||
+                    (!c.focus_plan_id &&
+                      linkedRows.length === 1 &&
+                      String(linkedRows[0].plan_id) === String(row.plan_id));
                   return `
                 <div class="tier-plan-pill-wrap${isFocus ? " active" : ""}">
                   <button type="button" class="tier-plan-pill" data-action="focus-client-plan" data-plan-id="${esc(row.plan_id)}" title="Show this plan’s pricing breakdown">${esc(name)}</button>
@@ -5594,17 +5605,17 @@
         </div>
 
         ${
-          fp
+          receiptPlan
             ? `
           <div class="field-block">
-            <div class="field-block-title">Active tier pricing</div>
-            ${renderPlanDetailedBreakdownHTML(fp)}
+            <div class="field-block-title">Plan pricing (Plan Builder)</div>
+            ${renderPlanDetailedBreakdownHTML(receiptPlan)}
           </div>`
-            : linkedRows.length
+            : linkedRows.length > 1
               ? `
           <div class="field-block">
-            <div class="field-block-title">Active tier pricing</div>
-            <div class="muted">Click a tier pill above to load setup fees, recurring rates, and add-on math for that plan.</div>
+            <div class="field-block-title">Plan pricing</div>
+            <div class="muted">Click a tier pill above to show setup fees, recurring rates, and add-on math for that plan.</div>
           </div>`
               : tpl
                 ? `
@@ -5834,7 +5845,7 @@
       const el = document.getElementById("cbLeft");
       if (!el) return;
       const c = getBuilderClient();
-      const fp = c ? getFocusedPlanForClient(c) : null;
+      const fp = c ? getEffectivePlanForClient(c) : null;
       const tierLine = fp
         ? `Active plan: ${fp.name || "(unnamed)"}`
         : c
@@ -5967,7 +5978,7 @@
       const el = document.getElementById("ibLeft");
       if (!el) return;
       const c = getInvoiceBuilderClient();
-      const fp = c ? getFocusedPlanForClient(c) : null;
+      const fp = c ? getEffectivePlanForClient(c) : null;
       const tierLine = fp
         ? `Active plan: ${fp.name || "(unnamed)"}`
         : c
@@ -7067,6 +7078,17 @@
       return plans.find((p) => String(p.id) === String(c.focus_plan_id)) || null;
     }
 
+    /** Pricing context: explicit focus, or the only linked plan when focus is unset. */
+    function getEffectivePlanForClient(c) {
+      const focused = getFocusedPlanForClient(c);
+      if (focused) return focused;
+      const linked = clientPlansForClient(c.id);
+      if (linked.length === 1) {
+        return plans.find((p) => String(p.id) === String(linked[0].plan_id)) || null;
+      }
+      return null;
+    }
+
     function computePlanSetupPricingTotal(plan) {
       if (!plan) return 0;
       let total = 0;
@@ -7194,7 +7216,7 @@
     }
 
     function buildDefaultInvoiceLineItemsFromPlan(c) {
-      const plan = getFocusedPlanForClient(c);
+      const plan = getEffectivePlanForClient(c);
       if (!plan) return null;
       const total = computePlanSetupPricingTotal(plan);
       const pnm = plan.name || "Plan";
@@ -9273,13 +9295,13 @@
           return v ? { display: v, muted: false } : { display: "(missing)", muted: true };
         }
         case "tier": {
-          const fp = getFocusedPlanForClient(c);
+          const fp = getEffectivePlanForClient(c);
           if (fp) return { display: fp.name || "Linked plan", muted: false };
           const v = contractTemplateLabel(c.contract_template);
           return v && v !== "None" ? { display: v, muted: false } : { display: "No tier linked", muted: true };
         }
         case "setup": {
-          const fp = getFocusedPlanForClient(c);
+          const fp = getEffectivePlanForClient(c);
           if (fp) return { display: fmtCurrency(computePlanSetupPricingTotal(fp)), muted: false };
           const tpl = getContractTemplate(c);
           if (!tpl) return { display: "Pick a tier", muted: true };
@@ -9288,7 +9310,7 @@
           return { display: fmtCurrency(getLineAmount(c, "setup", item.key)), muted: false };
         }
         case "monthly_subscription": {
-          const fp = getFocusedPlanForClient(c);
+          const fp = getEffectivePlanForClient(c);
           if (fp) return { display: fmtCurrency(computePlanSubscriptionMonthlyTotal(fp)), muted: false };
           const tpl = getContractTemplate(c);
           if (!tpl) return { display: "Pick a tier", muted: true };
@@ -9297,7 +9319,7 @@
           return { display: fmtCurrency(getLineAmount(c, "monthly", item.key)), muted: false };
         }
         case "pocket_sekretary": {
-          const fp = getFocusedPlanForClient(c);
+          const fp = getEffectivePlanForClient(c);
           if (fp) {
             const parents = getPlanParentServiceIds(fp);
             const addonIds = collectAddonOnlyLineIds(parents);
@@ -9318,13 +9340,13 @@
           return { display: fmtCurrency(getLineAmount(c, "monthly", item.key)), muted: false };
         }
         case "setup_subtotal":
-          if (c && getFocusedPlanForClient(c)) {
-            return { display: fmtCurrency(computePlanSetupPricingTotal(getFocusedPlanForClient(c))), muted: false };
+          if (c && getEffectivePlanForClient(c)) {
+            return { display: fmtCurrency(computePlanSetupPricingTotal(getEffectivePlanForClient(c))), muted: false };
           }
           return { display: fmtCurrency(computeSubtotal(c, "setup")), muted: false };
         case "monthly_subtotal":
-          if (c && getFocusedPlanForClient(c)) {
-            return { display: fmtCurrency(computePlanSubscriptionMonthlyTotal(getFocusedPlanForClient(c))), muted: false };
+          if (c && getEffectivePlanForClient(c)) {
+            return { display: fmtCurrency(computePlanSubscriptionMonthlyTotal(getEffectivePlanForClient(c))), muted: false };
           }
           return { display: fmtCurrency(computeSubtotal(c, "monthly")), muted: false };
         case "today_date":
@@ -10256,7 +10278,7 @@
     function hydrateInvoiceEditor() {
       const s = invoiceEditorState;
       const c = getInvoiceBuilderClient();
-      const fp = c ? getFocusedPlanForClient(c) : null;
+      const fp = c ? getEffectivePlanForClient(c) : null;
       if (fp) {
         invWizTierName.textContent = fp.name || "Linked plan";
         invWizTierMeta.textContent = `${fmtMoney(computePlanSetupPricingTotal(fp))} priced setup, ${fmtMoney(computePlanSubscriptionMonthlyTotal(fp))} priced recurring`;
@@ -11111,8 +11133,6 @@
         await handleSendContract(btn);
       } else if (action === "open-add-tier-modal") {
         await openAddTierModal();
-      } else if (action === "confirm-add-tier") {
-        await confirmAddClientPlan(btn.dataset.planId);
       } else if (action === "focus-client-plan") {
         await updateClientField({ focus_plan_id: btn.dataset.planId || null });
         renderProfile();
@@ -11608,7 +11628,15 @@
     const addTierModalOverlay = document.getElementById("addTierModalOverlay");
     const addTierModalClose = document.getElementById("addTierModalClose");
     const addTierModalCancel = document.getElementById("addTierModalCancel");
-    if (addTierModalOverlay) dismissOnBackdropClick(addTierModalOverlay, closeAddTierModal);
+    if (addTierModalOverlay) {
+      dismissOnBackdropClick(addTierModalOverlay, closeAddTierModal);
+      addTierModalOverlay.addEventListener("click", async (e) => {
+        const btn = e.target.closest("[data-action]");
+        if (!btn || btn.dataset.action !== "confirm-add-tier") return;
+        e.preventDefault();
+        await confirmAddClientPlan(btn.dataset.planId);
+      });
+    }
     if (addTierModalClose) addTierModalClose.addEventListener("click", closeAddTierModal);
     if (addTierModalCancel) addTierModalCancel.addEventListener("click", closeAddTierModal);
 
