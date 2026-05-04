@@ -6040,13 +6040,11 @@
     let builderActiveTemplate = null;      // { source: "custom"|"universal", id, name, body_html }
 
     // Invoice templates: public.invoice_templates (plan_id → Plan Builder plan).
-    // Active template for Invoice Builder is always resolved from the client's
-    // effective plan via pickInvoiceTemplateForPlan — no per-client picker.
+    // Active template is whichever row the user selects in the library (left column).
     let universalInvoiceTemplates = [];
     let universalInvoiceTemplatesLoaded = false;
+    let invoiceBuilderSelectedTemplateId = null;
     let activeInvoiceTemplate = null; // { source: 'universal', id, name, plan_id, line_items, terms_html }
-    /** Last resolve result for Invoice Builder empty states / hints. */
-    let invoiceBuilderTemplateResolution = { plan: null, templateRow: null, error: "no_client" };
 
     function pickInvoiceTemplateForPlan(planId) {
       if (!planId) return null;
@@ -6085,14 +6083,20 @@
       return { plan, templateRow, error: null };
     }
 
-    function syncActiveInvoiceTemplateFromClient() {
-      const c = getInvoiceBuilderClient();
-      invoiceBuilderTemplateResolution = resolveInvoiceTemplateForEffectivePlan(c);
-      if (invoiceBuilderTemplateResolution.templateRow) {
-        activeInvoiceTemplate = buildActiveInvoiceTemplateFromUniversalRow(invoiceBuilderTemplateResolution.templateRow);
-      } else {
+    function syncActiveInvoiceTemplateFromSelection() {
+      if (!invoiceBuilderSelectedTemplateId) {
         activeInvoiceTemplate = null;
+        return;
       }
+      const row = universalInvoiceTemplates.find(
+        (t) => String(t.id) === String(invoiceBuilderSelectedTemplateId),
+      );
+      if (!row) {
+        invoiceBuilderSelectedTemplateId = null;
+        activeInvoiceTemplate = null;
+        return;
+      }
+      activeInvoiceTemplate = buildActiveInvoiceTemplateFromUniversalRow(row);
     }
 
     function getBuilderClient() {
@@ -6278,13 +6282,13 @@
     function renderInvoiceBuilder() {
       if (!universalInvoiceTemplatesLoaded) {
         loadUniversalInvoiceTemplates().then(() => renderInvoiceBuilder());
+        return;
       }
       if (invoiceBuilderClientId && invoicesLoadedForClientId !== invoiceBuilderClientId) {
         loadClientInvoices(invoiceBuilderClientId).then(() => renderInvoiceBuilder());
+        return;
       }
-      if (universalInvoiceTemplatesLoaded) {
-        syncActiveInvoiceTemplateFromClient();
-      }
+      syncActiveInvoiceTemplateFromSelection();
       renderIBLeft();
       renderIBMiddle();
       renderIBRight();
@@ -6315,18 +6319,19 @@
       const invoiceCatalogSection = `
         <div class="cb-tmpl-section">
           <div class="cb-tmpl-section-title">Invoice templates (library)</div>
-          <p class="muted" style="font-size:12px;margin:0 0 8px;line-height:1.45;">Reference only — the client’s effective plan selects which template is used.</p>
+          <p class="muted" style="font-size:12px;margin:0 0 8px;line-height:1.45;">Click a template to select it for preview and generating invoices. Each template is tied to a Plan Builder plan.</p>
           ${universalInvoiceTemplates.length === 0
-            ? `<div class="cb-tmpl-empty">No invoice templates in the library yet.</div>`
+            ? `<div class="cb-tmpl-empty">No invoice templates in the library yet. Use + New Invoice Template.</div>`
             : universalInvoiceTemplates.map((t) => {
                 const univPlanName = t.plan_id
                   ? plans.find((p) => String(p.id) === String(t.plan_id))?.name || null
                   : null;
+                const activeSel = invoiceBuilderSelectedTemplateId && String(invoiceBuilderSelectedTemplateId) === String(t.id);
                 return `
-                <div class="cb-tmpl-item-static">
+                <button type="button" class="cb-tmpl-item${activeSel ? " active" : ""}" data-ib-action="select-invoice-template" data-template-id="${esc(t.id)}">
                   <div class="cb-tmpl-name">${esc(t.name || "(untitled)")}</div>
                   <div class="cb-tmpl-meta">${univPlanName ? `Plan: ${esc(univPlanName)} · ` : ""}Saved ${t.updated_at || t.created_at ? esc(formatDateTime(t.updated_at || t.created_at)) : ""}</div>
-                </div>`;
+                </button>`;
               }).join("")}
         </div>`;
 
@@ -6334,7 +6339,7 @@
         ${clientCard}
         <button type="button" class="cb-new-tmpl-btn" data-ib-action="new-invoice-template">+ New Invoice Template</button>
         <button type="button" class="cb-new-tmpl-btn" data-ib-action="new-quick-invoice">+ Quick Invoice</button>
-        <button type="button" class="cb-new-tmpl-btn" data-ib-action="create-invoice-plan-customer" data-client-id="${c ? esc(c.id) : ""}" data-client-name="${c ? esc(c.client_name || c.company_name || "") : ""}" ${c ? "" : "disabled"} title="${c ? "Invoice plan diagnostic for this customer (uses plan-linked template)." : "Open a client profile and use Save & go to Invoice Builder first."}">Create Invoice Plan for this Customer</button>
+        <button type="button" class="cb-new-tmpl-btn" data-ib-action="create-invoice-plan-customer" data-client-id="${c ? esc(c.id) : ""}" data-client-name="${c ? esc(c.client_name || c.company_name || "") : ""}" ${c ? "" : "disabled"} title="${c ? "Invoice plan diagnostic for this customer (uses the template selected in the library)." : "Open a client profile and use Save & go to Invoice Builder first."}">Create Invoice Plan for this Customer</button>
         <div class="cb-tmpl-list">
           ${invoiceCatalogSection}
         </div>
@@ -6345,35 +6350,33 @@
       const el = document.getElementById("ibMiddle");
       if (!el) return;
       const c = getInvoiceBuilderClient();
-      const res = invoiceBuilderTemplateResolution;
+      const fp = c ? getEffectivePlanForClient(c) : null;
 
       if (!activeInvoiceTemplate) {
-        let title = "No plan-linked template";
-        let sub = `Load a client with an effective Plan Builder plan and a saved invoice template whose plan matches.`;
-        let cta = "";
-        if (!c) {
-          title = "No client loaded";
-          sub = `Open a client profile and use Save & go to Invoice Builder.`;
-        } else if (res.error === "no_plan") {
-          title = "No effective plan";
-          sub = `Link a plan on the client profile (Contract Details → add tier) and set a focused plan, or ensure exactly one linked plan.`;
-        } else if (res.error === "no_template" && res.plan) {
-          title = "No invoice template for this plan";
-          sub = `There is no saved invoice template linked to plan "${esc(res.plan.name || "(unnamed)")}". Create one from Plan Builder line items.`;
-          cta = `<button type="button" class="cb-new-tmpl-btn" style="margin-top:14px;" data-ib-action="create-invoice-template-for-plan" data-plan-id="${esc(res.plan.id)}">Create invoice template from plan</button>`;
-        }
+        const title = "No template selected";
+        const sub = universalInvoiceTemplates.length === 0
+          ? `Use <strong>+ New Invoice Template</strong> to create one and save it to the library, then click it in the list on the left.`
+          : `Click a template under <strong>Invoice templates (library)</strong> on the left. Load a client when you are ready to generate an invoice.`;
         el.innerHTML = `
           <div class="cb-middle-empty">
             <div class="cb-middle-empty-title">${title}</div>
             <div class="cb-middle-empty-sub">${sub}</div>
-            ${cta}
           </div>`;
         return;
       }
       const it = activeInvoiceTemplate;
       const tplPlanName =
         it.plan_id ? plans.find((p) => String(p.id) === String(it.plan_id))?.name || null : null;
-      const badgeLabel = "Universal (plan-linked)";
+      const badgeLabel = "Library template";
+      const planMismatch =
+        c &&
+        fp &&
+        it.plan_id &&
+        String(it.plan_id) !== String(fp.id) &&
+        tplPlanName;
+      const mismatchNote = planMismatch
+        ? `<div class="muted" style="padding:0 20px 8px;font-size:12px;line-height:1.45;color:#b45309;">This template is for plan <strong>${esc(tplPlanName)}</strong>. This client’s effective plan is <strong>${esc(fp.name || "(unnamed)")}</strong> — you can still use this template; review amounts before sending.</div>`
+        : "";
       const lineRows = (it.line_items || []).map((li) => `
         <tr>
           <td style="padding:8px 10px;border-bottom:1px solid #f3f4f6;vertical-align:top;">
@@ -6395,6 +6398,7 @@
           <span class="cb-tmpl-badge cb-badge-invoice-template">${esc(badgeLabel)}</span>
         </div>
         ${tplPlanName ? `<div class="muted" style="padding:0 20px 8px;font-size:13px;">Plan Builder: <strong>${esc(tplPlanName)}</strong></div>` : ""}
+        ${mismatchNote}
         <div style="padding:16px 20px;">
           <div class="inv-section-title" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#0B5394;margin-bottom:8px;">Line items</div>
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -6424,14 +6428,11 @@
       if (!el) return;
       const c = getInvoiceBuilderClient();
       const it = activeInvoiceTemplate;
-      const res = invoiceBuilderTemplateResolution;
       let hint = "";
-      if (!c) {
+      if (!it) {
+        hint = "Select an invoice template from the library on the left.";
+      } else if (!c) {
         hint = "Load a client to generate an invoice.";
-      } else if (!it) {
-        if (res.error === "no_plan") hint = "No effective plan — fix client profile plan linkage.";
-        else if (res.error === "no_template") hint = "Create an invoice template for this plan first.";
-        else hint = "No plan-linked template available.";
       }
 
       if (!it) {
@@ -6472,7 +6473,7 @@
           </div>
           <div class="builder-mapping-row">
             <div class="builder-mapping-key" style="font-weight:600;color:#374151;">Source</div>
-            <div class="builder-mapping-value">Universal (plan-linked)</div>
+            <div class="builder-mapping-value">Library template</div>
           </div>
         </div>
       `;
@@ -11502,6 +11503,7 @@
         universalInvoiceTemplates = [...universalInvoiceTemplates, data].sort((a, b) =>
           (a.name || "").localeCompare(b.name || ""),
         );
+        invoiceBuilderSelectedTemplateId = data.id;
         invoiceTemplateEditorState = null;
         invTplStatus.textContent = "Saved to template library.";
         closeInvoiceTemplateEditor();
@@ -11574,32 +11576,45 @@
         return;
       }
 
+      syncActiveInvoiceTemplateFromSelection();
+
+      if (!activeInvoiceTemplate) {
+        invoiceDiagWizardSession.resolvedDiagnosticTemplate = null;
+        invoiceDiagWizardSession.diagnosticTemplateResolution = resolveInvoiceTemplateForEffectivePlan(c);
+        summaryEl.innerHTML = `<p class="inv-diag-empty-note">Select an invoice template from <strong>Invoice templates (library)</strong> on the left, then open this wizard again.</p>`;
+        if (invDiagAnalyze) invDiagAnalyze.disabled = true;
+        return;
+      }
+
+      invoiceDiagWizardSession.resolvedDiagnosticTemplate = {
+        name: activeInvoiceTemplate.name || "(untitled)",
+        line_items: activeInvoiceTemplate.line_items || [],
+      };
       const res = resolveInvoiceTemplateForEffectivePlan(c);
-      invoiceDiagWizardSession.resolvedDiagnosticTemplate = res.templateRow
-        ? { name: res.templateRow.name || "(untitled)", line_items: res.templateRow.line_items || [] }
-        : null;
       invoiceDiagWizardSession.diagnosticTemplateResolution = res;
 
-      if (res.error === "no_plan") {
-        summaryEl.innerHTML =
-          `<p class="inv-diag-empty-note">No effective Plan Builder plan for this client. Link a plan on the client profile (tier pills / focus).</p>`;
-        if (invDiagAnalyze) invDiagAnalyze.disabled = true;
-        return;
-      }
-
-      if (res.error === "no_template") {
-        summaryEl.innerHTML = `
-          <p class="inv-diag-empty-note" style="margin-bottom:12px;">No invoice template exists yet for plan <strong>${esc(res.plan.name || "(unnamed)")}</strong>.</p>
-          <button type="button" class="cb-new-tmpl-btn" data-ib-action="create-invoice-template-for-plan" data-plan-id="${esc(res.plan.id)}">Create invoice template from plan</button>`;
-        if (invDiagAnalyze) invDiagAnalyze.disabled = true;
-        return;
-      }
+      const tplPlanName = activeInvoiceTemplate.plan_id
+        ? plans.find((p) => String(p.id) === String(activeInvoiceTemplate.plan_id))?.name || null
+        : null;
+      const mismatchHtml =
+        res.plan &&
+        activeInvoiceTemplate.plan_id &&
+        String(activeInvoiceTemplate.plan_id) !== String(res.plan.id) &&
+        tplPlanName
+          ? `<p style="margin:10px 0 0;font-size:13px;color:#b45309;">Template is for plan <strong>${esc(tplPlanName)}</strong>; this client’s effective plan is <strong>${esc(res.plan.name || "(unnamed)")}</strong>.</p>`
+          : "";
 
       summaryEl.innerHTML = `
         <div class="inv-diag-box inv-diag-blue" style="margin-bottom:12px;">
-          <div class="inv-diag-box-title">Plan-linked template (automatic)</div>
-          <p style="margin:0;font-size:14px;color:#1e3a8a;">Plan: <strong>${esc(res.plan.name || "(unnamed)")}</strong></p>
-          <p style="margin:8px 0 0;font-size:14px;color:#1e3a8a;">Template: <strong>${esc(res.templateRow.name || "(untitled)")}</strong> · ${(res.templateRow.line_items || []).length} line item(s)</p>
+          <div class="inv-diag-box-title">Selected library template</div>
+          <p style="margin:0;font-size:14px;color:#1e3a8a;">Template: <strong>${esc(activeInvoiceTemplate.name || "(untitled)")}</strong> · ${(activeInvoiceTemplate.line_items || []).length} line item(s)</p>
+          ${tplPlanName ? `<p style="margin:8px 0 0;font-size:14px;color:#1e3a8a;">Plan Builder: <strong>${esc(tplPlanName)}</strong></p>` : ""}
+          ${
+            res.plan
+              ? `<p style="margin:8px 0 0;font-size:13px;color:#374151;">Client effective plan: <strong>${esc(res.plan.name || "(unnamed)")}</strong></p>`
+              : `<p style="margin:8px 0 0;font-size:13px;color:#6b7280;">No effective plan on this client profile.</p>`
+          }
+          ${mismatchHtml}
         </div>`;
       if (invDiagAnalyze) invDiagAnalyze.disabled = false;
     }
@@ -12031,6 +12046,13 @@
         openInvoiceTemplateEditorWithPlan(pid);
         return;
       }
+      if (action === "select-invoice-template") {
+        const tid = btn.getAttribute("data-template-id");
+        if (!tid) return;
+        invoiceBuilderSelectedTemplateId = tid;
+        renderInvoiceBuilder();
+        return;
+      }
       if (action === "new-invoice-template") {
         openInvoiceTemplateEditor();
       } else if (action === "new-quick-invoice") {
@@ -12042,16 +12064,9 @@
         if (!universalInvoiceTemplatesLoaded) {
           await loadUniversalInvoiceTemplates();
         }
-        syncActiveInvoiceTemplateFromClient();
+        syncActiveInvoiceTemplateFromSelection();
         if (!activeInvoiceTemplate) {
-          const res = invoiceBuilderTemplateResolution;
-          if (res.error === "no_plan") {
-            showInvoiceBuilderPlaceholderToast("No effective plan on this client — link a plan on the client profile.");
-          } else if (res.error === "no_template") {
-            showInvoiceBuilderPlaceholderToast("No invoice template for this plan yet. Create one from Plan Builder first.");
-          } else {
-            showInvoiceBuilderPlaceholderToast("No plan-linked invoice template available.");
-          }
+          showInvoiceBuilderPlaceholderToast("Select an invoice template from the library on the left.");
           return;
         }
         openInvoiceEditor({ template: activeInvoiceTemplate });
