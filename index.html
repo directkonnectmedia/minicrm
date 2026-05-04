@@ -7177,6 +7177,51 @@
       return "";
     }
 
+    /** Remaining financed setup balance after down payment (priced setup lines only). */
+    function computeSetupLineRemainingAfterDown(plan, cfg) {
+      if (!plan || !cfg || cfg.state !== "priced") return null;
+      const globDown = planShowsDownPaymentContext(plan);
+      const downActive = setupServiceDownPaymentActive(plan, cfg);
+      const totalSetup = cfg.price != null ? Number(cfg.price) : NaN;
+      const totalFinite = Number.isFinite(totalSetup) && totalSetup >= 0 ? totalSetup : 0;
+      const downRaw =
+        globDown && downActive ? parseDownPaymentAmt(cfg.down_payment_amount != null ? cfg.down_payment_amount : null) : null;
+      const down = downRaw != null && downRaw >= 0 ? downRaw : null;
+      const remaining = Math.max(0, totalFinite - (down != null ? down : 0));
+      const payN = parsePaymentCount(cfg.payment_count);
+      return { remaining, payN };
+    }
+
+    /**
+     * Single-payment setup remainder timing from Plan Builder (payment_count === 1):
+     * `date` + optional due_iso, or `milestone` (upon completion). First matching priced setup row wins.
+     */
+    function getPlanSingleFinanceBalanceTiming(plan) {
+      if (!plan) return null;
+      const parents = getPlanParentServiceIds(plan);
+      const addonIds = collectAddonOnlyLineIds(parents);
+      const scan = (tabKey, lineId) => {
+        const cfg = getPlanRowConfig(plan, tabKey, lineId);
+        const fin = computeSetupLineRemainingAfterDown(plan, cfg);
+        if (!fin || fin.remaining <= 0 || fin.payN !== 1) return null;
+        const trig =
+          cfg.payment_trigger_type === SETUP_PAYMENT_TRIGGER_DATE
+            ? SETUP_PAYMENT_TRIGGER_DATE
+            : SETUP_PAYMENT_TRIGGER_MILESTONE;
+        const dueIso = trig === SETUP_PAYMENT_TRIGGER_DATE ? normalizeDueDateValue(cfg.due_date_value) : null;
+        return { trigger: trig, due_iso: dueIso };
+      };
+      for (const pid of parents) {
+        const hit = scan("setup", pid);
+        if (hit) return hit;
+      }
+      for (const aid of addonIds) {
+        const hit = scan("addon_setup", aid);
+        if (hit) return hit;
+      }
+      return null;
+    }
+
     function subscriptionFrequencyFriendlyLabel(slug) {
       return SETUP_FINANCE_FREQUENCIES.find((r) => r[0] === slug)?.[1] || "Monthly";
     }
@@ -12281,9 +12326,15 @@
 
     function buildDispatcherConfirmSummaryHtml(startDates) {
       const sd = startDates || {};
+      let yellowLine = sd.yellow || "—";
+      if (sd.yellow_timing === "milestone") {
+        yellowLine = "Upon project completion (plan: milestone collection)";
+      } else if (sd.yellow_timing === "installment_rhythm" && sd.yellow) {
+        yellowLine = `${sd.yellow} (recurring installment rhythm)`;
+      }
       const rows = [
         ["Blue (due today / setup)", sd.blue || "—"],
-        ["Yellow (financing)", sd.yellow || "—"],
+        ["Yellow (financing)", yellowLine],
         ["Red (subscription)", sd.red || "—"],
       ];
       return `<dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`;
@@ -12293,7 +12344,12 @@
       const session = invoiceDiagWizardSession;
       if (!session) return;
       const rhythmRule = session.rhythmRule || {};
-      const startDates = session.startDates || { blue: null, yellow: null, red: null };
+      const startDates = session.startDates || {
+        blue: null,
+        yellow: null,
+        red: null,
+        yellow_timing: null,
+      };
       const previewPayload = {
         Rhythm_Rule: rhythmRule,
         yellow_anchor: rhythmRule.yellow_anchor,
@@ -12348,9 +12404,31 @@
       } else if (phase === "yellow") {
         const yMode = classifyYellowDatePickerMode(line_items, facts);
         if (yMode === "open") {
+          const plan = getEffectivePlanForClient(getInvoiceBuilderClient());
+          const singT = getPlanSingleFinanceBalanceTiming(plan);
+          if (singT && singT.trigger === SETUP_PAYMENT_TRIGGER_MILESTONE) {
+            titleHtml =
+              "<strong>Yellow</strong> — Financing (single payment). Your plan collects this balance <strong>upon project completion</strong> (not on a fixed calendar day).";
+            mount.innerHTML = `<div class="inv-diag-box inv-diag-yellow" style="margin-top:4px;">
+  <p style="margin:0 0 10px;font-size:14px;line-height:1.55;">This matches Plan Builder: <strong>Upon completion — collect when project is finished</strong>. No calendar start date is required for yellow.</p>
+  <p class="muted" style="margin:0;font-size:13px;line-height:1.45;">Tap <strong>Next</strong> to confirm and continue.</p>
+</div>`;
+            nextBtn.textContent = idx + 1 >= phases.length ? "Continue to confirmation" : "Next";
+            nextBtn.disabled = false;
+            titleEl.innerHTML = `${titleHtml} <span class="muted">(Step ${idx + 1} of ${phases.length})</span>`;
+            if (strip) {
+              strip.hidden = true;
+              strip.innerHTML = "";
+            }
+            return;
+          }
           titleHtml =
-            "<strong>Yellow</strong> — Financing (single payment). Pick any date for this balance.";
+            "<strong>Yellow</strong> — Financing (single payment). Pick when this balance is due (Plan Builder: <em>Specific date</em> — pre-filled when the plan includes one).";
           calendarMode = "open";
+          if (singT && singT.trigger === SETUP_PAYMENT_TRIGGER_DATE && singT.due_iso && !session.dispatcherPendingIso) {
+            session.dispatcherPendingIso = singT.due_iso;
+          }
+          nextBtn.disabled = !session.dispatcherPendingIso;
         } else {
           titleHtml =
             "<strong>Yellow</strong> — Financing (installments). Only dates matching your Part 1 rhythm are selectable.";
@@ -12451,7 +12529,7 @@
       session.stage = "dispatcher_dates";
       session.Rhythm_Rule = rhythmRule;
       session.rhythmRule = rhythmRule;
-      session.startDates = { blue: null, yellow: null, red: null };
+      session.startDates = { blue: null, yellow: null, red: null, yellow_timing: null };
       session.dispatcherPendingIso = null;
       session.dispatcherCalYM = null;
       session.dispatcherPhases = buildDispatcherDatePhases(session);
@@ -12600,12 +12678,40 @@
       invDiagDateNext.addEventListener("click", () => {
         const session = invoiceDiagWizardSession;
         if (!session || session.stage !== "dispatcher_dates") return;
-        if (!session.dispatcherPendingIso) return;
         const phases = session.dispatcherPhases || [];
         const idx = session.dispatcherPhaseIndex || 0;
         const phase = phases[idx];
-        const key = dispatcherPhaseToStartDateKey(phase);
-        if (key) session.startDates[key] = session.dispatcherPendingIso;
+        const line_items = session.analyzedTemplate?.line_items || [];
+        const facts = session.analysisFacts || extractInvoiceTemplateDiagnosticFacts(line_items);
+        const plan = getEffectivePlanForClient(getInvoiceBuilderClient());
+
+        const yellowSingleMilestone =
+          phase === "yellow" &&
+          classifyYellowDatePickerMode(line_items, facts) === "open" &&
+          getPlanSingleFinanceBalanceTiming(plan)?.trigger === SETUP_PAYMENT_TRIGGER_MILESTONE;
+
+        if (!yellowSingleMilestone && !session.dispatcherPendingIso) return;
+
+        if (phase === "yellow") {
+          const yMode = classifyYellowDatePickerMode(line_items, facts);
+          if (yMode === "open") {
+            const singT = getPlanSingleFinanceBalanceTiming(plan);
+            if (singT && singT.trigger === SETUP_PAYMENT_TRIGGER_MILESTONE) {
+              session.startDates.yellow = null;
+              session.startDates.yellow_timing = "milestone";
+            } else {
+              session.startDates.yellow = session.dispatcherPendingIso;
+              session.startDates.yellow_timing = "calendar_date";
+            }
+          } else {
+            session.startDates.yellow = session.dispatcherPendingIso;
+            session.startDates.yellow_timing = "installment_rhythm";
+          }
+        } else {
+          const key = dispatcherPhaseToStartDateKey(phase);
+          if (key) session.startDates[key] = session.dispatcherPendingIso;
+        }
+
         session.dispatcherPendingIso = null;
         session.dispatcherCalYM = null;
         if (idx + 1 >= phases.length) {
@@ -12628,7 +12734,10 @@
         const key = dispatcherPhaseToStartDateKey(lastPhase);
         session.dispatcherPhaseIndex = lastIdx;
         session.dispatcherPendingIso = key ? session.startDates[key] : null;
-        if (key) session.startDates[key] = null;
+        if (key) {
+          session.startDates[key] = null;
+          if (key === "yellow") session.startDates.yellow_timing = null;
+        }
         session.dispatcherCalYM = null;
         session.stage = "dispatcher_dates";
         renderDispatcherDateStage();
