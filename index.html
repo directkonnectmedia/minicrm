@@ -6166,6 +6166,35 @@
     }
 
     async function loadUniversalInvoiceTemplates() {
+      const { data: sess } = await sb.auth.getSession();
+      const token = sess && sess.session ? sess.session.access_token : null;
+      const canTryApi =
+        token &&
+        typeof window !== "undefined" &&
+        window.location &&
+        window.location.protocol !== "file:";
+
+      if (canTryApi) {
+        try {
+          const r = await fetch(`${window.location.origin}/api/invoice-templates`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const j = await r.json().catch(() => ({}));
+          if (r.ok && Array.isArray(j.rows)) {
+            universalInvoiceTemplates = j.rows;
+            universalInvoiceTemplatesLoaded = true;
+            return;
+          }
+          console.warn(
+            "invoice_templates list: /api/invoice-templates unavailable",
+            r.status,
+            j.error || "",
+          );
+        } catch (e) {
+          console.warn("invoice_templates list: API fetch failed", e);
+        }
+      }
+
       const { data, error } = await sb.from("invoice_templates").select("*").order("name", { ascending: true });
       if (error) {
         console.warn("Universal invoice templates unavailable:", error.message);
@@ -11524,7 +11553,20 @@
           })
           .select()
           .single();
-        if (error) throw error;
+        if (error) {
+          let msg = error.message || String(error);
+          const code = error.code || "";
+          if (
+            code === "42501" ||
+            /permission denied|rls|row-level security|violates row-level security/i.test(
+              msg,
+            )
+          ) {
+            msg +=
+              " Set SUPABASE_SERVICE_ROLE_KEY on Vercel (redeploy) so /api/invoice-templates can save, or run scripts/patch-invoice-templates-rls.sql in Supabase.";
+          }
+          throw new Error(msg);
+        }
         return data;
       };
 
@@ -11553,23 +11595,13 @@
           });
           const j = await apiRes.json().catch(() => ({}));
           if (apiRes.ok && j.row) return j.row;
-          if (apiRes.status === 404 || apiRes.status === 405) {
-            return directInsert();
-          }
-          const detailMsg =
-            j.detail &&
-            (typeof j.detail.message === "string"
-              ? j.detail.message
-              : typeof j.detail === "string"
-                ? j.detail
-                : null);
-          const msg = detailMsg || j.error || `Save failed (${apiRes.status})`;
-          throw new Error(msg);
+          console.warn(
+            "invoice_templates insert: API failed, falling back to Supabase client",
+            apiRes.status,
+            j.error || "",
+          );
         } catch (e) {
-          if (e && e.name === "TypeError" && String(e.message || "").includes("fetch")) {
-            return directInsert();
-          }
-          throw e;
+          console.warn("invoice_templates insert: API fetch failed, falling back", e);
         }
       }
 

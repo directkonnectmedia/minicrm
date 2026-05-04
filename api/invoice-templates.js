@@ -1,18 +1,11 @@
 /**
- * POST /api/invoice-templates
+ * GET  /api/invoice-templates  -> { rows: [...] }  (service role list)
+ * POST /api/invoice-templates  -> { ok, row }      (service role insert)
  *
- * Inserts a row into public.invoice_templates using the service role key,
- * after verifying the caller's JWT is a signed-in team member (admin, sales,
- * or web_designer). Use this when direct browser inserts fail RLS.
+ * Both require Authorization: Bearer <supabase_user_access_token> and a team
+ * role on the user (admin, sales, web_designer in user_metadata or app_metadata).
  *
- * Env (same as other admin routes):
- *   SUPABASE_SERVICE_ROLE_KEY — required
- *   SUPABASE_URL — optional (defaults to project URL below)
- *
- * Headers:
- *   Authorization: Bearer <supabase_user_access_token>
- * Body JSON:
- *   { name, line_items, terms_html?, plan_id? }
+ * Env: SUPABASE_SERVICE_ROLE_KEY (required), SUPABASE_URL (optional)
  */
 
 const SUPABASE_URL =
@@ -61,32 +54,73 @@ async function getCallerUser(jwt) {
   return readJson(r);
 }
 
+const restHeaders = () => ({
+  apikey: SERVICE_ROLE_KEY,
+  Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+  Accept: "application/json",
+});
+
+/**
+ * Validates Bearer JWT and team membership. Sends error response on failure.
+ * @returns {Promise<boolean>} true if authorized
+ */
+async function requireTeamJwtOrRespond(req, res) {
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
+    res.status(401).json({ error: "missing bearer token" });
+    return false;
+  }
+  const jwt = authHeader.slice(7).trim();
+  if (!jwt) {
+    res.status(401).json({ error: "empty bearer token" });
+    return false;
+  }
+
+  const caller = await getCallerUser(jwt);
+  if (!caller) {
+    res.status(401).json({ error: "invalid or expired session" });
+    return false;
+  }
+  if (!isTeamMember(caller)) {
+    res.status(403).json({
+      error:
+        "team role required: set user_metadata.roles to include admin, sales, or web_designer for this user in Supabase Auth",
+    });
+    return false;
+  }
+  return true;
+}
+
 export default async function handler(req, res) {
   if (!SERVICE_ROLE_KEY) {
     return res.status(500).json({
       error:
-        "SUPABASE_SERVICE_ROLE_KEY is not configured on the server. Add it in Vercel → Settings → Environment Variables.",
+        "SUPABASE_SERVICE_ROLE_KEY is not configured on the server. Add it in Vercel → Settings → Environment Variables and redeploy.",
     });
   }
 
+  const authorized = await requireTeamJwtOrRespond(req, res);
+  if (!authorized) return;
+
+  if (req.method === "GET") {
+    const listUrl = `${SUPABASE_URL}/rest/v1/invoice_templates?select=*&order=name.asc`;
+    const list = await fetch(listUrl, { headers: restHeaders() });
+    const data = await readJson(list);
+    if (!list.ok) {
+      const msg =
+        (data && typeof data.message === "string" && data.message) || "list failed";
+      return res.status(list.status >= 400 ? list.status : 500).json({
+        error: msg,
+        detail: data,
+      });
+    }
+    const rows = Array.isArray(data) ? data : [];
+    return res.status(200).json({ rows });
+  }
+
   if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
+    res.setHeader("Allow", "GET, POST");
     return res.status(405).json({ error: "method not allowed" });
-  }
-
-  const authHeader = req.headers.authorization || req.headers.Authorization;
-  if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
-    return res.status(401).json({ error: "missing bearer token" });
-  }
-  const jwt = authHeader.slice(7).trim();
-  if (!jwt) return res.status(401).json({ error: "empty bearer token" });
-
-  const caller = await getCallerUser(jwt);
-  if (!caller) {
-    return res.status(401).json({ error: "invalid or expired session" });
-  }
-  if (!isTeamMember(caller)) {
-    return res.status(403).json({ error: "team role required (admin, sales, or web_designer)" });
   }
 
   const body =
@@ -132,8 +166,7 @@ export default async function handler(req, res) {
   const ins = await fetch(`${SUPABASE_URL}/rest/v1/invoice_templates`, {
     method: "POST",
     headers: {
-      apikey: SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      ...restHeaders(),
       "Content-Type": "application/json",
       Prefer: "return=representation",
     },
