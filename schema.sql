@@ -736,3 +736,38 @@ drop trigger if exists service_addons_set_updated_at on public.service_addons;
 create trigger service_addons_set_updated_at
   before update on public.service_addons
   for each row execute function public.set_updated_at();
+
+-- =============================================================
+-- Client ↔ Plan references (Contract Details “tiers” from Plan Builder)
+-- =============================================================
+-- Linking is by reference only: deleting a link does not delete public.plans.
+-- Drop legacy CHECK so older template ids may remain on legacy rows; new UX uses client_plans.
+
+alter table public.clients drop constraint if exists clients_contract_template_check;
+
+alter table public.clients add column if not exists focus_plan_id uuid references public.plans(id) on delete set null;
+
+create table if not exists public.client_plans (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references public.clients(id) on delete cascade,
+  plan_id uuid not null references public.plans(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (client_id, plan_id)
+);
+
+create index if not exists client_plans_client_id_idx on public.client_plans (client_id);
+create index if not exists client_plans_plan_id_idx on public.client_plans (plan_id);
+
+alter table public.client_plans enable row level security;
+
+drop policy if exists "team only client_plans" on public.client_plans;
+create policy "team only client_plans"
+  on public.client_plans for all to authenticated
+  using (public.is_team_member())
+  with check (public.is_team_member());
+
+-- Integrations that expect a "global_plans" name: thin view over the Plan Builder library.
+create or replace view public.global_plans as
+  select * from public.plans;
+
+grant select on public.global_plans to authenticated;
