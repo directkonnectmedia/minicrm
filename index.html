@@ -3463,33 +3463,6 @@
     </div>
   </div>
 
-  <!-- Invoice Template Save Choice modal (Custom this client vs Universal) -->
-  <div class="overlay" id="invTplSaveOverlay">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="invTplSaveTitle">
-      <div class="modal-header">
-        <div class="modal-title" id="invTplSaveTitle">Save Invoice Template</div>
-        <button class="modal-close" id="invTplSaveClose" aria-label="Close">&times;</button>
-      </div>
-      <div class="step-body">
-        <div class="cb-save-choice">
-          <button type="button" class="cb-save-choice-btn" id="invTplSaveCustom">
-            <div class="cb-save-choice-title">Custom Template</div>
-            <div class="cb-save-choice-sub">Save for the currently loaded client only.</div>
-          </button>
-          <button type="button" class="cb-save-choice-btn" id="invTplSaveUniversal">
-            <div class="cb-save-choice-title">Universal Template</div>
-            <div class="cb-save-choice-sub">Save to the shared library, reusable for any client.</div>
-          </button>
-        </div>
-        <div id="invTplSaveError" class="cb-save-error"></div>
-      </div>
-      <div class="modal-footer">
-        <button class="ghost" id="invTplSaveBack">Back to editor</button>
-        <span></span>
-      </div>
-    </div>
-  </div>
-
   <!-- Saved Invoice Preview modal (view + manual mark-as-paid escape hatch) -->
   <div class="overlay" id="invoicePreviewOverlay">
     <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="invoicePreviewHeader">
@@ -11363,9 +11336,8 @@
     // ============================================================
     // INVOICE TEMPLATE EDITOR
     // ============================================================
-    // Single-pane editor for reusable invoice templates. Saves to
-    // either clients.invoice.custom (Custom) or public.invoice_templates
-    // (Universal). Mirrors the contract template Custom/Universal split.
+    // Single-pane editor for reusable invoice templates. Save writes to
+    // public.invoice_templates (shared library; left-pane catalog).
     let invoiceTemplateEditorState = null; // working draft
 
     const invoiceTemplateEditorOverlay = document.getElementById("invoiceTemplateEditorOverlay");
@@ -11377,13 +11349,6 @@
     const invTplCancel      = document.getElementById("invTplCancel");
     const invTplSave        = document.getElementById("invTplSave");
     const invTplStatus      = document.getElementById("invTplStatus");
-
-    const invTplSaveOverlay  = document.getElementById("invTplSaveOverlay");
-    const invTplSaveClose    = document.getElementById("invTplSaveClose");
-    const invTplSaveBack     = document.getElementById("invTplSaveBack");
-    const invTplSaveCustom   = document.getElementById("invTplSaveCustom");
-    const invTplSaveUniversal= document.getElementById("invTplSaveUniversal");
-    const invTplSaveError    = document.getElementById("invTplSaveError");
 
     function closeInvoiceTemplatePlanPicker() {
       const ov = document.getElementById("invoiceTemplatePlanPickOverlay");
@@ -11504,8 +11469,8 @@
     invTplCancel.addEventListener("click", closeInvoiceTemplateEditor);
     invoiceTemplateEditorClose.addEventListener("click", closeInvoiceTemplateEditor);
 
-    // Save button -> open the Custom/Universal save-choice modal
-    invTplSave.addEventListener("click", () => {
+    // Save -> insert into public.invoice_templates (library) and close editor.
+    invTplSave.addEventListener("click", async () => {
       if (!invoiceTemplateEditorState) return;
       if (!invoiceTemplateEditorState.plan_id) {
         alert("Select a Plan Builder plan first (close and use + New Invoice Template again).");
@@ -11515,67 +11480,40 @@
         alert("Add at least one line item before saving the template.");
         return;
       }
-      invTplSaveError.textContent = "";
-      invoiceTemplateEditorOverlay.classList.remove("open");
-      invTplSaveOverlay.classList.add("open");
-    });
-
-    function closeInvTplSave() {
-      invTplSaveOverlay.classList.remove("open");
-      invTplSaveError.textContent = "";
-    }
-    invTplSaveClose.addEventListener("click", closeInvTplSave);
-    invTplSaveBack.addEventListener("click", () => {
-      invTplSaveOverlay.classList.remove("open");
-      invoiceTemplateEditorOverlay.classList.add("open");
-    });
-
-    // Save as Custom -> writes to clients.invoice.custom jsonb on the
-    // currently-loaded client. Requires a client to be loaded.
-    invTplSaveCustom.addEventListener("click", async () => {
-      invTplSaveError.textContent = "";
-      const c = getInvoiceBuilderClient();
-      if (!c) { invTplSaveError.textContent = "No client loaded. Open a client first or save as Universal."; return; }
-      const s = invoiceTemplateEditorState;
-      const name = (s.name || "").trim() || "Custom Invoice Template";
-      const customPayload = {
-        name,
-        plan_id: s.plan_id || null,
-        line_items: s.line_items,
-        terms_html: s.terms_html,
-        saved_at: new Date().toISOString(),
-      };
-      const newInvoiceField = { ...(c.invoice || {}), custom: customPayload };
-      const { error } = await sb.from("clients").update({ invoice: newInvoiceField }).eq("id", c.id);
-      if (error) { invTplSaveError.textContent = "Save failed: " + error.message; return; }
-      const idx = allClients.findIndex((x) => x.id === c.id);
-      if (idx >= 0) allClients[idx] = { ...allClients[idx], invoice: newInvoiceField };
-      try { await addSystemNote(allClients[idx], "client", `Custom invoice template saved: ${name}`); } catch {}
-      invoiceTemplateEditorState = null;
-      closeInvTplSave();
-      renderInvoiceBuilder();
-    });
-
-    // Save as Universal -> inserts a new row into public.invoice_templates.
-    invTplSaveUniversal.addEventListener("click", async () => {
-      invTplSaveError.textContent = "";
       const s = invoiceTemplateEditorState;
       const name = (s.name || "").trim();
-      if (!name) { invTplSaveError.textContent = "Universal templates require a name."; return; }
-      const { data, error } = await sb.from("invoice_templates")
-        .insert({
-          name,
-          line_items: s.line_items,
-          terms_html: s.terms_html,
-          plan_id: s.plan_id || null,
-        })
-        .select()
-        .single();
-      if (error) { invTplSaveError.textContent = "Save failed: " + error.message; return; }
-      universalInvoiceTemplates = [...universalInvoiceTemplates, data].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-      invoiceTemplateEditorState = null;
-      closeInvTplSave();
-      renderInvoiceBuilder();
+      if (!name) {
+        alert("Enter a template name before saving.");
+        return;
+      }
+      invTplSave.disabled = true;
+      invTplStatus.textContent = "Saving to library...";
+      try {
+        const { data, error } = await sb.from("invoice_templates")
+          .insert({
+            name,
+            line_items: s.line_items,
+            terms_html: s.terms_html,
+            plan_id: s.plan_id || null,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        universalInvoiceTemplates = [...universalInvoiceTemplates, data].sort((a, b) =>
+          (a.name || "").localeCompare(b.name || ""),
+        );
+        invoiceTemplateEditorState = null;
+        invTplStatus.textContent = "Saved to template library.";
+        closeInvoiceTemplateEditor();
+        renderInvoiceBuilder();
+      } catch (err) {
+        console.error("save invoice template failed:", err);
+        const msg = err.message || String(err);
+        invTplStatus.textContent = "Save failed: " + msg;
+        alert("Save failed: " + msg);
+      } finally {
+        invTplSave.disabled = false;
+      }
     });
 
     // ============================================================
