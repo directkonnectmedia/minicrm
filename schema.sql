@@ -771,3 +771,35 @@ create or replace view public.global_plans as
   select * from public.plans;
 
 grant select on public.global_plans to authenticated;
+
+-- =============================================================
+-- One-time data cleanup: legacy static tiers → Plan Builder–ready
+-- =============================================================
+-- Targets every client whose contract_template is still one of the old
+-- fixed CRM tiers (basic_website / premium_website /
+-- premium_pocket_sekretary). Example: “Raymond” at “Test company” if
+-- he still shows “Legacy receipt (static template)”.
+--
+-- Does:
+--   1) Removes client ↔ plan links for those rows (fresh pills).
+--   2) Clears contract_template and focus_plan_id.
+--   3) Strips contract.setupOverrides / contract.monthlyOverrides only
+--      (keeps contract.company_name, contract.client_name, contract.custom).
+--
+-- Preview before running:
+--   select id, client_name, company_name, contract_template
+--   from public.clients
+--   where contract_template in ('basic_website','premium_website','premium_pocket_sekretary');
+-- =============================================================
+
+delete from public.client_plans cp
+using public.clients c
+where cp.client_id = c.id
+  and c.contract_template in ('basic_website', 'premium_website', 'premium_pocket_sekretary');
+
+update public.clients c
+set
+  contract_template = null,
+  focus_plan_id = null,
+  contract = coalesce(c.contract, '{}'::jsonb) - 'setupOverrides' - 'monthlyOverrides'
+where c.contract_template in ('basic_website', 'premium_website', 'premium_pocket_sekretary');
