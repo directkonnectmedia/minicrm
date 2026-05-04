@@ -11563,7 +11563,7 @@
             )
           ) {
             msg +=
-              " Set SUPABASE_SERVICE_ROLE_KEY on Vercel (redeploy) so /api/invoice-templates can save, or run scripts/patch-invoice-templates-rls.sql in Supabase.";
+              " Run scripts/patch-invoice-templates-rls.sql in Supabase SQL Editor (opens invoice_templates to signed-in users), or fix Vercel SUPABASE_SERVICE_ROLE_KEY + redeploy.";
           }
           throw new Error(msg);
         }

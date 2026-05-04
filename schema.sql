@@ -588,10 +588,12 @@ create table if not exists public.invoice_templates (
 
 alter table public.invoice_templates enable row level security;
 drop policy if exists "team only invoice templates" on public.invoice_templates;
-create policy "team only invoice templates"
+drop policy if exists "authenticated all invoice templates" on public.invoice_templates;
+-- Any logged-in Supabase user may CRUD (no team-role check). Tighten later if needed.
+create policy "authenticated all invoice templates"
   on public.invoice_templates for all to authenticated
-  using (public.is_team_member())
-  with check (public.is_team_member());
+  using (true)
+  with check (true);
 
 -- Browser CRM uses the anon key + signed-in JWT; ensure table privileges exist
 -- (some projects created this table before default grants were applied).

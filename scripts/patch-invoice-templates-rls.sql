@@ -1,44 +1,10 @@
 -- =============================================================================
--- Run this entire script in Supabase → SQL Editor (one shot). Safe to re-run.
--- Fixes invoice template saves blocked by RLS / missing grants / stale policies.
+-- Run in Supabase → SQL Editor (one shot). Safe to re-run.
+-- Opens public.invoice_templates to ANY signed-in user (authenticated role).
+-- No team roles / is_team_member — avoids RLS failures when saving templates.
 -- =============================================================================
 
--- 1) Team check used by RLS on invoice_templates, clients, plans, etc.
-create or replace function public.is_team_member() returns boolean
-  language sql stable
-as $$
-  select case
-    when auth.jwt() is null then false
-    else (
-      (
-        jsonb_typeof(auth.jwt() #> '{user_metadata,roles}') = 'array'
-        and exists (
-          select 1
-          from jsonb_array_elements_text(auth.jwt() #> '{user_metadata,roles}') as r(val)
-          where r.val in ('admin', 'sales', 'web_designer')
-        )
-      )
-      or (
-        jsonb_typeof(auth.jwt() #> '{user_metadata,role}') = 'string'
-        and (auth.jwt() #>> '{user_metadata,role}') in ('admin', 'sales', 'web_designer')
-      )
-      or (
-        jsonb_typeof(auth.jwt() #> '{app_metadata,roles}') = 'array'
-        and exists (
-          select 1
-          from jsonb_array_elements_text(auth.jwt() #> '{app_metadata,roles}') as r(val)
-          where r.val in ('admin', 'sales', 'web_designer')
-        )
-      )
-      or (
-        jsonb_typeof(auth.jwt() #> '{app_metadata,role}') = 'string'
-        and (auth.jwt() #>> '{app_metadata,role}') in ('admin', 'sales', 'web_designer')
-      )
-    )
-  end;
-$$;
-
--- 2) Ensure table exists (matches schema.sql; no-op if already there)
+-- 1) Ensure table exists
 create table if not exists public.invoice_templates (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -53,7 +19,7 @@ alter table public.invoice_templates enable row level security;
 alter table public.invoice_templates
   add column if not exists plan_id uuid references public.plans(id) on delete set null;
 
--- 3) Drop ALL policies on invoice_templates (clears duplicates / old names)
+-- 2) Drop ALL policies on invoice_templates
 do $$
 declare
   pol text;
@@ -68,11 +34,10 @@ begin
   end loop;
 end $$;
 
--- 4) Single canonical policy: team-only CRUD for authenticated sessions
-create policy "team only invoice templates"
+-- 3) Open table to every authenticated session (logged-in CRM user)
+create policy "authenticated all invoice templates"
   on public.invoice_templates for all to authenticated
-  using (public.is_team_member())
-  with check (public.is_team_member());
+  using (true)
+  with check (true);
 
--- 5) Table privileges for the Supabase "authenticated" role
 grant select, insert, update, delete on table public.invoice_templates to authenticated;

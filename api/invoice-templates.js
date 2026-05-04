@@ -1,9 +1,9 @@
 /**
- * GET  /api/invoice-templates  -> { rows: [...] }  (service role list)
- * POST /api/invoice-templates  -> { ok, row }      (service role insert)
+ * GET  /api/invoice-templates  -> { rows: [...] }
+ * POST /api/invoice-templates  -> { ok, row }
  *
- * Both require Authorization: Bearer <supabase_user_access_token> and a team
- * role on the user (admin, sales, web_designer in user_metadata or app_metadata).
+ * Requires a valid Supabase user JWT only (no admin/team role checks).
+ * Uses service role to read/write Postgres (bypasses RLS on the server).
  *
  * Env: SUPABASE_SERVICE_ROLE_KEY (required), SUPABASE_URL (optional)
  */
@@ -11,27 +11,6 @@
 const SUPABASE_URL =
   process.env.SUPABASE_URL || "https://ljghuyeugzmduzzvngkc.supabase.co";
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-const TEAM_ROLES = new Set(["admin", "sales", "web_designer"]);
-
-function readRoles(u) {
-  if (!u) return [];
-  const collect = (meta) => {
-    if (!meta || typeof meta !== "object") return [];
-    if (Array.isArray(meta.roles)) {
-      return meta.roles.filter((r) => typeof r === "string");
-    }
-    if (typeof meta.role === "string" && meta.role) {
-      return [meta.role];
-    }
-    return [];
-  };
-  return [...new Set([...collect(u.user_metadata), ...collect(u.app_metadata)])];
-}
-
-function isTeamMember(caller) {
-  return readRoles(caller).some((r) => TEAM_ROLES.has(r));
-}
 
 async function readJson(res) {
   const text = await res.text();
@@ -60,11 +39,8 @@ const restHeaders = () => ({
   Accept: "application/json",
 });
 
-/**
- * Validates Bearer JWT and team membership. Sends error response on failure.
- * @returns {Promise<boolean>} true if authorized
- */
-async function requireTeamJwtOrRespond(req, res) {
+/** Valid signed-in Supabase user only. */
+async function requireSessionJwtOrRespond(req, res) {
   const authHeader = req.headers.authorization || req.headers.Authorization;
   if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
     res.status(401).json({ error: "missing bearer token" });
@@ -81,13 +57,6 @@ async function requireTeamJwtOrRespond(req, res) {
     res.status(401).json({ error: "invalid or expired session" });
     return false;
   }
-  if (!isTeamMember(caller)) {
-    res.status(403).json({
-      error:
-        "team role required: set user_metadata.roles to include admin, sales, or web_designer for this user in Supabase Auth",
-    });
-    return false;
-  }
   return true;
 }
 
@@ -99,7 +68,7 @@ export default async function handler(req, res) {
     });
   }
 
-  const authorized = await requireTeamJwtOrRespond(req, res);
+  const authorized = await requireSessionJwtOrRespond(req, res);
   if (!authorized) return;
 
   if (req.method === "GET") {
