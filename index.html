@@ -3094,8 +3094,9 @@
           <button type="button" class="ghost inv-add-row" id="invAddLineItem">+ Add line item</button>
 
           <div class="inv-totals-display" style="margin-top: 18px;">
-            <div><span>Subtotal:</span> <strong id="invSubtotalDisplay">$0.00</strong></div>
-            <div><span>Balance Due:</span> <strong id="invBalanceDueDisplay">$0.00</strong></div>
+            <div><span>Subtotal Due Today:</span> <strong id="invDueTodaySubtotalDisplay">$0.00</strong></div>
+            <div><span>Subtotal Balance Due:</span> <strong id="invBalanceDueSubtotalDisplay">$0.00</strong></div>
+            <div><span>Total invoice:</span> <strong id="invInvoiceGrandDisplay">$0.00</strong></div>
             <div class="muted"><span>Balance After This Payment:</span> <strong id="invBalanceAfterDisplay">$0.00</strong></div>
           </div>
         </section>
@@ -4575,6 +4576,26 @@
       "PAID":        "#15803D",
     };
     const INVOICE_PILL_OPTIONS = ["DUE TODAY", "BALANCE DUE", "OVERDUE", "PAID"];
+
+    /** Sum line amounts by status pill (Due Today vs Balance Due bucket vs other). */
+    function invoiceAmountTotalsByStatusPill(line_items) {
+      let dueToday = 0;
+      let balanceDue = 0;
+      let other = 0;
+      for (const l of line_items || []) {
+        const amt = Number(l.amount) || 0;
+        const pill = String(l.status_pill || "").trim().toUpperCase();
+        if (pill === "DUE TODAY") dueToday += amt;
+        else if (pill === "BALANCE DUE" || pill === "OVERDUE") balanceDue += amt;
+        else other += amt;
+      }
+      return {
+        dueToday,
+        balanceDuePill: balanceDue,
+        other,
+        grand: dueToday + balanceDue + other,
+      };
+    }
 
     // ---- Helpers ----
     const esc = (s) => (s ?? "").toString().replace(/[&<>"']/g, (c) => (
@@ -6105,7 +6126,11 @@
           <td style="padding:8px 10px;border-bottom:1px solid #f3f4f6;text-align:right;color:#111827;">${fmtMoney(li.amount || 0)}</td>
         </tr>
       `).join("");
-      const total = (it.line_items || []).reduce((a, l) => a + (Number(l.amount) || 0), 0);
+      const pt = invoiceAmountTotalsByStatusPill(it.line_items || []);
+      const otherFoot =
+        pt.other !== 0
+          ? `<tr><td colspan="2" style="padding:8px 10px;text-align:right;font-weight:600;color:#374151;">Other lines</td><td style="padding:8px 10px;text-align:right;font-weight:600;color:#374151;">${fmtMoney(pt.other)}</td></tr>`
+          : "";
       el.innerHTML = `
         <div class="cb-middle-header">
           <div class="cb-middle-name">${esc(it.name || "(untitled)")}</div>
@@ -6124,7 +6149,10 @@
             </thead>
             <tbody>${lineRows || `<tr><td colspan="3" style="padding:12px;color:#6b7280;text-align:center;">(empty template)</td></tr>`}</tbody>
             <tfoot>
-              <tr><td colspan="2" style="padding:10px;text-align:right;font-weight:700;color:#0B5394;">Subtotal</td><td style="padding:10px;text-align:right;font-weight:700;color:#0B5394;">${fmtMoney(total)}</td></tr>
+              <tr><td colspan="2" style="padding:10px;text-align:right;font-weight:700;color:#B45309;">Subtotal Due Today</td><td style="padding:10px;text-align:right;font-weight:700;color:#B45309;">${fmtMoney(pt.dueToday)}</td></tr>
+              <tr><td colspan="2" style="padding:10px;text-align:right;font-weight:700;color:#0B5394;">Subtotal Balance Due</td><td style="padding:10px;text-align:right;font-weight:700;color:#0B5394;">${fmtMoney(pt.balanceDuePill)}</td></tr>
+              ${otherFoot}
+              <tr><td colspan="2" style="padding:10px;text-align:right;font-weight:700;color:#111827;border-top:1px solid #e5e7eb;">Total invoice</td><td style="padding:10px;text-align:right;font-weight:700;color:#111827;border-top:1px solid #e5e7eb;">${fmtMoney(pt.grand)}</td></tr>
             </tfoot>
           </table>
           <div class="inv-section-title" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#0B5394;margin:18px 0 8px;">Terms</div>
@@ -10353,9 +10381,10 @@
     const invWizTierMeta            = document.getElementById("invWizTierMeta");
     const invLineItemsBody          = document.getElementById("invLineItemsBody");
     const invAddLineItem            = document.getElementById("invAddLineItem");
-    const invSubtotalDisplay        = document.getElementById("invSubtotalDisplay");
-    const invBalanceDueDisplay      = document.getElementById("invBalanceDueDisplay");
-    const invBalanceAfterDisplay    = document.getElementById("invBalanceAfterDisplay");
+    const invDueTodaySubtotalDisplay   = document.getElementById("invDueTodaySubtotalDisplay");
+    const invBalanceDueSubtotalDisplay = document.getElementById("invBalanceDueSubtotalDisplay");
+    const invInvoiceGrandDisplay       = document.getElementById("invInvoiceGrandDisplay");
+    const invBalanceAfterDisplay       = document.getElementById("invBalanceAfterDisplay");
 
     // Step 2 inputs
     const invBilledTo               = document.getElementById("invBilledTo");
@@ -10536,19 +10565,14 @@
       `).join("");
     }
 
-    // Math fix: "Due on this invoice" = sum of DUE TODAY rows only.
-    // Subtotal = sum of all line items; balance due = subtotal (no historical
-    // payment is captured in v1.5; Stripe webhook will populate paid_at later).
+    // Math: split subtotals by status pill; grand total = all lines; balance after paying "due today" rows.
     function recomputeInvoiceTotals() {
-      const subtotal = invoiceEditorState.line_items.reduce((a, l) => a + (Number(l.amount) || 0), 0);
-      const dueToday = invoiceEditorState.line_items
-        .filter((l) => (l.status_pill || "").toUpperCase() === "DUE TODAY")
-        .reduce((a, l) => a + (Number(l.amount) || 0), 0);
-      const balanceDue = subtotal;
-      const balanceAfter = Math.max(0, balanceDue - dueToday);
-      invSubtotalDisplay.textContent = fmtMoney(subtotal);
-      invBalanceDueDisplay.textContent = fmtMoney(balanceDue);
-      invBalanceAfterDisplay.textContent = fmtMoney(balanceAfter);
+      const pt = invoiceAmountTotalsByStatusPill(invoiceEditorState.line_items);
+      const balanceAfter = Math.max(0, pt.grand - pt.dueToday);
+      if (invDueTodaySubtotalDisplay) invDueTodaySubtotalDisplay.textContent = fmtMoney(pt.dueToday);
+      if (invBalanceDueSubtotalDisplay) invBalanceDueSubtotalDisplay.textContent = fmtMoney(pt.balanceDuePill);
+      if (invInvoiceGrandDisplay) invInvoiceGrandDisplay.textContent = fmtMoney(pt.grand);
+      if (invBalanceAfterDisplay) invBalanceAfterDisplay.textContent = fmtMoney(balanceAfter);
     }
 
     // Editor input wiring (delegated)
@@ -10623,10 +10647,7 @@
     // the "paid" branch is reached only when toggling a saved invoice.
     function invoicePreviewDataFromState(extra) {
       const s = invoiceEditorState;
-      const subtotal = s.line_items.reduce((a, l) => a + (Number(l.amount) || 0), 0);
-      const dueToday = s.line_items
-        .filter((l) => (l.status_pill || "").toUpperCase() === "DUE TODAY")
-        .reduce((a, l) => a + (Number(l.amount) || 0), 0);
+      const pt = invoiceAmountTotalsByStatusPill(s.line_items);
       return Object.assign({
         receipt_no: (extra && extra.receipt_no) || "DCL-pending",
         issued_at: s.issued_at,
@@ -10637,9 +10658,12 @@
         terms_html: s.terms_html,
         stripe_payment_link: s.stripe_payment_link || "",
         amount_paid: 0,
-        subtotal,
-        balance_due: subtotal,
-        balance_after: Math.max(0, subtotal - dueToday),
+        subtotal: pt.grand,
+        subtotal_due_today: pt.dueToday,
+        subtotal_balance_due_pill: pt.balanceDuePill,
+        subtotal_other: pt.other,
+        balance_due: pt.grand,
+        balance_after: Math.max(0, pt.grand - pt.dueToday),
         status: "due",
       }, extra || {});
     }
@@ -10712,16 +10736,23 @@
           </div>`;
       }
 
-      // Totals stack: paid invoices show only Subtotal + Total Paid;
-      // due invoices show Subtotal + Balance Due + Due-on-this-invoice helper.
+      const pillTotals = invoiceAmountTotalsByStatusPill(d.line_items || []);
+      const otherTotalsRow =
+        pillTotals.other !== 0
+          ? `<tr><td style="padding:6px 0;color:${dark};font-size:14px;">Other lines</td><td style="padding:6px 0;text-align:right;color:${dark};font-size:14px;">${fmtMoney(pillTotals.other)}</td></tr>`
+          : "";
+
+      // Totals stack: paid = compact receipt; due = split by status pill + total + balance after paying Due Today rows.
       const totalsRows = isPaid
         ? `
           <tr><td style="padding:6px 0;color:${dark};font-size:14px;">Subtotal</td><td style="padding:6px 0;text-align:right;color:${dark};font-size:14px;">${fmtMoney(d.subtotal)}</td></tr>
           <tr><td style="padding:10px 0 6px;border-top:2px solid #15803D;font-weight:700;color:#15803D;font-size:18px;">Total Paid</td><td style="padding:10px 0 6px;border-top:2px solid #15803D;text-align:right;font-weight:700;color:#15803D;font-size:18px;">${fmtMoney(d.subtotal)}</td></tr>`
         : `
-          <tr><td style="padding:6px 0;color:${dark};font-size:14px;">Subtotal</td><td style="padding:6px 0;text-align:right;color:${dark};font-size:14px;">${fmtMoney(d.subtotal)}</td></tr>
-          <tr><td style="padding:10px 0 6px;border-top:2px solid ${blue};font-weight:700;color:${blue};font-size:18px;">Balance Due</td><td style="padding:10px 0 6px;border-top:2px solid ${blue};text-align:right;font-weight:700;color:${blue};font-size:18px;">${fmtMoney(d.balance_due)}</td></tr>
-          <tr><td style="padding:6px 0;color:${dark};font-size:13px;">Balance After This Payment</td><td style="padding:6px 0;text-align:right;color:${dark};font-size:13px;">${fmtMoney(d.balance_after || 0)}</td></tr>`;
+          <tr><td style="padding:6px 0;color:${dark};font-size:14px;">Subtotal Due Today</td><td style="padding:6px 0;text-align:right;color:#B45309;font-size:14px;font-weight:600;">${fmtMoney(pillTotals.dueToday)}</td></tr>
+          <tr><td style="padding:6px 0;color:${dark};font-size:14px;">Subtotal Balance Due</td><td style="padding:6px 0;text-align:right;color:${blue};font-size:14px;font-weight:600;">${fmtMoney(pillTotals.balanceDuePill)}</td></tr>
+          ${otherTotalsRow}
+          <tr><td style="padding:10px 0 6px;border-top:2px solid ${blue};font-weight:700;color:${blue};font-size:18px;">Total</td><td style="padding:10px 0 6px;border-top:2px solid ${blue};text-align:right;font-weight:700;color:${blue};font-size:18px;">${fmtMoney(pillTotals.grand)}</td></tr>
+          <tr><td style="padding:6px 0;color:${dark};font-size:13px;">Balance After This Payment</td><td style="padding:6px 0;text-align:right;color:${dark};font-size:13px;">${fmtMoney(Math.max(0, pillTotals.grand - pillTotals.dueToday))}</td></tr>`;
 
       // Header row: black logo box on the left (initials placeholder) + company info on the right.
       // No external image dependency to keep the saved HTML self-contained.
