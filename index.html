@@ -12584,10 +12584,9 @@
         if (!session?.dispatcherPhases?.length) return;
         if (session.dispatcherPhaseIndex > 0) {
           session.dispatcherPhaseIndex -= 1;
-          const prevPhase = session.dispatcherPhases[session.dispatcherPhaseIndex];
-          const key = dispatcherPhaseToStartDateKey(prevPhase);
-          if (key) session.startDates[key] = null;
-          session.dispatcherPendingIso = null;
+          const landPhase = session.dispatcherPhases[session.dispatcherPhaseIndex];
+          const key = dispatcherPhaseToStartDateKey(landPhase);
+          session.dispatcherPendingIso = key ? session.startDates[key] : null;
           session.dispatcherCalYM = null;
           renderDispatcherDateStage();
           return;
