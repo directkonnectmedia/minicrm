@@ -714,6 +714,36 @@
       margin-bottom: 12px;
     }
     .cb-new-tmpl-btn:hover { background: #1f2937; }
+    .cb-new-tmpl-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .cb-new-tmpl-btn:disabled:hover { background: #111827; }
+
+    .crm-ib-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #111827;
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      max-width: min(420px, calc(100vw - 32px));
+      text-align: center;
+      z-index: 2000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+    }
+    .crm-ib-toast.crm-ib-toast-visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
     .cb-tmpl-list { display: flex; flex-direction: column; gap: 14px; }
     .cb-tmpl-section-title {
       font-size: 11px; font-weight: 700; text-transform: uppercase;
@@ -5850,6 +5880,24 @@
       return invoiceBuilderClientId ? allClients.find((c) => c.id === invoiceBuilderClientId) : null;
     }
 
+    let invoiceBuilderToastTimer = null;
+    function showInvoiceBuilderPlaceholderToast(message) {
+      let el = document.getElementById("invoiceBuilderToast");
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "invoiceBuilderToast";
+        el.className = "crm-ib-toast";
+        el.setAttribute("role", "status");
+        document.body.appendChild(el);
+      }
+      el.textContent = message;
+      el.classList.add("crm-ib-toast-visible");
+      clearTimeout(invoiceBuilderToastTimer);
+      invoiceBuilderToastTimer = setTimeout(() => {
+        el.classList.remove("crm-ib-toast-visible");
+      }, 3400);
+    }
+
     async function loadUniversalTemplates() {
       const { data, error } = await sb.from("contract_text_templates").select("*").order("created_at", { ascending: true });
       if (error) {
@@ -6091,8 +6139,9 @@
 
       el.innerHTML = `
         ${clientCard}
-        <button class="cb-new-tmpl-btn" data-ib-action="new-invoice-template">+ New Invoice Template</button>
-        <button class="cb-new-tmpl-btn" data-ib-action="new-quick-invoice">+ Quick Invoice (no template)</button>
+        <button type="button" class="cb-new-tmpl-btn" data-ib-action="new-invoice-template">+ New Invoice Template</button>
+        <button type="button" class="cb-new-tmpl-btn" data-ib-action="new-quick-invoice">+ Quick Invoice (no template)</button>
+        <button type="button" class="cb-new-tmpl-btn" data-ib-action="create-invoice-plan-customer" data-client-id="${c ? esc(c.id) : ""}" ${c ? "" : "disabled"} title="${c ? "Coming soon: link a Plan Builder template to this customer for invoicing." : "Open a client profile and use Save & go to Invoice Builder first."}">Create Invoice Plan for this Customer</button>
         <div class="cb-tmpl-list">
           ${invoiceCustomSection}
           ${invoiceUniversalSection}
@@ -6108,7 +6157,7 @@
         el.innerHTML = `
           <div class="cb-middle-empty">
             <div class="cb-middle-empty-title">Nothing selected</div>
-            <div class="cb-middle-empty-sub">Pick an invoice template from the left, or click "+ New Invoice Template" / "+ Quick Invoice".</div>
+            <div class="cb-middle-empty-sub">Pick an invoice template from the left, or use one of the actions above (templates, quick invoice, or customer invoice plan).</div>
           </div>`;
         return;
       }
@@ -11249,6 +11298,16 @@
         openInvoiceTemplateEditor();
       } else if (action === "new-quick-invoice") {
         openInvoiceEditor();
+      } else if (action === "create-invoice-plan-customer") {
+        if (btn.disabled) return;
+        const c = getInvoiceBuilderClient();
+        const clientId = (btn.getAttribute("data-client-id") || (c && c.id) || "").trim() || null;
+        console.log("[Invoice Builder] Create Invoice Plan for this Customer — client_id:", clientId);
+        if (!clientId) {
+          showInvoiceBuilderPlaceholderToast("Open a client profile first, then use Save & go to Invoice Builder.");
+          return;
+        }
+        showInvoiceBuilderPlaceholderToast("Feature coming soon: invoice plans linked to this customer.");
       } else if (action === "open-invoice") {
         const id = btn.dataset.id;
         const row = clientInvoices.find((r) => String(r.id) === String(id));
