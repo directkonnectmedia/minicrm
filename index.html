@@ -123,9 +123,31 @@
     }
 
     /* Calendar */
-    #calendar { min-height: 600px; }
+    #calendar,
+    #invoiceCalendar { min-height: 600px; }
     .fc .fc-toolbar-title { font-size: 1.2em !important; }
     .fc-event { cursor: pointer; }
+
+    .calendar-subtabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .calendar-subtab {
+      background: transparent;
+      color: #6b7280;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 8px 14px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 0;
+      font-family: inherit;
+    }
+    .calendar-subtab:hover { background: #f3f4f6; color: #1f2937; }
+    .calendar-subtab.active { color: #111827; border-bottom-color: #111827; }
 
     .fup-type-tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; margin-left: 6px; }
     .fup-type-Followup    { background: #dbeafe; color: #1e40af; }
@@ -2800,7 +2822,16 @@
 
   <div class="tab-content" data-view="calendar">
     <div class="card">
-      <div id="calendar"></div>
+      <div class="calendar-subtabs" role="tablist" aria-label="Calendar views">
+        <button type="button" class="calendar-subtab active" data-cal-sub="regular" role="tab" aria-selected="true">Calendar</button>
+        <button type="button" class="calendar-subtab" data-cal-sub="invoice" role="tab" aria-selected="false">Invoice Calendar</button>
+      </div>
+      <div id="calendarPaneRegular" data-cal-pane="regular">
+        <div id="calendar"></div>
+      </div>
+      <div id="calendarPaneInvoice" data-cal-pane="invoice" hidden>
+        <div id="invoiceCalendar"></div>
+      </div>
     </div>
   </div>
 
@@ -11888,13 +11919,63 @@
 
     // ---------- Tabs (List/Calendar) + Calendar ----------
     let calendarInstance = null;
+    let invoiceCalendarInstance = null;
+    /** Which calendar sub-view is active when main Calendar tab is shown. */
+    let calendarSubTab = "regular";
+
+    function switchCalendarSubTab(sub) {
+      if (sub !== "regular" && sub !== "invoice") return;
+      calendarSubTab = sub;
+      const root = document.querySelector('.tab-content[data-view="calendar"]');
+      if (!root) return;
+      root.querySelectorAll("[data-cal-sub]").forEach((b) => {
+        const on = b.dataset.calSub === sub;
+        b.classList.toggle("active", on);
+        b.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      const reg = document.getElementById("calendarPaneRegular");
+      const inv = document.getElementById("calendarPaneInvoice");
+      if (reg) reg.hidden = sub !== "regular";
+      if (inv) inv.hidden = sub !== "invoice";
+      setTimeout(() => {
+        if (sub === "regular" && calendarInstance) calendarInstance.updateSize();
+        if (sub === "invoice") {
+          initInvoiceCalendar();
+          if (invoiceCalendarInstance) invoiceCalendarInstance.updateSize();
+        }
+      }, 50);
+    }
+
+    function initInvoiceCalendar() {
+      if (invoiceCalendarInstance) return;
+      const el = document.getElementById("invoiceCalendar");
+      if (!el) return;
+      invoiceCalendarInstance = new FullCalendar.Calendar(el, {
+        initialView: "dayGridMonth",
+        headerToolbar: {
+          left: "prev,next today",
+          center: "title",
+          right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+        },
+        height: "auto",
+        events: [],
+      });
+      invoiceCalendarInstance.render();
+    }
 
     function switchTab(name) {
       document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.view === name));
       document.querySelectorAll(".tab-content").forEach((t) => t.classList.toggle("active", t.dataset.view === name));
       if (name === "calendar") {
         initCalendar();
-        setTimeout(() => { if (calendarInstance) calendarInstance.updateSize(); }, 50);
+        switchCalendarSubTab(calendarSubTab);
+        setTimeout(() => {
+          if (calendarSubTab === "regular" && calendarInstance) calendarInstance.updateSize();
+          if (calendarSubTab === "invoice") {
+            initInvoiceCalendar();
+            if (invoiceCalendarInstance) invoiceCalendarInstance.updateSize();
+          }
+        }, 50);
       }
       if (name === "contract_builder") {
         renderContractBuilder();
@@ -11950,6 +12031,15 @@
 
     // ---------- Wire up ----------
     document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => switchTab(t.dataset.view)));
+
+    const calendarTabRoot = document.querySelector('.tab-content[data-view="calendar"]');
+    if (calendarTabRoot) {
+      calendarTabRoot.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-cal-sub]");
+        if (!btn || !calendarTabRoot.contains(btn)) return;
+        switchCalendarSubTab(btn.dataset.calSub);
+      });
+    }
 
     document.getElementById("openWizard").addEventListener("click", openWizard);
     document.getElementById("closeWizard").addEventListener("click", closeWizard);
