@@ -6928,16 +6928,17 @@
     }
 
     /**
-     * Summarize invoice template line_items for the diagnostic wizard (heuristic labels from descriptions).
+     * Summarize invoice template line_items for the diagnostic wizard:
+     * — Blue: non-recurring amounts marked Due Today (current / next charge).
+     * — Yellow: non-recurring remaining balance (Balance Due / Overdue).
+     * — Red: subscription rows (description Recurring), unchanged cadence logic.
      */
     function extractInvoiceTemplateDiagnosticFacts(line_items) {
-      let downPaymentTotal = 0;
-      let lumpSetupTotal = 0;
-      let financingTotal = 0;
+      let dueNowTotal = 0;
+      let balanceRemainingTotal = 0;
       const subscriptions = [];
       for (const li of line_items || []) {
         const desc = String(li.description || "");
-        const dLower = desc.toLowerCase();
         const amt = Number(li.amount) || 0;
         if (/recurring/i.test(desc)) {
           subscriptions.push({
@@ -6946,20 +6947,16 @@
           });
           continue;
         }
-        if (/installment/i.test(dLower)) {
-          financingTotal += amt;
+        const pill = String(li.status_pill || "").trim().toUpperCase();
+        if (pill === "DUE TODAY") {
+          dueNowTotal += amt;
           continue;
         }
-        if (/down payment/i.test(dLower)) {
-          downPaymentTotal += amt;
-          continue;
-        }
-        if (/setup/i.test(dLower) && !/installment/i.test(dLower)) {
-          lumpSetupTotal += amt;
-          continue;
+        if (pill === "BALANCE DUE" || pill === "OVERDUE") {
+          balanceRemainingTotal += amt;
         }
       }
-      return { downPaymentTotal, lumpSetupTotal, financingTotal, subscriptions };
+      return { dueNowTotal, balanceRemainingTotal, subscriptions };
     }
 
     function subscriptionBillingFrequencyPhrase(slug) {
@@ -10634,15 +10631,16 @@
     function buildInvoiceDiagnosticHumanSentences(clientDisplayName, facts) {
       const name = (clientDisplayName || "").trim() || "This customer";
       const blue = [];
-      if (facts.downPaymentTotal > 0) {
-        blue.push(`${name} will pay ${fmtMoney(facts.downPaymentTotal)} as a one-time down payment.`);
-      }
-      if (facts.lumpSetupTotal > 0) {
-        blue.push(`${name} will pay ${fmtMoney(facts.lumpSetupTotal)} as a one-time setup payment.`);
+      if (facts.dueNowTotal > 0) {
+        blue.push(
+          `${name} will pay ${fmtMoney(facts.dueNowTotal)} for what's due now — non-recurring lines marked Due Today (e.g. deposit or the installment billed next).`,
+        );
       }
       const yellow = [];
-      if (facts.financingTotal > 0) {
-        yellow.push(`${name} will pay ${fmtMoney(facts.financingTotal)} in financed installments for the setup fee.`);
+      if (facts.balanceRemainingTotal > 0) {
+        yellow.push(
+          `${name} still owes ${fmtMoney(facts.balanceRemainingTotal)} on setup and financing — the remaining balance on lines marked Balance Due or Overdue (excluding subscription).`,
+        );
       }
       const red = [];
       for (const sub of facts.subscriptions || []) {
@@ -11448,8 +11446,8 @@
         return `<div class="inv-diag-box ${cls}"><div class="inv-diag-box-title">${esc(title)}</div>${inner}</div>`;
       };
       g.innerHTML = [
-        box("inv-diag-blue", "One-time", sentences.blue),
-        box("inv-diag-yellow", "Financing", sentences.yellow),
+        box("inv-diag-blue", "Due now (next non-recurring charge)", sentences.blue),
+        box("inv-diag-yellow", "Remaining balance (setup & financing)", sentences.yellow),
         box("inv-diag-red", "Subscription", sentences.red),
       ].join("");
     }
@@ -11485,9 +11483,9 @@
       };
       push(`Connecting profile for ${clientName}...`);
       await delay(420);
-      push("Identifying one-time fees...");
+      push("Scanning non-recurring charges due now (Due Today)...");
       await delay(420);
-      push("Analyzing installment schedules...");
+      push("Mapping remaining setup & financing balances (Balance Due / Overdue)...");
       await delay(420);
       push("Extracting recurring cycles...");
       await delay(480);
