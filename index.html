@@ -761,6 +761,51 @@
       transition: opacity 0.22s ease, transform 0.22s ease;
       box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
     }
+    /* Invoice plan diagnostic wizard (3-stage) */
+    .inv-diag-body { padding: 0 20px 20px; max-height: min(78vh, 640px); overflow-y: auto; }
+    .inv-diag-context { font-size: 14px; margin: 0 0 14px; }
+    .inv-diag-template-list {
+      display: flex; flex-direction: column; gap: 8px;
+      margin-bottom: 16px; max-height: 280px; overflow-y: auto;
+    }
+    .inv-diag-tpl-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 10px;
+      cursor: pointer; font-size: 14px; color: #111827;
+      transition: background 120ms, border-color 120ms;
+    }
+    .inv-diag-tpl-row:hover { background: #f9fafb; border-color: #d1d5db; }
+    .inv-diag-tpl-row:has(input:checked) {
+      border-color: #4f46e5; background: #eef2ff;
+    }
+    .inv-diag-tpl-row input { margin-top: 3px; accent-color: #4f46e5; }
+    .inv-diag-tpl-meta { font-size: 12px; color: #6b7280; margin-top: 4px; }
+    .inv-diag-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 8px; }
+    .inv-diag-stage-label { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #6b7280; margin: 0 0 10px; }
+    .inv-diag-feed { list-style: none; margin: 0; padding: 0; }
+    .inv-diag-feed li {
+      padding: 10px 12px; margin-bottom: 8px; border-radius: 8px;
+      background: #f3f4f6; font-size: 14px; color: #111827;
+      border-left: 4px solid #6366f1;
+      animation: inv-diag-feed-in 0.35s ease-out;
+    }
+    @keyframes inv-diag-feed-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .inv-diag-gallery { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+    .inv-diag-box {
+      padding: 14px 16px; border-radius: 10px; font-size: 15px; line-height: 1.5;
+      border: 1px solid transparent;
+    }
+    .inv-diag-box-title { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 8px; opacity: 0.85; }
+    .inv-diag-box p { margin: 0 0 8px; }
+    .inv-diag-box p:last-child { margin-bottom: 0; }
+    .inv-diag-blue { background: #dbeafe; border-color: #3b82f6; color: #1e3a8a; }
+    .inv-diag-yellow { background: #fef9c3; border-color: #eab308; color: #713f12; }
+    .inv-diag-red { background: #fee2e2; border-color: #ef4444; color: #7f1d1d; }
+    .inv-diag-empty-note { font-size: 13px; color: #6b7280; font-style: italic; }
+
     .crm-ib-toast.crm-ib-toast-visible {
       opacity: 1;
       transform: translateX(-50%) translateY(0);
@@ -3236,6 +3281,39 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="ghost" id="invoiceTemplatePlanPickCancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invoice plan diagnostic wizard (template scan → human-readable verification) -->
+  <div class="overlay" id="invoiceDiagnosticWizardOverlay">
+    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="invoiceDiagnosticWizardTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="invoiceDiagnosticWizardTitle">Invoice plan diagnostic</div>
+        <button type="button" class="modal-close" id="invoiceDiagnosticWizardClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="inv-diag-body">
+        <section data-inv-diag-step="1">
+          <p class="invoice-wiz-hint" style="margin-top:0;">Select an invoice template to analyze. The wizard scans line items and shows how the system interprets charges for this customer.</p>
+          <p class="inv-diag-context muted" id="invDiagClientLine"></p>
+          <div id="invDiagTemplateList" class="inv-diag-template-list"></div>
+          <div id="invDiagNoTemplates" class="inv-diag-empty-note" hidden>No invoice templates available yet. Create a universal template or a custom template for this client first.</div>
+          <div class="inv-diag-actions">
+            <button type="button" class="ghost" id="invDiagCancel">Cancel</button>
+            <button type="button" id="invDiagAnalyze" disabled>Analyze Template</button>
+          </div>
+        </section>
+        <section data-inv-diag-step="2" hidden>
+          <p class="inv-diag-stage-label">Logic engine</p>
+          <ul id="invDiagFeed" class="inv-diag-feed" aria-live="polite"></ul>
+        </section>
+        <section data-inv-diag-step="3" hidden>
+          <p class="inv-diag-stage-label">Human-form verification</p>
+          <div id="invDiagGallery" class="inv-diag-gallery"></div>
+          <div class="inv-diag-actions">
+            <button type="button" id="invDiagCloseFinal">Close</button>
+          </div>
+        </section>
       </div>
     </div>
   </div>
@@ -6172,7 +6250,7 @@
         ${clientCard}
         <button type="button" class="cb-new-tmpl-btn" data-ib-action="new-invoice-template">+ New Invoice Template</button>
         <button type="button" class="cb-new-tmpl-btn" data-ib-action="new-quick-invoice">+ Quick Invoice (no template)</button>
-        <button type="button" class="cb-new-tmpl-btn" data-ib-action="create-invoice-plan-customer" data-client-id="${c ? esc(c.id) : ""}" ${c ? "" : "disabled"} title="${c ? "Coming soon: link a Plan Builder template to this customer for invoicing." : "Open a client profile and use Save & go to Invoice Builder first."}">Create Invoice Plan for this Customer</button>
+        <button type="button" class="cb-new-tmpl-btn" data-ib-action="create-invoice-plan-customer" data-client-id="${c ? esc(c.id) : ""}" data-client-name="${c ? esc(c.client_name || c.company_name || "") : ""}" ${c ? "" : "disabled"} title="${c ? "Run the 3-stage diagnostic on an invoice template for this customer." : "Open a client profile and use Save & go to Invoice Builder first."}">Create Invoice Plan for this Customer</button>
         <div class="cb-tmpl-list">
           ${invoiceCustomSection}
           ${invoiceUniversalSection}
@@ -6824,6 +6902,64 @@
 
     function subscriptionFrequencyFriendlyLabel(slug) {
       return SETUP_FINANCE_FREQUENCIES.find((r) => r[0] === slug)?.[1] || "Monthly";
+    }
+
+    /** Infer billing cadence slug from stored invoice line subtitle (template rows). */
+    function extractFrequencySlugFromInvoiceSubtitle(subtitle) {
+      const s = String(subtitle || "");
+      for (const [slug, label] of SETUP_FINANCE_FREQUENCIES) {
+        if (s.includes(label)) return slug;
+      }
+      const m = s.match(/\/\s*([\w\s]+)\s*$/);
+      if (m) {
+        const tail = m[1].trim();
+        const hit = SETUP_FINANCE_FREQUENCIES.find(([, lab]) => tail === lab || tail.startsWith(lab));
+        if (hit) return hit[0];
+      }
+      const low = s.toLowerCase();
+      if (low.includes("per month") || low.includes("every month")) return "monthly";
+      if (low.includes("per week") || low.includes("every week")) return "weekly";
+      if (low.includes("two weeks") || low.includes("bi-week")) return "biweekly";
+      if (low.includes("per day")) return "daily";
+      if (low.includes("per year") || low.includes("every year")) return "yearly";
+      if (low.includes("3 months")) return "every_3_months";
+      if (low.includes("6 months")) return "every_6_months";
+      return "monthly";
+    }
+
+    /**
+     * Summarize invoice template line_items for the diagnostic wizard (heuristic labels from descriptions).
+     */
+    function extractInvoiceTemplateDiagnosticFacts(line_items) {
+      let downPaymentTotal = 0;
+      let lumpSetupTotal = 0;
+      let financingTotal = 0;
+      const subscriptions = [];
+      for (const li of line_items || []) {
+        const desc = String(li.description || "");
+        const dLower = desc.toLowerCase();
+        const amt = Number(li.amount) || 0;
+        if (/recurring/i.test(desc)) {
+          subscriptions.push({
+            amount: amt,
+            slug: extractFrequencySlugFromInvoiceSubtitle(li.subtitle || ""),
+          });
+          continue;
+        }
+        if (/installment/i.test(dLower)) {
+          financingTotal += amt;
+          continue;
+        }
+        if (/down payment/i.test(dLower)) {
+          downPaymentTotal += amt;
+          continue;
+        }
+        if (/setup/i.test(dLower) && !/installment/i.test(dLower)) {
+          lumpSetupTotal += amt;
+          continue;
+        }
+      }
+      return { downPaymentTotal, lumpSetupTotal, financingTotal, subscriptions };
     }
 
     function subscriptionBillingFrequencyPhrase(slug) {
@@ -10494,6 +10630,30 @@
       return "$" + v.toFixed(2);
     }
 
+    /** Build human-readable verification sentences for invoice diagnostic stage 3. */
+    function buildInvoiceDiagnosticHumanSentences(clientDisplayName, facts) {
+      const name = (clientDisplayName || "").trim() || "This customer";
+      const blue = [];
+      if (facts.downPaymentTotal > 0) {
+        blue.push(`${name} will pay ${fmtMoney(facts.downPaymentTotal)} as a one-time down payment.`);
+      }
+      if (facts.lumpSetupTotal > 0) {
+        blue.push(`${name} will pay ${fmtMoney(facts.lumpSetupTotal)} as a one-time setup payment.`);
+      }
+      const yellow = [];
+      if (facts.financingTotal > 0) {
+        yellow.push(`${name} will pay ${fmtMoney(facts.financingTotal)} in financed installments for the setup fee.`);
+      }
+      const red = [];
+      for (const sub of facts.subscriptions || []) {
+        if (sub.amount > 0) {
+          const freqLabel = subscriptionFrequencyFriendlyLabel(sub.slug);
+          red.push(`${name} will pay ${fmtMoney(sub.amount)} ${freqLabel} for the recurring subscription.`);
+        }
+      }
+      return { blue, yellow, red };
+    }
+
     // Generate the next sequential receipt number for today.
     // Format: DCL-YYYYMMDD-NNN. Generated at save time so abandoned
     // drafts don't burn numbers. The unique index on receipt_no
@@ -11196,6 +11356,170 @@
       renderInvoiceBuilder();
     });
 
+    // ============================================================
+    // INVOICE PLAN DIAGNOSTIC WIZARD (3-stage: template → scan → verify)
+    // ============================================================
+    const invoiceDiagnosticWizardOverlay = document.getElementById("invoiceDiagnosticWizardOverlay");
+    const invoiceDiagnosticWizardClose = document.getElementById("invoiceDiagnosticWizardClose");
+    const invDiagCancel = document.getElementById("invDiagCancel");
+    const invDiagAnalyze = document.getElementById("invDiagAnalyze");
+    const invDiagCloseFinal = document.getElementById("invDiagCloseFinal");
+
+    let invoiceDiagWizardSession = null;
+
+    function setInvoiceDiagStep(stepNum) {
+      if (!invoiceDiagnosticWizardOverlay) return;
+      invoiceDiagnosticWizardOverlay.querySelectorAll("[data-inv-diag-step]").forEach((sec) => {
+        sec.hidden = sec.getAttribute("data-inv-diag-step") !== String(stepNum);
+      });
+    }
+
+    function closeInvoiceDiagnosticWizard() {
+      if (!invoiceDiagnosticWizardOverlay) return;
+      invoiceDiagnosticWizardOverlay.classList.remove("open");
+      setInvoiceDiagStep(1);
+      const feed = document.getElementById("invDiagFeed");
+      if (feed) feed.innerHTML = "";
+      if (invDiagAnalyze) invDiagAnalyze.disabled = true;
+      invoiceDiagnosticWizardOverlay.querySelectorAll('input[name="invDiagTplSelect"]').forEach((r) => {
+        r.checked = false;
+      });
+      invoiceDiagWizardSession = null;
+    }
+
+    function hydrateInvoiceDiagnosticWizardStep1(clientName, clientId) {
+      const lineEl = document.getElementById("invDiagClientLine");
+      const listEl = document.getElementById("invDiagTemplateList");
+      const emptyEl = document.getElementById("invDiagNoTemplates");
+      if (lineEl) lineEl.textContent = `Profile: ${clientName} · ID ${clientId}`;
+      const c = getInvoiceBuilderClient();
+      const rows = [];
+      const custom = c && c.invoice && c.invoice.custom;
+      if (custom) {
+        rows.push(`
+      <label class="inv-diag-tpl-row">
+        <input type="radio" name="invDiagTplSelect" value="custom">
+        <span><strong>${esc(custom.name || "Custom invoice template")}</strong><div class="inv-diag-tpl-meta">Custom (this client) · ${(custom.line_items || []).length} line item(s)</div></span>
+      </label>`);
+      }
+      for (const t of universalInvoiceTemplates) {
+        rows.push(`
+      <label class="inv-diag-tpl-row">
+        <input type="radio" name="invDiagTplSelect" value="universal:${esc(t.id)}">
+        <span><strong>${esc(t.name || "(untitled)")}</strong><div class="inv-diag-tpl-meta">Universal · ${(t.line_items || []).length} line item(s)</div></span>
+      </label>`);
+      }
+      if (listEl) {
+        listEl.innerHTML = rows.join("");
+        listEl.hidden = rows.length === 0;
+      }
+      if (emptyEl) emptyEl.hidden = rows.length > 0;
+      if (invDiagAnalyze) invDiagAnalyze.disabled = true;
+    }
+
+    function resolveInvoiceDiagSelectedTemplate() {
+      if (!invoiceDiagnosticWizardOverlay) return null;
+      const rad = invoiceDiagnosticWizardOverlay.querySelector('input[name="invDiagTplSelect"]:checked');
+      if (!rad) return null;
+      const v = rad.value;
+      if (v === "custom") {
+        const c = getInvoiceBuilderClient();
+        const tpl = c && c.invoice && c.invoice.custom;
+        if (!tpl) return null;
+        return { name: tpl.name || "Custom", line_items: tpl.line_items || [] };
+      }
+      if (v.startsWith("universal:")) {
+        const id = v.slice("universal:".length);
+        const row = universalInvoiceTemplates.find((r) => String(r.id) === String(id));
+        if (!row) return null;
+        return { name: row.name || "(untitled)", line_items: row.line_items || [] };
+      }
+      return null;
+    }
+
+    function renderInvoiceDiagGallery(sentences) {
+      const g = document.getElementById("invDiagGallery");
+      if (!g) return;
+      const box = (cls, title, lines) => {
+        const inner =
+          lines.length > 0
+            ? lines.map((s) => `<p>${esc(s)}</p>`).join("")
+            : `<p class="inv-diag-empty-note">No items detected in this category.</p>`;
+        return `<div class="inv-diag-box ${cls}"><div class="inv-diag-box-title">${esc(title)}</div>${inner}</div>`;
+      };
+      g.innerHTML = [
+        box("inv-diag-blue", "One-time", sentences.blue),
+        box("inv-diag-yellow", "Financing", sentences.yellow),
+        box("inv-diag-red", "Subscription", sentences.red),
+      ].join("");
+    }
+
+    async function openInvoiceDiagnosticWizard(clientId, clientName) {
+      if (!invoiceDiagnosticWizardOverlay) return;
+      if (!universalInvoiceTemplatesLoaded) await loadUniversalInvoiceTemplates();
+      invoiceDiagnosticWizardOverlay.classList.remove("open");
+      const feed = document.getElementById("invDiagFeed");
+      if (feed) feed.innerHTML = "";
+      setInvoiceDiagStep(1);
+      if (invDiagAnalyze) invDiagAnalyze.disabled = true;
+      invoiceDiagnosticWizardOverlay.querySelectorAll('input[name="invDiagTplSelect"]').forEach((r) => {
+        r.checked = false;
+      });
+      invoiceDiagWizardSession = {
+        clientId: String(clientId || "").trim(),
+        clientName: String(clientName || "").trim() || "This customer",
+      };
+      hydrateInvoiceDiagnosticWizardStep1(invoiceDiagWizardSession.clientName, invoiceDiagWizardSession.clientId);
+      invoiceDiagnosticWizardOverlay.classList.add("open");
+    }
+
+    async function runInvoiceDiagnosticProcessingForTemplate(tpl) {
+      const clientName = invoiceDiagWizardSession?.clientName || "This customer";
+      const feed = document.getElementById("invDiagFeed");
+      if (!feed) return;
+      const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+      const push = (text) => {
+        const li = document.createElement("li");
+        li.textContent = text;
+        feed.appendChild(li);
+      };
+      push(`Connecting profile for ${clientName}...`);
+      await delay(420);
+      push("Identifying one-time fees...");
+      await delay(420);
+      push("Analyzing installment schedules...");
+      await delay(420);
+      push("Extracting recurring cycles...");
+      await delay(480);
+      const facts = extractInvoiceTemplateDiagnosticFacts(tpl ? tpl.line_items : []);
+      const sentences = buildInvoiceDiagnosticHumanSentences(clientName, facts);
+      renderInvoiceDiagGallery(sentences);
+      setInvoiceDiagStep(3);
+    }
+
+    if (invoiceDiagnosticWizardOverlay) {
+      invoiceDiagnosticWizardOverlay.addEventListener("change", (e) => {
+        const t = e.target;
+        if (t && t.name === "invDiagTplSelect" && invDiagAnalyze) invDiagAnalyze.disabled = false;
+      });
+    }
+    if (invDiagAnalyze) {
+      invDiagAnalyze.addEventListener("click", async () => {
+        const tpl = resolveInvoiceDiagSelectedTemplate();
+        if (!tpl) {
+          alert("Select a template first.");
+          return;
+        }
+        setInvoiceDiagStep(2);
+        const feed = document.getElementById("invDiagFeed");
+        if (feed) feed.innerHTML = "";
+        await runInvoiceDiagnosticProcessingForTemplate(tpl);
+      });
+    }
+    if (invDiagCancel) invDiagCancel.addEventListener("click", closeInvoiceDiagnosticWizard);
+    if (invoiceDiagnosticWizardClose) invoiceDiagnosticWizardClose.addEventListener("click", closeInvoiceDiagnosticWizard);
+    if (invDiagCloseFinal) invDiagCloseFinal.addEventListener("click", closeInvoiceDiagnosticWizard);
+
     // ---- Saved invoice preview (view + manual mark-as-paid escape hatch) ----
     function closeInvoicePreview() {
       invoicePreviewOverlay.classList.remove("open");
@@ -11332,13 +11656,13 @@
       } else if (action === "create-invoice-plan-customer") {
         if (btn.disabled) return;
         const c = getInvoiceBuilderClient();
-        const clientId = (btn.getAttribute("data-client-id") || (c && c.id) || "").trim() || null;
-        console.log("[Invoice Builder] Create Invoice Plan for this Customer — client_id:", clientId);
+        const clientId = (btn.getAttribute("data-client-id") || (c && c.id) || "").toString().trim() || null;
+        const clientName = (btn.getAttribute("data-client-name") || (c && (c.client_name || c.company_name)) || "").toString().trim() || "This customer";
         if (!clientId) {
           showInvoiceBuilderPlaceholderToast("Open a client profile first, then use Save & go to Invoice Builder.");
           return;
         }
-        showInvoiceBuilderPlaceholderToast("Feature coming soon: invoice plans linked to this customer.");
+        openInvoiceDiagnosticWizard(clientId, clientName);
       } else if (action === "open-invoice") {
         const id = btn.dataset.id;
         const row = clientInvoices.find((r) => String(r.id) === String(id));
