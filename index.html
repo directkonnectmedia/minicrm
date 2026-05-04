@@ -875,8 +875,105 @@
       border-radius: 10px;
       padding: 14px;
       overflow-x: auto;
-      max-height: 220px;
+      max-height: 260px;
       margin: 0 0 12px;
+    }
+
+    .inv-diag-date-preview-strip {
+      font-size: 13px;
+      color: #374151;
+      background: #ecfdf5;
+      border: 1px solid #6ee7b7;
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin: 0 0 14px;
+      line-height: 1.45;
+    }
+    .inv-diag-date-preview-strip strong { color: #065f46; }
+    .inv-diag-confirm-summary {
+      font-size: 14px;
+      line-height: 1.55;
+      color: #111827;
+      margin-bottom: 14px;
+    }
+    .inv-diag-confirm-summary dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; }
+    .inv-diag-confirm-summary dt { font-weight: 600; color: #4b5563; }
+    .inv-diag-confirm-summary dd { margin: 0; }
+
+    .inv-diag-cal-wrap {
+      max-width: 420px;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 14px 16px 16px;
+      margin-bottom: 8px;
+    }
+    .inv-diag-cal-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      gap: 8px;
+    }
+    .inv-diag-cal-nav button {
+      padding: 6px 12px;
+      font-size: 13px;
+      background: #f3f4f6;
+      color: #111827;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .inv-diag-cal-nav button:hover { background: #e5e7eb; }
+    .inv-diag-cal-month-label { font-weight: 700; font-size: 15px; color: #111827; }
+    .inv-diag-cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+      text-align: center;
+      font-size: 12px;
+    }
+    .inv-diag-cal-dow {
+      font-weight: 600;
+      color: #6b7280;
+      padding: 4px 0;
+      font-size: 11px;
+    }
+    .inv-diag-cal-day {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      color: #111827;
+      border: 2px solid transparent;
+      background: #f9fafb;
+      padding: 0;
+      font-family: inherit;
+    }
+    .inv-diag-cal-day:hover:not(.inv-diag-cal-day-disabled):not(.inv-diag-cal-day-empty) {
+      border-color: #4f46e5;
+      background: #eef2ff;
+    }
+    .inv-diag-cal-day-selected {
+      background: #4f46e5 !important;
+      color: #fff !important;
+      border-color: #4338ca !important;
+    }
+    .inv-diag-cal-day-disabled {
+      opacity: 0.28;
+      cursor: not-allowed;
+      background: #f3f4f6;
+      color: #9ca3af;
+    }
+    .inv-diag-cal-day-empty {
+      visibility: hidden;
+      pointer-events: none;
+      cursor: default;
     }
 
     .crm-ib-toast.crm-ib-toast-visible {
@@ -3404,12 +3501,22 @@
           </div>
         </section>
         <section data-inv-diag-step="5" hidden>
-          <p class="inv-diag-stage-label">The available slots dispatcher</p>
-          <p class="invoice-wiz-hint" style="margin-top:0;">Part 2: starting calendar dates will be generated from the rhythm rules below.</p>
+          <p class="inv-diag-stage-label">Start date selection</p>
+          <p id="invDiagDatePhaseTitle" class="invoice-wiz-hint" style="margin-top:0;"></p>
+          <div id="invDiagDatePreviewStrip" class="inv-diag-date-preview-strip" aria-live="polite" hidden></div>
+          <div id="invDiagDateMount"></div>
+          <div class="inv-diag-actions">
+            <button type="button" class="ghost" id="invDiagDateBack">Back</button>
+            <button type="button" id="invDiagDateNext" disabled>Next</button>
+          </div>
+        </section>
+        <section data-inv-diag-step="6" hidden>
+          <p class="inv-diag-stage-label">Confirmation</p>
+          <div id="invDiagConfirmSummary" class="inv-diag-confirm-summary"></div>
           <pre id="invDiagDispatcherPreview" class="inv-diag-rhythm-preview"></pre>
           <div class="inv-diag-actions">
-            <button type="button" class="ghost" id="invDiagDispatcherBack">Back</button>
-            <button type="button" id="invDiagDispatcherDone">Close</button>
+            <button type="button" class="ghost" id="invDiagConfirmBack">Back</button>
+            <button type="button" id="invDiagDispatcherDone">Done</button>
           </div>
         </section>
       </div>
@@ -11733,7 +11840,9 @@
     const invDiagVerificationNext = document.getElementById("invDiagVerificationNext");
     const invDiagRhythmNext = document.getElementById("invDiagRhythmNext");
     const invDiagRhythmBack = document.getElementById("invDiagRhythmBack");
-    const invDiagDispatcherBack = document.getElementById("invDiagDispatcherBack");
+    const invDiagDateBack = document.getElementById("invDiagDateBack");
+    const invDiagDateNext = document.getElementById("invDiagDateNext");
+    const invDiagConfirmBack = document.getElementById("invDiagConfirmBack");
     const invDiagDispatcherDone = document.getElementById("invDiagDispatcherDone");
 
     const INV_RHYTHM_WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -11757,8 +11866,20 @@
       if (rhythmMount) rhythmMount.innerHTML = "";
       const dispatcherPre = document.getElementById("invDiagDispatcherPreview");
       if (dispatcherPre) dispatcherPre.textContent = "";
+      const dateMount = document.getElementById("invDiagDateMount");
+      if (dateMount) dateMount.innerHTML = "";
+      const dateTitle = document.getElementById("invDiagDatePhaseTitle");
+      if (dateTitle) dateTitle.innerHTML = "";
+      const previewStrip = document.getElementById("invDiagDatePreviewStrip");
+      if (previewStrip) {
+        previewStrip.hidden = true;
+        previewStrip.innerHTML = "";
+      }
+      const confirmSummary = document.getElementById("invDiagConfirmSummary");
+      if (confirmSummary) confirmSummary.innerHTML = "";
       if (invDiagAnalyze) invDiagAnalyze.disabled = true;
       if (invDiagRhythmNext) invDiagRhythmNext.disabled = true;
+      if (invDiagDateNext) invDiagDateNext.disabled = true;
       const sumEl = document.getElementById("invDiagTemplateSummary");
       if (sumEl) sumEl.innerHTML = "";
       invoiceDiagWizardSession = null;
@@ -12009,6 +12130,313 @@
       return rule;
     }
 
+    function formatIsoLocalFromDate(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+
+    function dispatcherPhaseToStartDateKey(phase) {
+      if (phase === "blue") return "blue";
+      if (phase === "yellow") return "yellow";
+      if (phase === "red") return "red";
+      return null;
+    }
+
+    function jsWeekdayFromInvoiceDayName(name) {
+      const idx = INV_RHYTHM_WEEKDAYS.findIndex(
+        (d) => d.toLowerCase() === String(name || "").trim().toLowerCase(),
+      );
+      if (idx < 0) return null;
+      return idx === 6 ? 0 : idx + 1;
+    }
+
+    function classifyYellowDatePickerMode(line_items, facts) {
+      const bal = facts?.balanceRemainingTotal ?? 0;
+      if (bal <= 0) return "skip";
+      if (!shouldIncludeFinanceRhythmCard(line_items)) return "open";
+      return "filtered";
+    }
+
+    function buildDispatcherDatePhases(session) {
+      const line_items = session?.analyzedTemplate?.line_items || [];
+      const facts = session?.analysisFacts || extractInvoiceTemplateDiagnosticFacts(line_items);
+      const phases = [];
+      if ((facts.dueNowTotal || 0) > 0) phases.push("blue");
+      if ((facts.balanceRemainingTotal || 0) > 0) phases.push("yellow");
+      if ((line_items || []).some((li) => /recurring/i.test(li.description || ""))) phases.push("red");
+      return phases;
+    }
+
+    function rhythmDetailForYellowFilter(rhythmRule) {
+      return rhythmRule?.finance || null;
+    }
+
+    function rhythmDetailForRedFilter(rhythmRule) {
+      const subs = rhythmRule?.subscriptions || [];
+      return subs[0] || null;
+    }
+
+    function dateSelectableForRhythmFilter(isoDateStr, detail) {
+      if (!detail) return true;
+      const parts = isoDateStr.split("-").map((x) => parseInt(x, 10));
+      if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return false;
+      const [y, m, d] = parts;
+      const dt = new Date(y, m - 1, d, 12, 0, 0);
+      if (detail.type === "daily") return true;
+      if (detail.type === "monthly") {
+        const dom = detail.day_of_month;
+        if (!Number.isFinite(dom)) return true;
+        return dt.getDate() === dom;
+      }
+      if (detail.type === "weekly" || detail.type === "biweekly") {
+        const want = jsWeekdayFromInvoiceDayName(detail.weekday);
+        if (want === null) return true;
+        return dt.getDay() === want;
+      }
+      return true;
+    }
+
+    function addMonthsKeepDom(baseDate, monthsToAdd, anchorDom) {
+      const y = baseDate.getFullYear();
+      const m = baseDate.getMonth() + monthsToAdd;
+      const target = new Date(y, m + 1, 0, 12, 0, 0);
+      const dim = target.getDate();
+      const dom = Math.min(anchorDom, dim);
+      return new Date(y, m, dom, 12, 0, 0);
+    }
+
+    function computeOccurrencePreview(isoStart, detail, count) {
+      const out = [];
+      const parts = isoStart.split("-").map((x) => parseInt(x, 10));
+      if (parts.length !== 3) return out;
+      const [y0, m0, d0] = parts;
+      let cur = new Date(y0, m0 - 1, d0, 12, 0, 0);
+      const n = Math.min(Math.max(count, 1), 8);
+
+      if (!detail || detail.type === "daily") {
+        for (let i = 0; i < n; i++) {
+          out.push(formatIsoLocalFromDate(cur));
+          cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1, 12, 0, 0);
+        }
+        return out;
+      }
+      if (detail.type === "monthly") {
+        const dom = Number(detail.day_of_month) || cur.getDate();
+        for (let i = 0; i < n; i++) {
+          out.push(formatIsoLocalFromDate(cur));
+          cur = addMonthsKeepDom(cur, 1, dom);
+        }
+        return out;
+      }
+      if (detail.type === "weekly") {
+        for (let i = 0; i < n; i++) {
+          out.push(formatIsoLocalFromDate(cur));
+          cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 7, 12, 0, 0);
+        }
+        return out;
+      }
+      if (detail.type === "biweekly") {
+        for (let i = 0; i < n; i++) {
+          out.push(formatIsoLocalFromDate(cur));
+          cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 14, 12, 0, 0);
+        }
+        return out;
+      }
+      out.push(formatIsoLocalFromDate(cur));
+      return out;
+    }
+
+    function buildDispatcherCalendarHtml(year, monthIndex, opts) {
+      const { selectableFn, selectedIso } = opts;
+      const first = new Date(year, monthIndex, 1, 12, 0, 0);
+      const startPad = (first.getDay() + 6) % 7;
+      const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+      const label = first.toLocaleString(undefined, { month: "long", year: "numeric" });
+      let cells = "";
+      const dow = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      const dowRow = dow.map((d) => `<div class="inv-diag-cal-dow">${esc(d)}</div>`).join("");
+      for (let i = 0; i < startPad; i++) {
+        cells += `<div class="inv-diag-cal-day inv-diag-cal-day-empty" aria-hidden="true"></div>`;
+      }
+      for (let d = 1; d <= daysInMonth; d++) {
+        const iso = formatIsoLocalFromDate(new Date(year, monthIndex, d, 12, 0, 0));
+        const ok = selectableFn(iso);
+        const sel = selectedIso === iso;
+        const cls = ["inv-diag-cal-day", ok ? "" : "inv-diag-cal-day-disabled", sel ? "inv-diag-cal-day-selected" : ""]
+          .filter(Boolean)
+          .join(" ");
+        cells += `<button type="button" class="${cls}" data-cal-iso="${iso}"${ok ? "" : " disabled"}>${d}</button>`;
+      }
+      return `<div class="inv-diag-cal-wrap">
+  <div class="inv-diag-cal-nav">
+    <button type="button" data-dir="prev">←</button>
+    <span class="inv-diag-cal-month-label">${esc(label)}</span>
+    <button type="button" data-dir="next">→</button>
+  </div>
+  <div class="inv-diag-cal-grid">${dowRow}${cells}</div>
+</div>`;
+    }
+
+    function buildDispatcherConfirmSummaryHtml(startDates) {
+      const sd = startDates || {};
+      const rows = [
+        ["Blue (due today / setup)", sd.blue || "—"],
+        ["Yellow (financing)", sd.yellow || "—"],
+        ["Red (subscription)", sd.red || "—"],
+      ];
+      return `<dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`;
+    }
+
+    function finalizeDispatcherConfirmation() {
+      const session = invoiceDiagWizardSession;
+      if (!session) return;
+      const rhythmRule = session.rhythmRule || {};
+      const startDates = session.startDates || { blue: null, yellow: null, red: null };
+      const previewPayload = {
+        Rhythm_Rule: rhythmRule,
+        yellow_anchor: rhythmRule.yellow_anchor,
+        red_anchor: rhythmRule.red_anchor,
+        start_dates: { ...startDates },
+        client_id: session.clientId || null,
+        client_name: session.clientName || null,
+        template_name: session.analyzedTemplate?.name || null,
+      };
+      session.dispatcherPreviewPayload = previewPayload;
+      const pre = document.getElementById("invDiagDispatcherPreview");
+      if (pre) pre.textContent = JSON.stringify(previewPayload, null, 2);
+      const sumEl = document.getElementById("invDiagConfirmSummary");
+      if (sumEl) sumEl.innerHTML = buildDispatcherConfirmSummaryHtml(startDates);
+    }
+
+    function renderDispatcherDateStage() {
+      const session = invoiceDiagWizardSession;
+      const mount = document.getElementById("invDiagDateMount");
+      const titleEl = document.getElementById("invDiagDatePhaseTitle");
+      const nextBtn = document.getElementById("invDiagDateNext");
+      const strip = document.getElementById("invDiagDatePreviewStrip");
+      if (!mount || !session || !titleEl || !nextBtn) return;
+
+      const phases = session.dispatcherPhases || [];
+      const idx = session.dispatcherPhaseIndex || 0;
+      const phase = phases[idx];
+      const line_items = session.analyzedTemplate?.line_items || [];
+      const facts = session.analysisFacts || extractInvoiceTemplateDiagnosticFacts(line_items);
+      const rhythmRule = session.rhythmRule || {};
+
+      nextBtn.disabled = !session.dispatcherPendingIso;
+
+      if (strip) {
+        strip.hidden = true;
+        strip.innerHTML = "";
+      }
+
+      if (!phase) {
+        mount.innerHTML = "";
+        return;
+      }
+
+      let titleHtml = "";
+      let filterDetail = null;
+      let calendarMode = "open";
+
+      if (phase === "blue") {
+        titleHtml =
+          "<strong>Blue</strong> — Setup / due today (one-time). Pick any calendar date for this charge.";
+        calendarMode = "open";
+      } else if (phase === "yellow") {
+        const yMode = classifyYellowDatePickerMode(line_items, facts);
+        if (yMode === "open") {
+          titleHtml =
+            "<strong>Yellow</strong> — Financing (single payment). Pick any date for this balance.";
+          calendarMode = "open";
+        } else {
+          titleHtml =
+            "<strong>Yellow</strong> — Financing (installments). Only dates matching your Part 1 rhythm are selectable.";
+          calendarMode = "filtered";
+          filterDetail = rhythmDetailForYellowFilter(rhythmRule);
+        }
+      } else if (phase === "red") {
+        titleHtml =
+          "<strong>Red</strong> — Subscription. Only dates matching your Part 1 rhythm anchor are selectable.";
+        calendarMode = "filtered";
+        filterDetail = rhythmDetailForRedFilter(rhythmRule);
+      }
+
+      titleEl.innerHTML =
+        `${titleHtml} <span class="muted">(Step ${idx + 1} of ${phases.length})</span>`;
+
+      if (!session.dispatcherCalYM) {
+        const now = new Date();
+        session.dispatcherCalYM = { y: now.getFullYear(), m: now.getMonth() };
+      }
+      const calY = session.dispatcherCalYM.y;
+      const calM = session.dispatcherCalYM.m;
+
+      const selectableFn = (iso) => {
+        if (calendarMode === "open") return true;
+        return dateSelectableForRhythmFilter(iso, filterDetail);
+      };
+
+      mount.innerHTML = buildDispatcherCalendarHtml(calY, calM, {
+        selectableFn,
+        selectedIso: session.dispatcherPendingIso,
+      });
+
+      nextBtn.textContent = idx + 1 >= phases.length ? "Continue to confirmation" : "Next";
+
+      mount.querySelectorAll(".inv-diag-cal-nav button[data-dir]").forEach((btn) => {
+        btn.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          const dir = btn.getAttribute("data-dir");
+          let ny = calY;
+          let nm = calM;
+          if (dir === "prev") {
+            nm -= 1;
+            if (nm < 0) {
+              nm = 11;
+              ny -= 1;
+            }
+          } else {
+            nm += 1;
+            if (nm > 11) {
+              nm = 0;
+              ny += 1;
+            }
+          }
+          session.dispatcherCalYM = { y: ny, m: nm };
+          renderDispatcherDateStage();
+        });
+      });
+
+      mount.querySelectorAll(".inv-diag-cal-day[data-cal-iso]").forEach((btn) => {
+        btn.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          if (btn.disabled) return;
+          const iso = btn.getAttribute("data-cal-iso");
+          session.dispatcherPendingIso = iso;
+          mount.querySelectorAll(".inv-diag-cal-day").forEach((b) => b.classList.remove("inv-diag-cal-day-selected"));
+          btn.classList.add("inv-diag-cal-day-selected");
+          nextBtn.disabled = false;
+        });
+        btn.addEventListener("mouseenter", () => {
+          if (calendarMode !== "filtered") return;
+          if (btn.disabled || btn.classList.contains("inv-diag-cal-day-empty")) return;
+          const iso = btn.getAttribute("data-cal-iso");
+          if (!iso || !strip || !filterDetail) return;
+          const prev = computeOccurrencePreview(iso, filterDetail, 4);
+          strip.hidden = false;
+          strip.innerHTML = `<strong>Next occurrences:</strong> ${prev.map((d) => esc(d)).join(" · ")}`;
+        });
+        btn.addEventListener("mouseleave", () => {
+          if (!strip) return;
+          strip.hidden = true;
+          strip.innerHTML = "";
+        });
+      });
+    }
+
     function goToRhythmSetupFromVerification() {
       if (!invoiceDiagWizardSession?.analyzedTemplate?.line_items) return;
       invoiceDiagWizardSession.stage = "rhythm_setup";
@@ -12018,20 +12446,25 @@
     }
 
     function goToDispatcherFromRhythm(rhythmRule) {
-      invoiceDiagWizardSession.stage = "dispatcher";
-      invoiceDiagWizardSession.Rhythm_Rule = rhythmRule;
-      invoiceDiagWizardSession.rhythmRule = rhythmRule;
-      const previewPayload = {
-        Rhythm_Rule: rhythmRule,
-        yellow_anchor: rhythmRule.yellow_anchor,
-        red_anchor: rhythmRule.red_anchor,
-        client_id: invoiceDiagWizardSession?.clientId || null,
-        client_name: invoiceDiagWizardSession?.clientName || null,
-        template_name: invoiceDiagWizardSession?.analyzedTemplate?.name || null,
-      };
-      invoiceDiagWizardSession.dispatcherPreviewPayload = previewPayload;
-      const pre = document.getElementById("invDiagDispatcherPreview");
-      if (pre) pre.textContent = JSON.stringify(previewPayload, null, 2);
+      const session = invoiceDiagWizardSession;
+      if (!session) return;
+      session.stage = "dispatcher_dates";
+      session.Rhythm_Rule = rhythmRule;
+      session.rhythmRule = rhythmRule;
+      session.startDates = { blue: null, yellow: null, red: null };
+      session.dispatcherPendingIso = null;
+      session.dispatcherCalYM = null;
+      session.dispatcherPhases = buildDispatcherDatePhases(session);
+      session.dispatcherPhaseIndex = 0;
+
+      if (!session.dispatcherPhases.length) {
+        finalizeDispatcherConfirmation();
+        session.stage = "dispatcher_confirm";
+        setInvoiceDiagStep(6);
+        return;
+      }
+
+      renderDispatcherDateStage();
       setInvoiceDiagStep(5);
     }
 
@@ -12042,8 +12475,22 @@
       invoiceDiagnosticWizardOverlay.classList.remove("open");
       const feed = document.getElementById("invDiagFeed");
       if (feed) feed.innerHTML = "";
+      const dateMountOpen = document.getElementById("invDiagDateMount");
+      if (dateMountOpen) dateMountOpen.innerHTML = "";
+      const dateTitleOpen = document.getElementById("invDiagDatePhaseTitle");
+      if (dateTitleOpen) dateTitleOpen.innerHTML = "";
+      const previewStripOpen = document.getElementById("invDiagDatePreviewStrip");
+      if (previewStripOpen) {
+        previewStripOpen.hidden = true;
+        previewStripOpen.innerHTML = "";
+      }
+      const confirmSummaryOpen = document.getElementById("invDiagConfirmSummary");
+      if (confirmSummaryOpen) confirmSummaryOpen.innerHTML = "";
+      const dispatcherPreOpen = document.getElementById("invDiagDispatcherPreview");
+      if (dispatcherPreOpen) dispatcherPreOpen.textContent = "";
       setInvoiceDiagStep(1);
       if (invDiagAnalyze) invDiagAnalyze.disabled = true;
+      if (invDiagDateNext) invDiagDateNext.disabled = true;
       const sumEl = document.getElementById("invDiagTemplateSummary");
       if (sumEl) sumEl.innerHTML = "";
       invoiceDiagWizardSession = {
@@ -12131,11 +12578,62 @@
         goToDispatcherFromRhythm(rhythmRule);
       });
     }
-    if (invDiagDispatcherBack) {
-      invDiagDispatcherBack.addEventListener("click", () => {
-        if (invoiceDiagWizardSession) invoiceDiagWizardSession.stage = "rhythm_setup";
+    if (invDiagDateBack) {
+      invDiagDateBack.addEventListener("click", () => {
+        const session = invoiceDiagWizardSession;
+        if (!session?.dispatcherPhases?.length) return;
+        if (session.dispatcherPhaseIndex > 0) {
+          session.dispatcherPhaseIndex -= 1;
+          const prevPhase = session.dispatcherPhases[session.dispatcherPhaseIndex];
+          const key = dispatcherPhaseToStartDateKey(prevPhase);
+          if (key) session.startDates[key] = null;
+          session.dispatcherPendingIso = null;
+          session.dispatcherCalYM = null;
+          renderDispatcherDateStage();
+          return;
+        }
+        session.stage = "rhythm_setup";
         renderRhythmSetupStage();
         setInvoiceDiagStep(4);
+      });
+    }
+    if (invDiagDateNext) {
+      invDiagDateNext.addEventListener("click", () => {
+        const session = invoiceDiagWizardSession;
+        if (!session || session.stage !== "dispatcher_dates") return;
+        if (!session.dispatcherPendingIso) return;
+        const phases = session.dispatcherPhases || [];
+        const idx = session.dispatcherPhaseIndex || 0;
+        const phase = phases[idx];
+        const key = dispatcherPhaseToStartDateKey(phase);
+        if (key) session.startDates[key] = session.dispatcherPendingIso;
+        session.dispatcherPendingIso = null;
+        session.dispatcherCalYM = null;
+        if (idx + 1 >= phases.length) {
+          finalizeDispatcherConfirmation();
+          session.stage = "dispatcher_confirm";
+          setInvoiceDiagStep(6);
+        } else {
+          session.dispatcherPhaseIndex = idx + 1;
+          renderDispatcherDateStage();
+        }
+      });
+    }
+    if (invDiagConfirmBack) {
+      invDiagConfirmBack.addEventListener("click", () => {
+        const session = invoiceDiagWizardSession;
+        if (!session?.dispatcherPhases?.length) return;
+        const phases = session.dispatcherPhases;
+        const lastIdx = phases.length - 1;
+        const lastPhase = phases[lastIdx];
+        const key = dispatcherPhaseToStartDateKey(lastPhase);
+        session.dispatcherPhaseIndex = lastIdx;
+        session.dispatcherPendingIso = key ? session.startDates[key] : null;
+        if (key) session.startDates[key] = null;
+        session.dispatcherCalYM = null;
+        session.stage = "dispatcher_dates";
+        renderDispatcherDateStage();
+        setInvoiceDiagStep(5);
       });
     }
     if (invDiagDispatcherDone) invDiagDispatcherDone.addEventListener("click", closeInvoiceDiagnosticWizard);
