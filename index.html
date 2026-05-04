@@ -11470,6 +11470,72 @@
     invTplCancel.addEventListener("click", closeInvoiceTemplateEditor);
     invoiceTemplateEditorClose.addEventListener("click", closeInvoiceTemplateEditor);
 
+    /** Prefer server insert (service role) so RLS/JWT mismatches do not block saves. */
+    async function insertInvoiceTemplateRow(payload) {
+      const { name, line_items, terms_html, plan_id } = payload;
+      const directInsert = async () => {
+        const { data, error } = await sb
+          .from("invoice_templates")
+          .insert({
+            name,
+            line_items,
+            terms_html,
+            plan_id: plan_id || null,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      };
+
+      const { data: sess } = await sb.auth.getSession();
+      const token = sess && sess.session ? sess.session.access_token : null;
+      const canTryApi =
+        token &&
+        typeof window !== "undefined" &&
+        window.location &&
+        window.location.protocol !== "file:";
+
+      if (canTryApi) {
+        try {
+          const apiRes = await fetch(`${window.location.origin}/api/invoice-templates`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              name,
+              line_items,
+              terms_html,
+              plan_id: plan_id || null,
+            }),
+          });
+          const j = await apiRes.json().catch(() => ({}));
+          if (apiRes.ok && j.row) return j.row;
+          if (apiRes.status === 404 || apiRes.status === 405) {
+            return directInsert();
+          }
+          const detailMsg =
+            j.detail &&
+            (typeof j.detail.message === "string"
+              ? j.detail.message
+              : typeof j.detail === "string"
+                ? j.detail
+                : null);
+          const msg = detailMsg || j.error || `Save failed (${apiRes.status})`;
+          throw new Error(msg);
+        } catch (e) {
+          if (e && e.name === "TypeError" && String(e.message || "").includes("fetch")) {
+            return directInsert();
+          }
+          throw e;
+        }
+      }
+
+      return directInsert();
+    }
+
     // Save -> insert into public.invoice_templates (library) and close editor.
     invTplSave.addEventListener("click", async () => {
       if (!invoiceTemplateEditorState) return;
@@ -11490,16 +11556,12 @@
       invTplSave.disabled = true;
       invTplStatus.textContent = "Saving to library...";
       try {
-        const { data, error } = await sb.from("invoice_templates")
-          .insert({
-            name,
-            line_items: s.line_items,
-            terms_html: s.terms_html,
-            plan_id: s.plan_id || null,
-          })
-          .select()
-          .single();
-        if (error) throw error;
+        const data = await insertInvoiceTemplateRow({
+          name,
+          line_items: s.line_items,
+          terms_html: s.terms_html,
+          plan_id: s.plan_id || null,
+        });
         universalInvoiceTemplates = [...universalInvoiceTemplates, data].sort((a, b) =>
           (a.name || "").localeCompare(b.name || ""),
         );
