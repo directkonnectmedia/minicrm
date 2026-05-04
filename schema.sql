@@ -806,3 +806,9 @@ set
   focus_plan_id = null,
   contract = coalesce(c.contract, '{}'::jsonb) - 'setupOverrides' - 'monthlyOverrides'
 where c.contract_template in ('basic_website', 'premium_website', 'premium_pocket_sekretary');
+
+-- Stripe Customer sync (CRM links Supabase clients ↔ Stripe customers)
+alter table public.clients add column if not exists stripe_customer_id text;
+create unique index if not exists clients_stripe_customer_id_uidx
+  on public.clients (stripe_customer_id)
+  where stripe_customer_id is not null;
