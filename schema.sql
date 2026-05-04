@@ -299,6 +299,7 @@ create policy "authenticated all"
 -- Mirrors readUserRoles() in index.html / api/admin/team.js:
 --   - user_metadata.roles[] array of strings
 --   - legacy user_metadata.role single string
+--   - same shapes under app_metadata (some Auth tooling stores roles there)
 create or replace function public.is_team_member() returns boolean
   language sql stable
 as $$
@@ -316,6 +317,18 @@ as $$
       or (
         jsonb_typeof(auth.jwt() #> '{user_metadata,role}') = 'string'
         and (auth.jwt() #>> '{user_metadata,role}') in ('admin', 'sales', 'web_designer')
+      )
+      or (
+        jsonb_typeof(auth.jwt() #> '{app_metadata,roles}') = 'array'
+        and exists (
+          select 1
+          from jsonb_array_elements_text(auth.jwt() #> '{app_metadata,roles}') as r(val)
+          where r.val in ('admin', 'sales', 'web_designer')
+        )
+      )
+      or (
+        jsonb_typeof(auth.jwt() #> '{app_metadata,role}') = 'string'
+        and (auth.jwt() #>> '{app_metadata,role}') in ('admin', 'sales', 'web_designer')
       )
     )
   end;

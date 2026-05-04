@@ -22,15 +22,18 @@ const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const TEAM_ROLES = new Set(["admin", "sales", "web_designer"]);
 
 function readRoles(u) {
-  if (!u || !u.user_metadata) return [];
-  const meta = u.user_metadata;
-  if (Array.isArray(meta.roles)) {
-    return meta.roles.filter((r) => typeof r === "string");
-  }
-  if (typeof meta.role === "string" && meta.role) {
-    return [meta.role];
-  }
-  return [];
+  if (!u) return [];
+  const collect = (meta) => {
+    if (!meta || typeof meta !== "object") return [];
+    if (Array.isArray(meta.roles)) {
+      return meta.roles.filter((r) => typeof r === "string");
+    }
+    if (typeof meta.role === "string" && meta.role) {
+      return [meta.role];
+    }
+    return [];
+  };
+  return [...new Set([...collect(u.user_metadata), ...collect(u.app_metadata)])];
 }
 
 function isTeamMember(caller) {
