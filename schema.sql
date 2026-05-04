@@ -296,15 +296,28 @@ create policy "authenticated all"
 -- stay terse. Re-running this block is safe -- every drop/create is
 -- idempotent.
 
+-- Mirrors readUserRoles() in index.html / api/admin/team.js:
+--   - user_metadata.roles[] array of strings
+--   - legacy user_metadata.role single string
 create or replace function public.is_team_member() returns boolean
   language sql stable
 as $$
   select case
     when auth.jwt() is null then false
-    when (auth.jwt() #> '{user_metadata,roles}') is null then false
-    when jsonb_typeof(auth.jwt() #> '{user_metadata,roles}') = 'array'
-      then (auth.jwt() #> '{user_metadata,roles}') ?| array['admin', 'sales', 'web_designer']
-    else false
+    else (
+      (
+        jsonb_typeof(auth.jwt() #> '{user_metadata,roles}') = 'array'
+        and exists (
+          select 1
+          from jsonb_array_elements_text(auth.jwt() #> '{user_metadata,roles}') as r(val)
+          where r.val in ('admin', 'sales', 'web_designer')
+        )
+      )
+      or (
+        jsonb_typeof(auth.jwt() #> '{user_metadata,role}') = 'string'
+        and (auth.jwt() #>> '{user_metadata,role}') in ('admin', 'sales', 'web_designer')
+      )
+    )
   end;
 $$;
 
@@ -566,6 +579,10 @@ create policy "team only invoice templates"
   on public.invoice_templates for all to authenticated
   using (public.is_team_member())
   with check (public.is_team_member());
+
+-- Browser CRM uses the anon key + signed-in JWT; ensure table privileges exist
+-- (some projects created this table before default grants were applied).
+grant select, insert, update, delete on table public.invoice_templates to authenticated;
 
 drop trigger if exists invoice_templates_set_updated_at on public.invoice_templates;
 create trigger invoice_templates_set_updated_at
