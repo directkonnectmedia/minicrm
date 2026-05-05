@@ -72,6 +72,8 @@ export default async function handler(req, res) {
     return res.status(500).json({
       error: "list failed",
       detail: listJson,
+      hint:
+        "Ensure invoices has portal_dispatch_status, portal_published_at, scheduled_dispatch_time and migrations were applied.",
     });
   }
 

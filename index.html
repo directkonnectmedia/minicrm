@@ -13616,7 +13616,7 @@
         return;
       }
       const { data: auth } = await sb.auth.getSession();
-      if (!auth?.session) {
+      if (!auth?.session?.access_token) {
         showInvoiceBuilderPlaceholderToast("Sign in to schedule.");
         return;
       }
@@ -13637,56 +13637,60 @@
       const nowIso = new Date().toISOString();
       const schedIso = publishNow ? nowIso : dispatchAtIso;
 
+      const baseFields = {
+        client_id: client.id,
+        receipt_no: data.receipt_no,
+        issued_at: data.issued_at,
+        billed_to_name: data.billed_to_name,
+        from_company: data.from_company,
+        from_subtitle: data.from_subtitle,
+        line_items: data.line_items,
+        payment_methods: [],
+        terms_html: data.terms_html,
+        amount_paid: 0,
+        status: "due",
+        stripe_payment_link: null,
+        rendered_html: renderedHtml,
+      };
+
+      const invoice = existingInv ? { ...baseFields, id: existingInv.id } : baseFields;
+
       try {
-        if (existingInv) {
-          const { error: upErr } = await sb
-            .from("invoices")
-            .update({
-              rendered_html: renderedHtml,
-              line_items: data.line_items,
-              terms_html: data.terms_html,
-              billed_to_name: data.billed_to_name,
-              issued_at: data.issued_at,
-              scheduled_dispatch_time: schedIso,
-              portal_dispatch_status: publishNow ? "pushed" : "queued",
-              portal_published_at: publishNow ? nowIso : null,
-            })
-            .eq("id", existingInv.id);
-          if (upErr) throw upErr;
-        } else {
-          const insertRow = {
-            client_id: client.id,
-            receipt_no: data.receipt_no,
-            issued_at: data.issued_at,
-            billed_to_name: data.billed_to_name,
-            from_company: data.from_company,
-            from_subtitle: data.from_subtitle,
-            line_items: data.line_items,
-            payment_methods: [],
-            terms_html: data.terms_html,
-            amount_paid: 0,
-            status: "due",
-            stripe_payment_link: null,
-            rendered_html: renderedHtml,
-            scheduled_dispatch_time: schedIso,
-            portal_dispatch_status: publishNow ? "pushed" : "queued",
-            portal_published_at: publishNow ? nowIso : null,
-          };
-          const { data: ins, error: insErr } = await sb.from("invoices").insert(insertRow).select().single();
-          if (insErr) throw insErr;
-          const { error: lkErr } = await sb
-            .from("invoice_calendar_events")
-            .update({ invoice_id: ins.id, scheduled_dispatch_time: schedIso })
-            .eq("id", calRow.id);
-          if (lkErr) throw lkErr;
+        const res = await fetch("/api/invoices/publish-calendar", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${auth.session.access_token}`,
+          },
+          body: JSON.stringify({
+            calendarEventId: calRow.id,
+            publishNow,
+            dispatchAtIso: publishNow ? null : schedIso,
+            invoice,
+          }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const hint =
+            (j.detail && (j.detail.message || j.detail.hint)) ||
+            (typeof j.detail === "string" ? j.detail : "") ||
+            "";
+          const errMsg = j.error || res.statusText || "Request failed";
+          throw new Error(
+            errMsg +
+              (hint ? ` — ${hint}` : "") +
+              (j.detail && typeof j.detail === "object" && !j.detail.message
+                ? ` ${JSON.stringify(j.detail).slice(0, 400)}`
+                : ""),
+          );
         }
 
-        if (existingInv) {
-          const { error: calUp } = await sb
-            .from("invoice_calendar_events")
-            .update({ scheduled_dispatch_time: schedIso })
-            .eq("id", calRow.id);
-          if (calUp) throw calUp;
+        if (!j.ok || !j.invoice) {
+          throw new Error("Server did not confirm the invoice save.");
+        }
+
+        if (publishNow && !j.invoice.portal_published_at) {
+          throw new Error("Portal publish was not confirmed (portal_published_at missing).");
         }
 
         if (calRow.client_id && String(invoicesLoadedForClientId) === String(calRow.client_id)) {
@@ -13694,14 +13698,16 @@
         }
 
         showInvoiceBuilderPlaceholderToast(
-          publishNow ? "Invoice sent to the Client Portal." : "Portal dispatch queued for the scheduled time.",
+          publishNow
+            ? "Invoice is live in the Client Portal."
+            : "Portal dispatch queued for the scheduled time.",
         );
         closeInvoiceCalendarEventModal();
         if (invoiceCalendarInstance) invoiceCalendarInstance.refetchEvents();
       } catch (e) {
         console.error("portal dispatch save:", e);
         showInvoiceBuilderPlaceholderToast(
-          "Save failed: " + (e?.message || String(e)),
+          "Failed to push to Client Portal: " + (e?.message || String(e)),
         );
       }
     }
