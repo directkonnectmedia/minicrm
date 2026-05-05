@@ -761,15 +761,27 @@
 
       <!-- Invoice tab -->
       <section class="portal-tab-panel" data-tab-panel="invoice">
-        <div class="invoice-placeholder">
-          <div class="invoice-placeholder-icon">&#x1F4C4;</div>
-          <h2 class="invoice-placeholder-title">Invoices coming soon</h2>
-          <p class="invoice-placeholder-body">
-            We're still putting this part together. For now your account manager will send billing details directly. Once it's live, all your invoices and payment history will show up right here.
-          </p>
+        <div id="invoiceList" class="contract-list">
+          <!-- populated by renderInvoiceList() -->
         </div>
       </section>
     </main>
+  </div>
+
+  <!-- Invoice viewer modal -->
+  <div class="overlay" id="invoiceOverlay">
+    <div class="modal" style="max-width: min(920px, 96vw);">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-title" id="invoiceModalTitle">Invoice</span>
+        </div>
+        <button class="modal-close" id="invoiceModalClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="contract-body" id="invoiceModalBody" style="max-height: 70vh; overflow: auto;"></div>
+      <div class="modal-footer">
+        <button class="contract-view-btn" id="invoiceModalCloseBtn" type="button">Close</button>
+      </div>
+    </div>
   </div>
 
   <!-- ============================================================
@@ -1551,6 +1563,7 @@
     // ================================================================
     let currentClient    = null;   // matched row from public.clients
     let currentContracts = [];     // signed_contracts for that client
+    let currentInvoices  = [];      // published invoices (portal_published_at set)
 
     // Pull the row that matches the signed-in user's email. RLS does the
     // gating; we just SELECT and assume the result is empty unless our
@@ -1604,6 +1617,77 @@
       return rows;
     }
 
+    async function fetchInvoicesForClient(clientId) {
+      if (!clientId) return [];
+      const { data, error } = await sb
+        .from("invoices")
+        .select("id, receipt_no, issued_at, status, portal_published_at, rendered_html")
+        .eq("client_id", clientId)
+        .not("portal_published_at", "is", null)
+        .order("portal_published_at", { ascending: false });
+      if (error) {
+        console.warn("Invoice fetch failed:", error);
+        return [];
+      }
+      return data || [];
+    }
+
+    function invoicePortalMetaLine(inv) {
+      const issued = inv.issued_at
+        ? new Date(String(inv.issued_at) + "T12:00:00").toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          })
+        : "—";
+      const pub = inv.portal_published_at
+        ? new Date(inv.portal_published_at).toLocaleString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })
+        : "";
+      const payLabel = inv.status === "paid" ? "Paid" : "Due";
+      const parts = [`<span class="contract-row-meta-label">Issued</span> ${escapeHtml(issued)}`];
+      if (pub) parts.push(`<span class="contract-row-meta-label">In portal</span> ${escapeHtml(pub)}`);
+      parts.push(`<span class="contract-row-meta-label">Payment</span> ${escapeHtml(payLabel)}`);
+      return parts.map((p) => `<span>${p}</span>`).join(" ");
+    }
+
+    function renderInvoiceList(rows) {
+      const list = document.getElementById("invoiceList");
+      if (!list) return;
+      if (!rows || rows.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <span class="empty-state-icon">&#x1F4C4;</span>
+            <div class="empty-state-title">No invoices yet</div>
+            <div>Invoices appear here after your account manager schedules them to the portal.</div>
+          </div>
+        `;
+        return;
+      }
+      list.innerHTML = rows.map((inv) => {
+        return `
+          <div class="contract-row">
+            <div class="contract-row-main">
+              <div class="contract-row-title">
+                <span class="contract-row-name">${escapeHtml(inv.receipt_no || "Invoice")}</span>
+              </div>
+              <div class="contract-row-meta">
+                ${invoicePortalMetaLine(inv)}
+              </div>
+            </div>
+            <div class="contract-row-actions">
+              <button type="button" class="contract-view-btn primary" data-invoice-id="${escapeHtml(inv.id)}">View invoice</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
     // Open modal when a contract row's button is clicked
     document.getElementById("contractList").addEventListener("click", (e) => {
       const btn = e.target.closest("[data-contract-id]");
@@ -1612,6 +1696,37 @@
       const contract = currentContracts.find((c) => String(c.id) === id);
       if (contract) openContractModal(contract);
     });
+
+    const invoiceOverlay = document.getElementById("invoiceOverlay");
+    const invoiceModalTitle = document.getElementById("invoiceModalTitle");
+    const invoiceModalBody = document.getElementById("invoiceModalBody");
+
+    function openInvoiceModal(inv) {
+      if (invoiceModalTitle) invoiceModalTitle.textContent = inv.receipt_no || "Invoice";
+      if (invoiceModalBody) {
+        invoiceModalBody.innerHTML = inv.rendered_html || "<em>Invoice content unavailable.</em>";
+      }
+      if (invoiceOverlay) invoiceOverlay.classList.add("open");
+    }
+
+    function closeInvoiceModal() {
+      if (invoiceOverlay) invoiceOverlay.classList.remove("open");
+    }
+
+    document.getElementById("invoiceList").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-invoice-id]");
+      if (!btn) return;
+      const id = btn.dataset.invoiceId;
+      const inv = currentInvoices.find((x) => String(x.id) === id);
+      if (inv) openInvoiceModal(inv);
+    });
+    document.getElementById("invoiceModalClose").addEventListener("click", closeInvoiceModal);
+    document.getElementById("invoiceModalCloseBtn").addEventListener("click", closeInvoiceModal);
+    if (invoiceOverlay) {
+      invoiceOverlay.addEventListener("click", (e) => {
+        if (e.target === invoiceOverlay) closeInvoiceModal();
+      });
+    }
 
     // ================================================================
     // BOOT
@@ -1678,11 +1793,13 @@
 
       currentClient = client;
       currentContracts = await fetchContractsForClient(client.id);
+      currentInvoices = await fetchInvoicesForClient(client.id);
       renderPortalHeader({
         company_name: client.company_name || email,
         email: email,
       });
       renderContractList(currentContracts);
+      renderInvoiceList(currentInvoices);
       showView("portal");
     }
 
@@ -1691,6 +1808,7 @@
       if (event === "SIGNED_OUT" || !session) {
         currentClient = null;
         currentContracts = [];
+        currentInvoices = [];
         // Avoid flashing signin during the brief moment between sign-in
         // and the very-next page load that boot() handles. Only push to
         // signin on an explicit sign-out.

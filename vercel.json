@@ -5,5 +5,11 @@
       "destination": "/favicon.svg",
       "permanent": false
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/publish-invoices",
+      "schedule": "* * * * *"
+    }
   ]
 }

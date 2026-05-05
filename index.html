@@ -205,6 +205,10 @@
     .inv-cal-pill-blue { background: #dbeafe; color: #1e40af; }
     .inv-cal-pill-yellow { background: #fef9c3; color: #713f12; }
     .inv-cal-pill-red { background: #fee2e2; color: #991b1b; }
+    /* Invoice calendar portal dispatch (FullCalendar eventClassNames) */
+    .inv-cal-ev-unset .fc-event-title { opacity: 0.95; }
+    .inv-cal-ev-queued .fc-event-title::before { content: "\1F550 "; }
+    .inv-cal-ev-pushed .fc-event-title::before { content: "\2713 "; }
     .step-meta { padding: 16px 20px 4px; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
     .step-body { padding: 4px 20px 16px; overflow-y: auto; flex: 1; }
     .step-title { font-size: 18px; font-weight: 600; margin: 0 0 6px; }
@@ -11973,6 +11977,9 @@
           status: "due",
           stripe_payment_link: data.stripe_payment_link || null,
           rendered_html: renderedHtml,
+          portal_dispatch_status: "pushed",
+          portal_published_at: new Date().toISOString(),
+          scheduled_dispatch_time: new Date().toISOString(),
         };
         const { data: inserted, error } = await sb.from("invoices").insert(row).select().single();
         if (error) throw error;
@@ -13441,18 +13448,91 @@
       return "Payment philosophy snapshot stored for automation.";
     }
 
+    /** Browser-local wall time for schedule UI; document if you add org-wide TZ. */
+    const CRM_DISPATCH_TZ_LABEL = "your local time zone";
+
+    function calendarEventDateCategory(scheduledDateYmd) {
+      const sd = String(scheduledDateYmd || "").slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(sd)) return "future";
+      const [yy, mm, dd] = sd.split("-").map((x) => parseInt(x, 10));
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const ev = new Date(yy, mm - 1, dd);
+      const t0 = today.getTime();
+      const e0 = ev.getTime();
+      if (e0 < t0) return "past";
+      if (e0 === t0) return "today";
+      return "future";
+    }
+
+    function combineLocalDateAndTimeToIso(dateYmd, timeHm) {
+      const d = String(dateYmd || "").slice(0, 10);
+      const t = String(timeHm || "09:00").trim() || "09:00";
+      const [hh, mi] = t.split(":").map((x) => parseInt(x, 10));
+      const [y, m, day] = d.split("-").map((x) => parseInt(x, 10));
+      const dt = new Date(y, m - 1, day, Number.isFinite(hh) ? hh : 9, Number.isFinite(mi) ? mi : 0, 0, 0);
+      return dt.toISOString();
+    }
+
+    function chargesToInvoiceLineItems(charges) {
+      const arr = Array.isArray(charges) ? charges : [];
+      return arr.map((c) => {
+        const pill =
+          c.color === "blue" ? "DUE TODAY" : c.color === "yellow" ? "BALANCE DUE" : "BALANCE DUE";
+        return {
+          description: String(c.label || billingSimShortLabel(c) || "Line").trim() || "Line",
+          subtitle: billingSimShortLabel(c),
+          status_pill: pill,
+          amount: Number(c.amount) || 0,
+        };
+      });
+    }
+
+    function invoiceCalendarDispatchPhaseFromState(calRow, invRow) {
+      const inv = invRow || null;
+      if (inv) {
+        if (inv.portal_published_at || inv.portal_dispatch_status === "pushed") return "pushed";
+        if (inv.portal_dispatch_status === "queued" && !inv.portal_published_at) return "queued";
+      }
+      return "unset";
+    }
+
+    function invoiceCalendarColorsForDispatchPhase(phase) {
+      if (phase === "pushed") return { bg: "#16a34a", border: "#15803d" };
+      if (phase === "queued") return { bg: "#2563eb", border: "#1e3a8a" };
+      return { bg: "#9ca3af", border: "#4b5563" };
+    }
+
+    let invoiceCalModalCtx = null;
+
     async function fetchInvoiceCalendarEventsForRange(startStr, endStr) {
       const start = startStr.slice(0, 10);
       const end = endStr.slice(0, 10);
       const { data, error } = await sb
         .from("invoice_calendar_events")
-        .select("id, client_id, scheduled_date, status, total_amount, charges, billing_philosophy, template_name")
+        .select(
+          "id, client_id, scheduled_date, status, total_amount, charges, billing_philosophy, template_name, invoice_id, scheduled_dispatch_time",
+        )
         .gte("scheduled_date", start)
         .lte("scheduled_date", end)
         .eq("source", "plan_wizard")
         .order("scheduled_date", { ascending: true });
       if (error) throw error;
-      return data || [];
+      const rows = data || [];
+      const invIds = [...new Set(rows.map((r) => r.invoice_id).filter(Boolean))];
+      let invById = {};
+      if (invIds.length) {
+        const { data: invs, error: ie } = await sb
+          .from("invoices")
+          .select("id, portal_dispatch_status, portal_published_at, scheduled_dispatch_time")
+          .in("id", invIds);
+        if (ie) console.warn("invoice join for calendar:", ie);
+        invById = Object.fromEntries((invs || []).map((x) => [String(x.id), x]));
+      }
+      return rows.map((r) => ({
+        ...r,
+        _inv: r.invoice_id ? invById[String(r.invoice_id)] : null,
+      }));
     }
 
     async function loadInvoiceCalendarEventsForFullCalendar(startStr, endStr) {
@@ -13461,8 +13541,14 @@
         const c = allClients.find((cl) => String(cl.id) === String(row.client_id));
         const companyName = c?.company_name || c?.client_name || "Client";
         const charges = Array.isArray(row.charges) ? row.charges : [];
-        const colors = invoiceCalendarColorsFromCharges(charges);
-        const statusDisplay = row.status === "scheduled" ? "Scheduled" : String(row.status || "");
+        const phase = invoiceCalendarDispatchPhaseFromState(row, row._inv);
+        const colors = invoiceCalendarColorsForDispatchPhase(phase);
+        const statusDisplay =
+          phase === "pushed"
+            ? "In portal"
+            : phase === "queued"
+              ? "Queued for portal"
+              : "Portal time not set";
         const total = Number(row.total_amount) || 0;
         return {
           id: row.id,
@@ -13471,6 +13557,8 @@
           allDay: true,
           backgroundColor: colors.bg,
           borderColor: colors.border,
+          classNames:
+            phase === "pushed" ? ["inv-cal-ev-pushed"] : phase === "queued" ? ["inv-cal-ev-queued"] : ["inv-cal-ev-unset"],
           extendedProps: {
             companyName,
             scheduled_date: row.scheduled_date,
@@ -13480,9 +13568,142 @@
             charges,
             billing_philosophy: row.billing_philosophy,
             template_name: row.template_name,
+            invoice_id: row.invoice_id,
+            scheduled_dispatch_time: row.scheduled_dispatch_time,
+            dispatchPhase: phase,
+            rawCalendarRow: row,
           },
         };
       });
+    }
+
+    function buildInvoiceDataFromCalendarRow(calRow, client, receiptNo) {
+      const line_items = chargesToInvoiceLineItems(calRow.charges);
+      const pt = invoiceAmountTotalsByStatusPill(line_items);
+      const issued_at = String(calRow.scheduled_date || "").slice(0, 10);
+      return {
+        receipt_no: receiptNo,
+        issued_at,
+        billed_to_name: client.client_name || client.company_name || "",
+        from_company: "Direct Konnect LLC",
+        from_subtitle: "Web Design & Development Services",
+        line_items,
+        terms_html: INVOICE_DEFAULTS.terms_html,
+        stripe_payment_link: "",
+        amount_paid: 0,
+        subtotal: pt.grand,
+        subtotal_due_today: pt.dueToday,
+        subtotal_balance_due_pill: pt.balanceDuePill,
+        subtotal_other: pt.other,
+        balance_due: pt.grand,
+        balance_after: Math.max(0, pt.grand - pt.dueToday),
+        status: "due",
+      };
+    }
+
+    async function persistInvoiceCalendarPortalDispatch({ publishNow, dispatchAtIso }) {
+      const ctx = invoiceCalModalCtx;
+      if (!ctx?.rawCalendarRow) return;
+      const calRow = ctx.rawCalendarRow;
+      const charges = Array.isArray(calRow.charges) ? calRow.charges : [];
+      if (!charges.length) {
+        showInvoiceBuilderPlaceholderToast("No charges on this calendar row — nothing to send.");
+        return;
+      }
+      const client = allClients.find((c) => String(c.id) === String(calRow.client_id));
+      if (!client) {
+        showInvoiceBuilderPlaceholderToast("Client not loaded.");
+        return;
+      }
+      const { data: auth } = await sb.auth.getSession();
+      if (!auth?.session) {
+        showInvoiceBuilderPlaceholderToast("Sign in to schedule.");
+        return;
+      }
+
+      let existingInv = null;
+      if (calRow.invoice_id) {
+        const { data: invFull, error: fe } = await sb.from("invoices").select("*").eq("id", calRow.invoice_id).maybeSingle();
+        if (fe) {
+          console.warn("load invoice for calendar:", fe);
+        } else {
+          existingInv = invFull;
+        }
+      }
+
+      const receiptNo = existingInv?.receipt_no || (await nextReceiptNo());
+      const data = buildInvoiceDataFromCalendarRow(calRow, client, receiptNo);
+      const renderedHtml = renderInvoiceHTML(data);
+      const nowIso = new Date().toISOString();
+      const schedIso = publishNow ? nowIso : dispatchAtIso;
+
+      try {
+        if (existingInv) {
+          const { error: upErr } = await sb
+            .from("invoices")
+            .update({
+              rendered_html: renderedHtml,
+              line_items: data.line_items,
+              terms_html: data.terms_html,
+              billed_to_name: data.billed_to_name,
+              issued_at: data.issued_at,
+              scheduled_dispatch_time: schedIso,
+              portal_dispatch_status: publishNow ? "pushed" : "queued",
+              portal_published_at: publishNow ? nowIso : null,
+            })
+            .eq("id", existingInv.id);
+          if (upErr) throw upErr;
+        } else {
+          const insertRow = {
+            client_id: client.id,
+            receipt_no: data.receipt_no,
+            issued_at: data.issued_at,
+            billed_to_name: data.billed_to_name,
+            from_company: data.from_company,
+            from_subtitle: data.from_subtitle,
+            line_items: data.line_items,
+            payment_methods: [],
+            terms_html: data.terms_html,
+            amount_paid: 0,
+            status: "due",
+            stripe_payment_link: null,
+            rendered_html: renderedHtml,
+            scheduled_dispatch_time: schedIso,
+            portal_dispatch_status: publishNow ? "pushed" : "queued",
+            portal_published_at: publishNow ? nowIso : null,
+          };
+          const { data: ins, error: insErr } = await sb.from("invoices").insert(insertRow).select().single();
+          if (insErr) throw insErr;
+          const { error: lkErr } = await sb
+            .from("invoice_calendar_events")
+            .update({ invoice_id: ins.id, scheduled_dispatch_time: schedIso })
+            .eq("id", calRow.id);
+          if (lkErr) throw lkErr;
+        }
+
+        if (existingInv) {
+          const { error: calUp } = await sb
+            .from("invoice_calendar_events")
+            .update({ scheduled_dispatch_time: schedIso })
+            .eq("id", calRow.id);
+          if (calUp) throw calUp;
+        }
+
+        if (calRow.client_id && String(invoicesLoadedForClientId) === String(calRow.client_id)) {
+          loadClientInvoices(calRow.client_id).then(() => renderInvoiceBuilder());
+        }
+
+        showInvoiceBuilderPlaceholderToast(
+          publishNow ? "Invoice sent to the Client Portal." : "Portal dispatch queued for the scheduled time.",
+        );
+        closeInvoiceCalendarEventModal();
+        if (invoiceCalendarInstance) invoiceCalendarInstance.refetchEvents();
+      } catch (e) {
+        console.error("portal dispatch save:", e);
+        showInvoiceBuilderPlaceholderToast(
+          "Save failed: " + (e?.message || String(e)),
+        );
+      }
     }
 
     function openInvoiceCalendarEventModalFromFc(info) {
@@ -13491,6 +13712,9 @@
       const titleEl = document.getElementById("invoiceCalEventTitle");
       if (!ov || !body) return;
       const p = info.event.extendedProps || {};
+      const raw = p.rawCalendarRow || {};
+      invoiceCalModalCtx = { eventId: info.event.id, extendedProps: p, rawCalendarRow: raw };
+
       const dateLabel = formatDueDateFriendly(p.scheduled_date) || p.scheduled_date;
       if (titleEl) titleEl.textContent = `Invoice — ${dateLabel}`;
       const charges = Array.isArray(p.charges) ? p.charges : [];
@@ -13509,15 +13733,75 @@
         })
         .join("");
       const phil = billingPhilosophySnippet(p.billing_philosophy);
+      const dateCat = calendarEventDateCategory(p.scheduled_date);
+      const phase = p.dispatchPhase || "unset";
+      let actionHtml = "";
+      if (phase === "pushed") {
+        actionHtml = `<p class="muted" style="margin-top:12px;">This invoice is already visible in the <strong>Client Portal</strong>.</p>`;
+      } else if (dateCat === "past") {
+        actionHtml = `<p class="muted" style="margin-top:12px;">This date is in the past. Use the Invoice Builder on the client profile if you still need to publish an invoice.</p>`;
+      } else if (dateCat === "today") {
+        actionHtml = `
+          <div class="inv-cal-dispatch-actions" style="margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb;">
+            <button type="button" class="primary" id="invCalBtnSendNow">Send to Portal Now</button>
+            <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+              <label style="font-size:13px;color:#374151;">Schedule for later today <span class="muted">(${esc(CRM_DISPATCH_TZ_LABEL)})</span></label>
+              <input type="time" id="invCalTimeInput" value="17:00" style="padding:8px 10px;border-radius:8px;border:1px solid #d1d5db;" />
+              <button type="button" class="ghost" id="invCalBtnLaterToday">Schedule</button>
+            </div>
+          </div>`;
+      } else {
+        actionHtml = `
+          <div class="inv-cal-dispatch-actions" style="margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb;">
+            <label style="display:block;font-weight:600;margin-bottom:8px;color:#374151;">Schedule Portal Dispatch Time <span class="muted">(${esc(CRM_DISPATCH_TZ_LABEL)})</span></label>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+              <input type="time" id="invCalTimeInput" value="10:00" style="padding:8px 10px;border-radius:8px;border:1px solid #d1d5db;" />
+              <button type="button" class="primary" id="invCalBtnFutureQueue">Queue for portal</button>
+            </div>
+          </div>`;
+      }
+
       body.innerHTML = `
         <div class="inv-cal-detail-meta">
           <div><strong>${esc(p.companyName || "Client")}</strong></div>
-          <div>Status: <strong>${esc(p.statusDisplay || "Scheduled")}</strong> · Total: <strong>${esc(fmtMoney(total))}</strong></div>
+          <div>Portal: <strong>${esc(p.statusDisplay || "—")}</strong> · Total: <strong>${esc(fmtMoney(total))}</strong></div>
           ${p.template_name ? `<div>Template: ${esc(p.template_name)}</div>` : ""}
           <div style="margin-top:10px;font-size:12px;color:#6b7280;">${esc(phil)}</div>
         </div>
         <div class="inv-diag-box-title" style="margin-bottom:6px;">Charge breakdown</div>
-        ${rows || '<p class="muted">No line items.</p>'}`;
+        ${rows || '<p class="muted">No line items.</p>'}
+        ${actionHtml}`;
+
+      const sendNow = document.getElementById("invCalBtnSendNow");
+      if (sendNow) {
+        sendNow.addEventListener("click", () => {
+          void persistInvoiceCalendarPortalDispatch({ publishNow: true, dispatchAtIso: null });
+        });
+      }
+      const laterToday = document.getElementById("invCalBtnLaterToday");
+      if (laterToday) {
+        laterToday.addEventListener("click", () => {
+          const inp = document.getElementById("invCalTimeInput");
+          const hm = inp && inp.value ? inp.value : "17:00";
+          const iso = combineLocalDateAndTimeToIso(String(p.scheduled_date).slice(0, 10), hm);
+          const t = new Date(iso).getTime();
+          if (t <= Date.now()) {
+            showInvoiceBuilderPlaceholderToast("Pick a time later than now for today.");
+            return;
+          }
+          void persistInvoiceCalendarPortalDispatch({ publishNow: false, dispatchAtIso: iso });
+        });
+      }
+      const fut = document.getElementById("invCalBtnFutureQueue");
+      if (fut) {
+        fut.addEventListener("click", () => {
+          const inp = document.getElementById("invCalTimeInput");
+          const hm = inp && inp.value ? inp.value : "10:00";
+          const iso = combineLocalDateAndTimeToIso(String(p.scheduled_date).slice(0, 10), hm);
+          void persistInvoiceCalendarPortalDispatch({ publishNow: false, dispatchAtIso: iso });
+        });
+      }
+
       ov.classList.add("open");
     }
 
@@ -14878,7 +15162,9 @@
           const total = fmtMoney(Number(p.total_amount) || 0);
           const name = p.companyName || "Client";
           const st = p.statusDisplay || "Scheduled";
-          info.el.setAttribute("title", `${name} — ${total} — Status: ${st}`);
+          const phase = p.dispatchPhase || "unset";
+          const prefix = phase === "pushed" ? "Sent — " : phase === "queued" ? "Queued — " : "";
+          info.el.setAttribute("title", `${prefix}${name} — ${total} — ${st}`);
         },
       });
       invoiceCalendarInstance.render();

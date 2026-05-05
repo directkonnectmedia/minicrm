@@ -529,18 +529,64 @@ create table if not exists public.invoices (
 create unique index if not exists invoices_receipt_no_idx on public.invoices (receipt_no);
 create index if not exists invoices_client_id_idx on public.invoices (client_id);
 
+-- Portal dispatch: scheduled push to Client Portal (separate from payment status).
+alter table public.invoices add column if not exists scheduled_dispatch_time timestamptz;
+alter table public.invoices add column if not exists portal_dispatch_status text;
+alter table public.invoices add column if not exists portal_published_at timestamptz;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'invoices_portal_dispatch_status_check'
+  ) then
+    alter table public.invoices
+      alter column portal_dispatch_status set default 'pending_time';
+    update public.invoices
+      set portal_dispatch_status = 'pending_time'
+      where portal_dispatch_status is null;
+    alter table public.invoices
+      alter column portal_dispatch_status set not null;
+    alter table public.invoices
+      add constraint invoices_portal_dispatch_status_check
+      check (portal_dispatch_status in ('pending_time', 'queued', 'pushed'));
+  end if;
+end $$;
+
+-- Existing invoices (legacy): publish so portal clients keep access after RLS change.
+-- Do not touch rows queued for a future portal_dispatch_time.
+update public.invoices
+set
+  portal_published_at = coalesce(portal_published_at, created_at),
+  portal_dispatch_status = 'pushed'
+where portal_published_at is null
+  and portal_dispatch_status is distinct from 'queued';
+
+create index if not exists invoices_dispatch_due_idx
+  on public.invoices (scheduled_dispatch_time asc)
+  where portal_published_at is null and portal_dispatch_status = 'queued';
+
 alter table public.invoices enable row level security;
 
--- RLS mirrors signed_contracts: team members get full access, portal
--- clients can only read invoices attached to their own client row.
+-- Team: full CRUD. Portal clients: read only rows published to the portal.
 drop policy if exists "team or own invoices" on public.invoices;
-create policy "team or own invoices"
+drop policy if exists "team invoices all" on public.invoices;
+drop policy if exists "portal clients read published invoices" on public.invoices;
+
+create policy "team invoices all"
   on public.invoices for all to authenticated
-  using (
-    public.is_team_member()
-    or client_id in (select id from public.clients where lower(email) = lower(auth.email()))
-  )
+  using (public.is_team_member())
   with check (public.is_team_member());
+
+create policy "portal clients read published invoices"
+  on public.invoices for select to authenticated
+  using (
+    not public.is_team_member()
+    and client_id in (
+      select id from public.clients where lower(email) = lower(auth.email())
+    )
+    and portal_published_at is not null
+  );
 
 drop trigger if exists invoices_set_updated_at on public.invoices;
 create trigger invoices_set_updated_at
@@ -871,6 +917,12 @@ create index if not exists invoice_calendar_events_client_date_idx
   on public.invoice_calendar_events (client_id, scheduled_date);
 create index if not exists invoice_calendar_events_batch_idx
   on public.invoice_calendar_events (commit_batch_id);
+
+alter table public.invoice_calendar_events add column if not exists invoice_id uuid references public.invoices(id) on delete set null;
+alter table public.invoice_calendar_events add column if not exists scheduled_dispatch_time timestamptz;
+create index if not exists invoice_calendar_events_invoice_id_idx
+  on public.invoice_calendar_events (invoice_id)
+  where invoice_id is not null;
 
 alter table public.invoice_calendar_events enable row level security;
 
