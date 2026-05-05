@@ -197,6 +197,14 @@
       gap: 8px;
       background: #f9fafb;
     }
+    .modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; font-size: 14px; line-height: 1.55; color: #374151; }
+    .inv-cal-detail-meta { font-size: 13px; color: #6b7280; margin-bottom: 12px; }
+    .inv-cal-detail-row { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
+    .inv-cal-detail-row:last-child { border-bottom: none; }
+    .inv-cal-pill { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; flex-shrink: 0; }
+    .inv-cal-pill-blue { background: #dbeafe; color: #1e40af; }
+    .inv-cal-pill-yellow { background: #fef9c3; color: #713f12; }
+    .inv-cal-pill-red { background: #fee2e2; color: #991b1b; }
     .step-meta { padding: 16px 20px 4px; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
     .step-body { padding: 4px 20px 16px; overflow-y: auto; flex: 1; }
     .step-title { font-size: 18px; font-weight: 600; margin: 0 0 6px; }
@@ -804,6 +812,64 @@
     .inv-diag-box p:last-child { margin-bottom: 0; }
     .inv-diag-blue { background: #dbeafe; border-color: #3b82f6; color: #1e3a8a; }
     .inv-diag-yellow { background: #fef9c3; border-color: #eab308; color: #713f12; }
+    .inv-diag-yellow-verify-line {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(113, 63, 18, 0.22);
+      font-size: 13px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .inv-diag-yellow-signing-line {
+      margin-top: 10px;
+      font-size: 13px;
+      line-height: 1.48;
+      color: #574010;
+      font-weight: 500;
+    }
+    .inv-diag-stage1-financing-note {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: #fefce8;
+      border: 1px solid #facc15;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #713f12;
+    }
+    .inv-diag-phil-primary { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0 16px; }
+    .inv-diag-phil-choice {
+      flex: 1 1 220px;
+      max-width: 100%;
+      text-align: left;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 2px solid #e5e7eb;
+      background: #fafafa;
+      cursor: pointer;
+      font: inherit;
+      color: #111827;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .inv-diag-phil-choice:hover { border-color: #c7d2fe; background: #f5f7ff; }
+    .inv-diag-phil-choice.active { border-color: #4f46e5; background: #eef2ff; box-shadow: 0 0 0 1px rgba(79,70,229,0.12); }
+    .inv-diag-phil-choice-title { font-weight: 700; font-size: 15px; margin: 0 0 6px; color: #111827; }
+    .inv-diag-phil-choice-desc { font-size: 13px; line-height: 1.45; margin: 0; color: #4b5563; }
+    .inv-diag-phil-panel {
+      margin-top: 8px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+    }
+    .inv-diag-phil-panel[hidden] { display: none !important; }
+    .inv-diag-phil-field { margin-bottom: 14px; }
+    .inv-diag-phil-field:last-child { margin-bottom: 0; }
+    .inv-diag-phil-field label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+    .inv-diag-phil-field input[type="number"] { width: 5rem; padding: 8px 10px; border-radius: 8px; border: 1px solid #d1d5db; }
+    .inv-diag-phil-field select { padding: 8px 10px; border-radius: 8px; border: 1px solid #d1d5db; font: inherit; min-width: 5rem; }
+    .inv-diag-phil-toggle label { display: flex; align-items: flex-start; gap: 10px; font-weight: 500; cursor: pointer; }
+    .inv-diag-phil-toggle input { margin-top: 3px; }
     .inv-diag-red { background: #fee2e2; border-color: #ef4444; color: #7f1d1d; }
     .inv-diag-empty-note { font-size: 13px; color: #6b7280; font-style: italic; }
 
@@ -976,7 +1042,7 @@
       cursor: default;
     }
 
-    /* Billing simulator (wizard step 7) */
+    /* Billing simulator (invoice diagnostic final step) */
     .inv-diag-sim-legend {
       display: flex;
       flex-wrap: wrap;
@@ -3152,6 +3218,20 @@
     </div>
   </div>
 
+  <!-- Invoice Calendar event detail (scheduled charges from Plan Wizard commits) -->
+  <div class="overlay" id="invoiceCalendarEventOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="invoiceCalEventTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="invoiceCalEventTitle">Scheduled invoice</div>
+        <button type="button" class="modal-close" id="invoiceCalendarEventClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body" id="invoiceCalendarEventBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="ghost" id="invoiceCalendarEventCloseFooter">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div class="tab-content" data-view="sekretary">
     <div class="card sekretary-card">
       <div class="sekretary-layout">
@@ -3606,25 +3686,69 @@
           </div>
         </section>
         <section data-inv-diag-step="6" hidden>
-          <p class="inv-diag-stage-label">Confirmation</p>
-          <div id="invDiagConfirmSummary" class="inv-diag-confirm-summary"></div>
-          <pre id="invDiagDispatcherPreview" class="inv-diag-rhythm-preview"></pre>
-          <div class="inv-diag-actions">
-            <button type="button" class="ghost" id="invDiagConfirmBack">Back</button>
-            <button type="button" id="invDiagConfirmSimNext">Continue to billing simulation</button>
-          </div>
-        </section>
-        <section data-inv-diag-step="7" hidden>
-          <p class="inv-diag-stage-label">Billing simulation</p>
-          <p class="invoice-wiz-hint" style="margin-top:0;">Read-only preview for the next <strong>6 months</strong> from today. Colors combine when multiple bill types fall on the same day.</p>
+          <p class="inv-diag-stage-label">Billing calendar (simulation)</p>
+          <p class="invoice-wiz-hint" style="margin-top:0;">
+            Preview spans the <strong>next 6 months</strong> from today. Use ← → on the calendar to move between months. The legend explains solid colors and collision blends (e.g. orange = financing + subscription, brown = all three).
+          </p>
           <div id="invDiagSimLegend" class="inv-diag-sim-legend" aria-hidden="true"></div>
           <div id="invDiagSimMount"></div>
           <div id="invDiagSimPopup" class="inv-diag-sim-popup" hidden></div>
-          <p class="muted" style="font-size:12px;margin:0 0 10px;">Hover or click a colored day for the money stack. Click again to dismiss a pinned stack.</p>
+          <p class="muted" style="font-size:12px;margin:0 0 10px;">Click a colored day for the total and line breakdown. Click again to dismiss.</p>
           <div class="inv-diag-actions">
-            <button type="button" class="ghost" id="invDiagSimBack">Back</button>
+            <button type="button" class="ghost" id="invDiagConfirmBack">Back</button>
             <button type="button" class="ghost" id="invDiagSimClose">Close</button>
-            <button type="button" id="invDiagFinalizeLaunch">Finalize &amp; Launch Plan</button>
+            <button type="button" id="invDiagSimToPhilosophy">Next</button>
+          </div>
+        </section>
+        <section data-inv-diag-step="7" hidden>
+          <p class="inv-diag-stage-label">Payment philosophy</p>
+          <p class="invoice-wiz-hint" style="margin-top:0;">
+            How should <strong>automated billing</strong> behave for <strong>this client’s live account</strong> when real-world timing drifts (late payments, mid-month starts)? This does not change the plan template or invoice template.
+          </p>
+          <div class="inv-diag-phil-primary" role="radiogroup" aria-label="Billing schedule philosophy">
+            <button type="button" class="inv-diag-phil-choice active" id="invDiagPhilAnchorBtn" data-phil-mode="anchor" aria-pressed="true">
+              <div class="inv-diag-phil-choice-title">Anchor (fixed schedule)</div>
+              <p class="inv-diag-phil-choice-desc">Dates you set stay on the calendar grid (same day of month/week). The system targets those anchor days even if a prior payment cleared late.</p>
+            </button>
+            <button type="button" class="inv-diag-phil-choice" id="invDiagPhilShifterBtn" data-phil-mode="shifter" aria-pressed="false">
+              <div class="inv-diag-phil-choice-title">Shifter (fluid schedule)</div>
+              <p class="inv-diag-phil-choice-desc">The interval between charges is sacred (e.g. ~30 days). A late payment pushes the whole future schedule forward to keep the gap.</p>
+            </button>
+          </div>
+          <div id="invDiagPhilosophyAnchorPanel" class="inv-diag-phil-panel">
+            <div class="inv-diag-phil-field inv-diag-phil-toggle">
+              <label>
+                <input type="checkbox" id="invDiagPhilProrate" />
+                <span>Auto-prorate the first month to align with the anchor date?</span>
+              </label>
+            </div>
+            <div class="inv-diag-phil-field">
+              <label for="invDiagPhilMinGap">Minimum gap between payments (days)</label>
+              <p class="muted" style="font-size:12px;margin:0 0 6px;">If a late payment lands too close to the next anchor charge, skip or delay that next charge to avoid double-billing.</p>
+              <input type="number" id="invDiagPhilMinGap" min="1" max="60" value="7" step="1" />
+            </div>
+          </div>
+          <div id="invDiagPhilosophyShifterPanel" class="inv-diag-phil-panel" hidden>
+            <div class="inv-diag-phil-field">
+              <label for="invDiagPhilShiftTrigger">Shift only if payment is late by more than</label>
+              <select id="invDiagPhilShiftTrigger" aria-label="Grace days before shifting schedule">
+                <option value="1">1 day</option>
+                <option value="3" selected>3 days</option>
+                <option value="5">5 days</option>
+              </select>
+              <p class="muted" style="font-size:12px;margin:8px 0 0;">Minor delays under this threshold do not move future dates.</p>
+            </div>
+            <div class="inv-diag-phil-field inv-diag-phil-toggle">
+              <label>
+                <input type="checkbox" id="invDiagPhilBizDay" checked />
+                <span>If a shifted charge date falls on a weekend, move it to the next weekday? (US bank-holiday calendar not included yet.)</span>
+              </label>
+            </div>
+          </div>
+          <div class="inv-diag-actions">
+            <button type="button" class="ghost" id="invDiagPhilosophyBack">Back</button>
+            <button type="button" class="ghost" id="invDiagPhilosophyClose">Close</button>
+            <button type="button" id="invDiagFinalizeLaunch">Finalize &amp; Launch</button>
           </div>
         </section>
       </div>
@@ -5388,6 +5512,11 @@
       populateFilterModalOptions();
       render();
       refreshCalendar();
+      if (invoiceCalendarInstance) {
+        try {
+          invoiceCalendarInstance.refetchEvents();
+        } catch (_) {}
+      }
       subscribeToContractChanges();
     }
 
@@ -7358,35 +7487,41 @@
     }
 
     /**
-     * Summarize invoice template line_items for the diagnostic wizard:
-     * — Blue: non-recurring amounts marked Due Today (current / next charge).
-     * — Yellow: non-recurring remaining balance (Balance Due / Overdue).
-     * — Red: subscription rows (description Recurring), unchanged cadence logic.
+     * Split total across N whole-cent installments (fallback when template has no structured rows).
      */
-    function extractInvoiceTemplateDiagnosticFacts(line_items) {
-      let dueNowTotal = 0;
-      let balanceRemainingTotal = 0;
-      const subscriptions = [];
-      for (const li of line_items || []) {
-        const desc = String(li.description || "");
-        const amt = Number(li.amount) || 0;
-        if (/recurring/i.test(desc)) {
-          subscriptions.push({
-            amount: amt,
-            slug: extractFrequencySlugFromInvoiceSubtitle(li.subtitle || ""),
-          });
-          continue;
-        }
-        const pill = String(li.status_pill || "").trim().toUpperCase();
-        if (pill === "DUE TODAY") {
-          dueNowTotal += amt;
-          continue;
-        }
-        if (pill === "BALANCE DUE" || pill === "OVERDUE") {
-          balanceRemainingTotal += amt;
+    function allocateFinancingInstallmentsDollars(totalDollars, n) {
+      const nInt = Math.max(1, Math.floor(Number(n)));
+      const centsTotal = Math.round((Number(totalDollars) || 0) * 100);
+      const base = Math.floor(centsTotal / nInt);
+      const remainder = centsTotal - base * nInt;
+      const amounts = [];
+      for (let i = 0; i < nInt; i++) {
+        amounts.push((base + (i < remainder ? 1 : 0)) / 100);
+      }
+      return amounts;
+    }
+
+    function summarizeInstallmentAmountGroups(amounts) {
+      const map = new Map();
+      for (const a of amounts || []) {
+        const k = (Math.round(Number(a) * 100) / 100).toFixed(2);
+        map.set(k, (map.get(k) || 0) + 1);
+      }
+      const entries = Array.from(map.entries()).sort((a, b) => Number(b[0]) - Number(a[0]));
+      const bits = [];
+      let sumPhraseParts = [];
+      for (const [key, ct] of entries) {
+        const lab = `$${key}`;
+        if (ct === 1) {
+          bits.push(`one installment at ${lab}`);
+          sumPhraseParts.push(lab);
+        } else {
+          bits.push(`${ct} installments at ${lab} each`);
+          sumPhraseParts.push(`${ct} × ${lab}`);
         }
       }
-      return { dueNowTotal, balanceRemainingTotal, subscriptions };
+      const readablePhrase = bits.length ? bits.join(", ") + " (penny-accurate to the Balance Due total)" : "";
+      return { readablePhrase, sumPhrase: sumPhraseParts.join(" + ") };
     }
 
     /** UI bucket for rhythm sentence (prompt covers daily / weekly / biweekly / monthly). */
@@ -7406,6 +7541,58 @@
       if (j === 2 && k !== 12) return `${v}nd`;
       if (j === 3 && k !== 13) return `${v}rd`;
       return `${v}th`;
+    }
+
+    function parseInstallmentKofN(description) {
+      const m = String(description || "").match(/installment\s+(\d+)\s+of\s+(\d+)/i);
+      if (!m) return null;
+      const k = parseInt(m[1], 10);
+      const n = parseInt(m[2], 10);
+      if (!Number.isFinite(k) || !Number.isFinite(n) || n < 1 || k < 1 || k > n) return null;
+      return { k, n };
+    }
+
+    /**
+     * Plan-builder rows: "Installment k of N" + status pill. Schedule N prefers k=1 DUE TODAY row when present.
+     * balanceAmounts follow k=2…N (sorted) on BALANCE DUE / OVERDUE only.
+     */
+    function analyzeFinancingInstallmentRows(line_items) {
+      const rows = [];
+      for (const li of line_items || []) {
+        if (/recurring/i.test(li.description || "")) continue;
+        const parsed = parseInstallmentKofN(li.description || "");
+        if (!parsed) continue;
+        const pill = String(li.status_pill || "").trim().toUpperCase();
+        rows.push({ parsed, pill, amount: Number(li.amount) || 0 });
+      }
+      if (!rows.length) return null;
+
+      const k1DueToday = rows.filter((r) => r.parsed.k === 1 && r.pill === "DUE TODAY");
+      let scheduleTotalN = 0;
+      if (k1DueToday.length === 1) {
+        scheduleTotalN = k1DueToday[0].parsed.n;
+      } else {
+        scheduleTotalN = Math.max(0, ...rows.map((r) => r.parsed.n));
+      }
+      if (scheduleTotalN < 2) return null;
+
+      const inSchedule = rows.filter((r) => r.parsed.n === scheduleTotalN);
+      const balanceRows = inSchedule
+        .filter((r) => r.pill === "BALANCE DUE" || r.pill === "OVERDUE")
+        .sort((a, b) => a.parsed.k - b.parsed.k);
+
+      const balanceAmounts = balanceRows.map((r) => r.amount);
+      const balanceScheduleKs = balanceRows.map((r) => r.parsed.k);
+      if (!balanceAmounts.length) return null;
+
+      const firstAligned = k1DueToday.length === 1 && k1DueToday[0].parsed.n === scheduleTotalN;
+      return {
+        scheduleTotalN,
+        balanceAmounts,
+        balanceScheduleKs,
+        firstInstallmentOnDueToday: !!firstAligned,
+        firstInstallmentAmount: firstAligned ? k1DueToday[0].amount : 0,
+      };
     }
 
     /** Largest "of N" from descriptions like "Installment k of N" (plan-generated rows). */
@@ -7442,6 +7629,110 @@
     }
 
     /**
+     * Installment count for financing sim + human verification (matches rhythm "multi yellow" rules).
+     * Uses largest "Installment … of N" when present; else counts Balance Due / Overdue non-recurring lines.
+     */
+    function resolveYellowInstallmentCountForSim(line_items) {
+      const maxInst = getMaxInstallmentScheduleTotal(line_items);
+      if (maxInst >= 2) return maxInst;
+      const chunks = countBalanceDueNonRecurringLines(line_items);
+      return Math.max(1, chunks);
+    }
+
+    /**
+     * Summarize invoice template line_items for the diagnostic wizard:
+     * — Blue: non-recurring amounts marked Due Today (current / next charge).
+     * — Yellow: non-recurring remaining balance (Balance Due / Overdue).
+     * — Red: subscription rows (description Recurring), unchanged cadence logic.
+     */
+    function extractInvoiceTemplateDiagnosticFacts(line_items) {
+      let dueNowTotal = 0;
+      let balanceRemainingTotal = 0;
+      const subscriptions = [];
+      for (const li of line_items || []) {
+        const desc = String(li.description || "");
+        const amt = Number(li.amount) || 0;
+        if (/recurring/i.test(desc)) {
+          subscriptions.push({
+            amount: amt,
+            slug: extractFrequencySlugFromInvoiceSubtitle(li.subtitle || ""),
+          });
+          continue;
+        }
+        const pill = String(li.status_pill || "").trim().toUpperCase();
+        if (pill === "DUE TODAY") {
+          dueNowTotal += amt;
+          continue;
+        }
+        if (pill === "BALANCE DUE" || pill === "OVERDUE") {
+          balanceRemainingTotal += amt;
+        }
+      }
+      const out = { dueNowTotal, balanceRemainingTotal, subscriptions };
+      if (balanceRemainingTotal > 0) {
+        const multi = shouldIncludeFinanceRhythmCard(line_items);
+        const inst = analyzeFinancingInstallmentRows(line_items);
+
+        if (multi && inst && inst.balanceAmounts.length > 0 && inst.scheduleTotalN >= 2) {
+          const reps = Number(inst.balanceAmounts[0]) || 0;
+          const amountsUniform = inst.balanceAmounts.every((a) => Math.abs(Number(a) - reps) < 0.005);
+          out.yellowFinancing = {
+            total: balanceRemainingTotal,
+            structuredFromTemplate: true,
+            scheduleTotalN: inst.scheduleTotalN,
+            firstInstallmentOnDueToday: inst.firstInstallmentOnDueToday,
+            firstInstallmentAmount: inst.firstInstallmentAmount,
+            balanceScheduleKs: inst.balanceScheduleKs.slice(),
+            balanceInstallmentCount: inst.balanceAmounts.length,
+            installmentAmounts: inst.balanceAmounts.slice(),
+            representativeInstallmentAmount: reps,
+            amountsUniform,
+            isMultiPayment: multi,
+            installmentCount: inst.balanceAmounts.length,
+            installmentAmount: amountsUniform ? reps : balanceRemainingTotal / inst.balanceAmounts.length,
+          };
+        } else if (multi) {
+          const payN = resolveYellowInstallmentCountForSim(line_items);
+          const fbAmounts = allocateFinancingInstallmentsDollars(balanceRemainingTotal, payN);
+          const fbRep = fbAmounts[0] || balanceRemainingTotal;
+          const fbUni = fbAmounts.every((a) => Math.abs(Number(a) - fbRep) < 0.005);
+          out.yellowFinancing = {
+            total: balanceRemainingTotal,
+            structuredFromTemplate: false,
+            scheduleTotalN: payN,
+            firstInstallmentOnDueToday: false,
+            firstInstallmentAmount: 0,
+            balanceInstallmentCount: payN,
+            installmentAmounts: fbAmounts,
+            representativeInstallmentAmount: fbRep,
+            amountsUniform: fbUni,
+            isMultiPayment: multi,
+            installmentCount: payN,
+            installmentAmount: fbUni ? fbRep : balanceRemainingTotal / Math.max(1, payN),
+            balanceScheduleKs: Array.from({ length: payN }, (_, i) => i + 1),
+          };
+        } else {
+          out.yellowFinancing = {
+            total: balanceRemainingTotal,
+            structuredFromTemplate: false,
+            scheduleTotalN: 1,
+            firstInstallmentOnDueToday: false,
+            firstInstallmentAmount: 0,
+            balanceInstallmentCount: 1,
+            installmentAmounts: [balanceRemainingTotal],
+            representativeInstallmentAmount: balanceRemainingTotal,
+            amountsUniform: true,
+            isMultiPayment: false,
+            installmentCount: 1,
+            installmentAmount: balanceRemainingTotal,
+            balanceScheduleKs: [1],
+          };
+        }
+      }
+      return out;
+    }
+
+    /**
      * Yellow (finance / balance-due non-recurring) and Red (subscription) rhythm cards only — excludes blue (due today).
      */
     function extractRhythmCardsFromLineItems(line_items) {
@@ -7465,6 +7756,7 @@
           frequencySlug: freqSlug,
           uiBucket: rhythmUIBucketFromSlug(freqSlug),
           totalRemaining: facts.balanceRemainingTotal,
+          yellowFinancing: facts.yellowFinancing || null,
           lines: yellowLines,
         });
       }
@@ -11164,16 +11456,63 @@
     function buildInvoiceDiagnosticHumanSentences(clientDisplayName, facts) {
       const name = (clientDisplayName || "").trim() || "This customer";
       const blue = [];
+      const yfi = facts.yellowFinancing;
       if (facts.dueNowTotal > 0) {
         blue.push(
-          `${name} will pay ${fmtMoney(facts.dueNowTotal)} for what's due now — non-recurring lines marked Due Today (e.g. deposit or the installment billed next).`,
+          `${name} will pay ${fmtMoney(facts.dueNowTotal)} for what's due now — non-recurring lines marked Due Today (e.g. deposit or the next installment).`,
         );
+        if (yfi?.structuredFromTemplate && yfi.firstInstallmentOnDueToday && yfi.scheduleTotalN >= 2) {
+          blue.push(
+            `That Due Today subtotal includes installment 1 of ${yfi.scheduleTotalN} — ${fmtMoney(yfi.firstInstallmentAmount)} financing billed today. The yellow box below counts only Balance Due financing (typically installments 2 through ${yfi.scheduleTotalN}).`,
+          );
+        }
       }
       const yellow = [];
       if (facts.balanceRemainingTotal > 0) {
-        yellow.push(
-          `${name} still owes ${fmtMoney(facts.balanceRemainingTotal)} on setup and financing — the remaining balance on lines marked Balance Due or Overdue (excluding subscription).`,
-        );
+        const yf = facts.yellowFinancing;
+        if (yf && yf.isMultiPayment && yf.balanceInstallmentCount >= 2) {
+          const parts = summarizeInstallmentAmountGroups(yf.installmentAmounts);
+
+          if (yf.structuredFromTemplate && yf.firstInstallmentOnDueToday) {
+            yellow.push(
+              `${name} will pay ${fmtMoney(yf.total)} in Balance Due financing — template installments 2 through ${yf.scheduleTotalN} (${yf.balanceInstallmentCount} payments). ${
+                yf.amountsUniform
+                  ? `Each is ${fmtMoney(yf.representativeInstallmentAmount)}.`
+                  : `Amounts by row: ${parts.readablePhrase.replace(" (penny-accurate to the Balance Due total)", "")}.`
+              }`,
+            );
+          } else {
+            yellow.push(
+              `${name} will pay ${fmtMoney(yf.total)} in Balance Due financing — ${yf.balanceInstallmentCount} scheduled installments. ${
+                yf.amountsUniform
+                  ? `Each installment is ${fmtMoney(yf.representativeInstallmentAmount)} per template rows.`
+                  : `Mix of amounts (${parts.readablePhrase.replace(" (penny-accurate to the Balance Due total)", "")}).`
+              }`,
+            );
+          }
+
+          yellow.push(
+            yf.firstInstallmentOnDueToday
+              ? `Due at signing: Installment 1 of ${yf.scheduleTotalN} (${fmtMoney(yf.firstInstallmentAmount)}) is on the Due Today (blue) rows. Later steps schedule installments 2 through ${yf.scheduleTotalN} using each Balance Due row amount.`
+              : `Due at signing: When dates line up, overlapping blue + yellow days show both stacks; amounts follow the template rows.`,
+          );
+
+          if (yf.amountsUniform) {
+            yellow.push(
+              `Verify: ${fmtMoney(yf.representativeInstallmentAmount)} × ${yf.balanceInstallmentCount} = ${fmtMoney(yf.total)} (Balance Due financing${yf.firstInstallmentOnDueToday ? `; installment 1 of ${yf.scheduleTotalN} is in Due Today above` : ""}).`,
+            );
+          } else {
+            yellow.push(`Verify: ${parts.sumPhrase} = ${fmtMoney(yf.total)} (Balance Due financing).`);
+          }
+        } else if (yf && !yf.isMultiPayment) {
+          yellow.push(
+            `${name} will pay ${fmtMoney(facts.balanceRemainingTotal)} in financing as a single payment — the remaining balance on lines marked Balance Due or Overdue (excluding subscription).`,
+          );
+        } else if (yf) {
+          yellow.push(
+            `${name} will pay ${fmtMoney(facts.balanceRemainingTotal)} in financing — Balance Due installments as shown on the template.`,
+          );
+        }
       }
       const red = [];
       for (const sub of facts.subscriptions || []) {
@@ -11996,12 +12335,94 @@
     const invDiagDateBack = document.getElementById("invDiagDateBack");
     const invDiagDateNext = document.getElementById("invDiagDateNext");
     const invDiagConfirmBack = document.getElementById("invDiagConfirmBack");
-    const invDiagConfirmSimNext = document.getElementById("invDiagConfirmSimNext");
-    const invDiagSimBack = document.getElementById("invDiagSimBack");
     const invDiagSimClose = document.getElementById("invDiagSimClose");
+    const invDiagSimToPhilosophy = document.getElementById("invDiagSimToPhilosophy");
+    const invDiagPhilosophyBack = document.getElementById("invDiagPhilosophyBack");
+    const invDiagPhilosophyClose = document.getElementById("invDiagPhilosophyClose");
     const invDiagFinalizeLaunch = document.getElementById("invDiagFinalizeLaunch");
 
     const INV_RHYTHM_WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+    function defaultBillingPhilosophyState() {
+      return {
+        schemaVersion: 1,
+        mode: "anchor",
+        autoProrateFirstMonth: false,
+        minimumGapDays: 7,
+        shiftTriggerDays: 3,
+        businessDayRollForward: true,
+      };
+    }
+
+    function normalizeClientBillingPhilosophy(raw) {
+      const d = defaultBillingPhilosophyState();
+      if (!raw || typeof raw !== "object") return { ...d };
+      const mode = raw.mode === "shifter" ? "shifter" : "anchor";
+      const st = Number(raw.shiftTriggerDays);
+      return {
+        schemaVersion: 1,
+        mode,
+        autoProrateFirstMonth: !!raw.autoProrateFirstMonth,
+        minimumGapDays: Math.min(60, Math.max(1, Number(raw.minimumGapDays) || d.minimumGapDays)),
+        shiftTriggerDays: [1, 3, 5].includes(st) ? st : d.shiftTriggerDays,
+        businessDayRollForward: raw.businessDayRollForward !== false,
+      };
+    }
+
+    function setPaymentPhilosophyMode(mode) {
+      const anchorBtn = document.getElementById("invDiagPhilAnchorBtn");
+      const shifterBtn = document.getElementById("invDiagPhilShifterBtn");
+      const anchorPanel = document.getElementById("invDiagPhilosophyAnchorPanel");
+      const shifterPanel = document.getElementById("invDiagPhilosophyShifterPanel");
+      if (!anchorBtn || !shifterBtn) return;
+      const isAnchor = mode !== "shifter";
+      anchorBtn.classList.toggle("active", isAnchor);
+      shifterBtn.classList.toggle("active", !isAnchor);
+      anchorBtn.setAttribute("aria-pressed", isAnchor ? "true" : "false");
+      shifterBtn.setAttribute("aria-pressed", !isAnchor ? "true" : "false");
+      if (anchorPanel) {
+        anchorPanel.hidden = !isAnchor;
+        anchorPanel.setAttribute("aria-hidden", !isAnchor ? "true" : "false");
+      }
+      if (shifterPanel) {
+        shifterPanel.hidden = isAnchor;
+        shifterPanel.setAttribute("aria-hidden", isAnchor ? "true" : "false");
+      }
+    }
+
+    function syncPaymentPhilosophyFromSession() {
+      const s = invoiceDiagWizardSession?.billingPhilosophy || defaultBillingPhilosophyState();
+      setPaymentPhilosophyMode(s.mode);
+      const pr = document.getElementById("invDiagPhilProrate");
+      const gap = document.getElementById("invDiagPhilMinGap");
+      const trig = document.getElementById("invDiagPhilShiftTrigger");
+      const biz = document.getElementById("invDiagPhilBizDay");
+      if (pr) pr.checked = !!s.autoProrateFirstMonth;
+      if (gap) gap.value = String(Math.min(60, Math.max(1, Number(s.minimumGapDays) || 7)));
+      if (trig) {
+        const st = Number(s.shiftTriggerDays);
+        trig.value = [1, 3, 5].includes(st) ? String(st) : "3";
+      }
+      if (biz) biz.checked = s.businessDayRollForward !== false;
+    }
+
+    function collectBillingPhilosophyPayload() {
+      const anchorBtn = document.getElementById("invDiagPhilAnchorBtn");
+      const mode = anchorBtn && anchorBtn.classList.contains("active") ? "anchor" : "shifter";
+      const pr = document.getElementById("invDiagPhilProrate");
+      const gap = document.getElementById("invDiagPhilMinGap");
+      const trig = document.getElementById("invDiagPhilShiftTrigger");
+      const biz = document.getElementById("invDiagPhilBizDay");
+      const gd = gap ? parseInt(gap.value, 10) : 7;
+      const st = trig ? parseInt(trig.value, 10) : 3;
+      return {
+        mode,
+        autoProrateFirstMonth: !!(pr && pr.checked),
+        minimumGapDays: Math.min(60, Math.max(1, Number.isFinite(gd) ? gd : 7)),
+        shiftTriggerDays: [1, 3, 5].includes(st) ? st : 3,
+        businessDayRollForward: !!(biz && biz.checked),
+      };
+    }
 
     let invoiceDiagWizardSession = null;
     let billingSimPopupPinned = false;
@@ -12022,8 +12443,6 @@
       if (feed) feed.innerHTML = "";
       const rhythmMount = document.getElementById("invDiagRhythmMount");
       if (rhythmMount) rhythmMount.innerHTML = "";
-      const dispatcherPre = document.getElementById("invDiagDispatcherPreview");
-      if (dispatcherPre) dispatcherPre.textContent = "";
       const dateMount = document.getElementById("invDiagDateMount");
       if (dateMount) dateMount.innerHTML = "";
       const dateTitle = document.getElementById("invDiagDatePhaseTitle");
@@ -12033,8 +12452,6 @@
         previewStrip.hidden = true;
         previewStrip.innerHTML = "";
       }
-      const confirmSummary = document.getElementById("invDiagConfirmSummary");
-      if (confirmSummary) confirmSummary.innerHTML = "";
       const simMount = document.getElementById("invDiagSimMount");
       if (simMount) simMount.innerHTML = "";
       const simLegend = document.getElementById("invDiagSimLegend");
@@ -12084,6 +12501,25 @@
       const tplPlanName = activeInvoiceTemplate.plan_id
         ? plans.find((p) => String(p.id) === String(activeInvoiceTemplate.plan_id))?.name || null
         : null;
+
+      const liForDiag = activeInvoiceTemplate.line_items || [];
+      let stage1FinanceNoteHtml = "";
+      try {
+        const factsStage1 = extractInvoiceTemplateDiagnosticFacts(liForDiag);
+        const yfS = factsStage1.yellowFinancing;
+        if (yfS && yfS.isMultiPayment && yfS.balanceInstallmentCount >= 2) {
+          const nFull = yfS.scheduleTotalN || yfS.balanceInstallmentCount;
+          const extras = yfS.firstInstallmentOnDueToday
+            ? ` Installment 1 of ${nFull} (${esc(fmtMoney(yfS.firstInstallmentAmount))}) is Due Today — this note is only the Balance Due slice.`
+            : "";
+          stage1FinanceNoteHtml = `<div class="inv-diag-stage1-financing-note" role="note">
+  <strong>Multi-payment financing</strong> — Financing schedule length: <strong>${nFull}</strong> · Balance Due installments: <strong>${yfS.balanceInstallmentCount}</strong>${yfS.amountsUniform ? ` × ${esc(fmtMoney(yfS.representativeInstallmentAmount))} each` : ""} (${esc(fmtMoney(yfS.total))} balance due).${extras}
+</div>`;
+        }
+      } catch {
+        /* ignore */
+      }
+
       const mismatchHtml =
         res.plan &&
         activeInvoiceTemplate.plan_id &&
@@ -12103,7 +12539,7 @@
               : `<p style="margin:8px 0 0;font-size:13px;color:#6b7280;">No effective plan on this client profile.</p>`
           }
           ${mismatchHtml}
-        </div>`;
+        </div>${stage1FinanceNoteHtml}`;
       if (invDiagAnalyze) invDiagAnalyze.disabled = false;
     }
 
@@ -12118,7 +12554,16 @@
       const box = (cls, title, lines) => {
         const inner =
           lines.length > 0
-            ? lines.map((s) => `<p>${esc(s)}</p>`).join("")
+            ? lines
+                .map((s) => {
+                  let pClass = "";
+                  if (cls === "inv-diag-yellow") {
+                    if (/^Verify:/i.test(s)) pClass = "inv-diag-yellow-verify-line";
+                    else if (/^Due at signing:/i.test(s)) pClass = "inv-diag-yellow-signing-line";
+                  }
+                  return `<p${pClass ? ` class="${esc(pClass)}"` : ""}>${esc(s)}</p>`;
+                })
+                .join("")
             : `<p class="inv-diag-empty-note">No items detected in this category.</p>`;
         return `<div class="inv-diag-box ${cls}"><div class="inv-diag-box-title">${esc(title)}</div>${inner}</div>`;
       };
@@ -12435,11 +12880,38 @@
       return null;
     }
 
+    /** Billing sim UI (wizard step 6) — keep a short horizon for readability. */
+    const BILLING_SIM_UI_MONTHS = 6;
+    /** Persisted Invoice Calendar commits — subscriptions should continue far enough to scan ahead. */
+    const INVOICE_CALENDAR_COMMIT_MONTHS = 120;
+    /** Max rhythm steps when expanding dates (daily subs over many years); guards infinite loops. */
+    const BILLING_RHYTHM_GUARD_MAX = 5000;
+
     function pushBillingOccurrencesInRange(isoStart, detail, todayIso, endIso, maxEvents) {
       const out = [];
       let cur = isoStart;
       let guard = 0;
-      while (cur && cur <= endIso && guard < 500) {
+      while (cur && cur <= endIso && guard < BILLING_RHYTHM_GUARD_MAX) {
+        if (cur >= todayIso) {
+          out.push(cur);
+          if (maxEvents != null && out.length >= maxEvents) break;
+        }
+        const next = advanceBillingRhythmStep(cur, detail);
+        if (!next || next <= cur) break;
+        cur = next;
+        guard++;
+      }
+      return out;
+    }
+
+    /**
+     * Rhythm dates after isoCursor's first advancement (does not emit isoCursor itself).
+     */
+    function pushBillingOccurrencesInRangeStarting(isoCursor, detail, todayIso, endIso, maxEvents) {
+      const out = [];
+      let cur = isoCursor;
+      let guard = 0;
+      while (cur && cur <= endIso && guard < BILLING_RHYTHM_GUARD_MAX) {
         if (cur >= todayIso) {
           out.push(cur);
           if (maxEvents != null && out.length >= maxEvents) break;
@@ -12471,18 +12943,14 @@
       return { blue, yellow, redTotal, recurring };
     }
 
-    function resolveYellowInstallmentCountForSim(line_items) {
-      const maxInst = getMaxInstallmentScheduleTotal(line_items);
-      if (maxInst >= 2) return maxInst;
-      const chunks = countBalanceDueNonRecurringLines(line_items);
-      return Math.max(1, chunks);
-    }
-
-    function getBillingSimHorizonBounds() {
+    function getBillingSimHorizonBounds(monthsAhead) {
+      const raw = Number(monthsAhead);
+      const m =
+        Number.isFinite(raw) && raw > 0 ? Math.min(Math.round(raw), 240) : BILLING_SIM_UI_MONTHS;
       const t = new Date();
       t.setHours(12, 0, 0, 0);
       const end = new Date(t);
-      end.setMonth(end.getMonth() + 6);
+      end.setMonth(end.getMonth() + m);
       return { todayIso: formatIsoLocalFromDate(t), endIso: formatIsoLocalFromDate(end) };
     }
 
@@ -12494,14 +12962,15 @@
       ledger[iso].charges.push({ color, label, amount: n });
     }
 
-    function buildBillingSimulationLedger(session) {
+    function buildBillingSimulationLedger(session, horizonMonths) {
       const ledger = {};
       const line_items = session?.analyzedTemplate?.line_items || [];
       const amt = extractSimulatorAmountsFromLineItems(line_items);
       const sd = session?.startDates || {};
       const yt = sd.yellow_timing;
       const rhythmRule = session?.rhythmRule || {};
-      const { todayIso, endIso } = getBillingSimHorizonBounds();
+      const hm = horizonMonths != null ? horizonMonths : BILLING_SIM_UI_MONTHS;
+      const { todayIso, endIso } = getBillingSimHorizonBounds(hm);
 
       if (sd.blue && amt.blue > 0) {
         billingSimLedgerAdd(ledger, sd.blue, "blue", "Setup / due today", amt.blue, todayIso, endIso);
@@ -12514,20 +12983,64 @@
         /* Yellow tied to project completion — no fixed calendar charges in sim */
       } else if (yellowInstallmentMode && sd.yellow && amt.yellow > 0) {
         const detail = rhythmDetailForYellowFilter(rhythmRule);
-        const payN = Math.max(2, resolveYellowInstallmentCountForSim(line_items));
-        const per = payN > 0 ? amt.yellow / payN : amt.yellow;
-        const dates = detail ? pushBillingOccurrencesInRange(sd.yellow, detail, todayIso, endIso, payN) : [];
-        dates.forEach((iso, idx) => {
-          billingSimLedgerAdd(
-            ledger,
-            iso,
-            "yellow",
-            `Financing (${idx + 1} of ${payN})`,
-            per,
-            todayIso,
-            endIso,
-          );
-        });
+        const yf = session?.analysisFacts?.yellowFinancing;
+        const amounts = yf?.installmentAmounts;
+        const ks = yf?.balanceScheduleKs;
+        if (detail && amounts && amounts.length && yf.balanceInstallmentCount >= 1) {
+          const ksMax =
+            ks && ks.length > 0
+              ? Math.max(...ks.map((x) => (Number(x) || 0)), 0)
+              : amounts.length;
+          const scheduleN = Math.max(
+            Number(yf.scheduleTotalN) >= 2 ? Number(yf.scheduleTotalN) : 0,
+            ksMax,
+            amounts.length,
+          ) || amounts.length;
+          const nBal = amounts.length;
+          const financingAtSigning = sd.blue && sd.yellow && String(sd.blue) === String(sd.yellow);
+
+          if (financingAtSigning && yf.firstInstallmentOnDueToday && Number(yf.firstInstallmentAmount) > 0) {
+            billingSimLedgerAdd(
+              ledger,
+              sd.yellow,
+              "yellow",
+              `Finance — installment 1 of ${scheduleN} (at signing, same day as down payment)`,
+              yf.firstInstallmentAmount,
+              todayIso,
+              endIso,
+            );
+            const nextRhythmIso = advanceBillingRhythmStep(sd.yellow, detail);
+            const futureDates = nextRhythmIso
+              ? pushBillingOccurrencesInRangeStarting(nextRhythmIso, detail, todayIso, endIso, nBal)
+              : [];
+            futureDates.forEach((iso, idx) => {
+              const kk = ks && ks[idx] != null ? ks[idx] : idx + 2;
+              billingSimLedgerAdd(
+                ledger,
+                iso,
+                "yellow",
+                `Finance — installment ${kk} of ${scheduleN}`,
+                Number(amounts[idx]) || 0,
+                todayIso,
+                endIso,
+              );
+            });
+          } else {
+            const dates = pushBillingOccurrencesInRange(sd.yellow, detail, todayIso, endIso, nBal);
+            dates.forEach((iso, idx) => {
+              const kk = ks && ks[idx] != null ? ks[idx] : idx + 1;
+              billingSimLedgerAdd(
+                ledger,
+                iso,
+                "yellow",
+                `Finance — installment ${kk} of ${scheduleN}`,
+                Number(amounts[idx]) || 0,
+                todayIso,
+                endIso,
+              );
+            });
+          }
+        }
       } else if (sd.yellow && amt.yellow > 0) {
         billingSimLedgerAdd(ledger, sd.yellow, "yellow", "Financing (balance)", amt.yellow, todayIso, endIso);
       }
@@ -12607,6 +13120,13 @@
         .join("");
     }
 
+    function billingSimShortLabel(charge) {
+      if (charge.color === "blue") return "Setup";
+      if (charge.color === "yellow") return "Finance";
+      if (charge.color === "red") return "Subscription";
+      return charge.label || "Charge";
+    }
+
     function hideBillingSimPopup(force) {
       const popup = document.getElementById("invDiagSimPopup");
       if (!popup) return;
@@ -12626,16 +13146,13 @@
       const row = session.billingSimLedger[iso];
       if (!row?.charges?.length) return;
       const total = row.charges.reduce((a, c) => a + c.amount, 0);
-      const lines = row.charges
-        .map(
-          (c) =>
-            `<div class="inv-diag-sim-popup-line">${esc(c.label)}: <strong>${esc(fmtMoney(c.amount))}</strong></div>`,
-        )
-        .join("");
+      const breakdown = row.charges
+        .map((c) => `${esc(fmtMoney(c.amount))} ${esc(billingSimShortLabel(c))}`)
+        .join(" + ");
       const title = formatDueDateFriendly(iso) || iso;
-      popup.innerHTML = `<div class="inv-diag-sim-popup-title">${esc(title)}</div><div class="inv-diag-sim-popup-total">Total: <strong>${esc(fmtMoney(total))}</strong></div>${lines}`;
+      popup.innerHTML = `<div class="inv-diag-sim-popup-title">${esc(title)}</div><div class="inv-diag-sim-popup-total"><strong>${esc(fmtMoney(total))} total</strong>: ${breakdown}</div>`;
       popup.hidden = false;
-      const w = 280;
+      const w = 320;
       let left = (clientX || 0) + 14;
       let top = (clientY || 0) + 14;
       popup.style.width = `${w}px`;
@@ -12710,11 +13227,367 @@
       });
     }
 
-    /** CRM calendar persistence requires schema + API — not implemented in this codebase. */
-    function finalizeInvoicePlanWizardLaunch() {
-      showInvoiceBuilderPlaceholderToast(
-        "Billing calendar persistence is not configured yet. There is no dedicated table/API in this repo for committing simulated invoice dates. Confirm the desired Supabase schema (e.g. client_billing_events) and we can wire Finalize next.",
-      );
+    async function commitInvoiceCalendarEventsFromSession(session, billingPhilosophyDoc, ledgerOpt) {
+      if (!session?.clientId) return { error: new Error("missing client") };
+      const ledger =
+        ledgerOpt && typeof ledgerOpt === "object"
+          ? ledgerOpt
+          : buildBillingSimulationLedger(session, INVOICE_CALENDAR_COMMIT_MONTHS);
+      const batchId = crypto.randomUUID();
+      const rows = [];
+      for (const iso of Object.keys(ledger).sort()) {
+        const entry = ledger[iso];
+        if (!entry?.charges?.length) continue;
+        const total = entry.charges.reduce((a, c) => a + (Number(c.amount) || 0), 0);
+        if (!(total > 0)) continue;
+        rows.push({
+          client_id: session.clientId,
+          scheduled_date: iso,
+          status: "scheduled",
+          total_amount: total,
+          charges: entry.charges,
+          billing_philosophy: billingPhilosophyDoc,
+          template_name: session.analyzedTemplate?.name || null,
+          source: "plan_wizard",
+          commit_batch_id: batchId,
+        });
+      }
+      if (rows.length) {
+        const insertChunk = 400;
+        for (let i = 0; i < rows.length; i += insertChunk) {
+          const chunk = rows.slice(i, i + insertChunk);
+          const { error: insErr } = await sb.from("invoice_calendar_events").insert(chunk);
+          if (insErr) return { error: insErr };
+        }
+      }
+      const { error: delErr } = await sb
+        .from("invoice_calendar_events")
+        .delete()
+        .eq("client_id", session.clientId)
+        .eq("source", "plan_wizard")
+        .neq("commit_batch_id", batchId);
+      if (delErr) return { error: delErr };
+      return {};
+    }
+
+    /**
+     * Removes committed plan-wizard projections for a client.
+     * Used when the effective plan no longer has a universal invoice template,
+     * or during focus-plan replays.
+     */
+    async function deletePlanWizardInvoiceCalendarForClient(clientId) {
+      if (!clientId) return { error: new Error("missing client id") };
+      const { error } = await sb
+        .from("invoice_calendar_events")
+        .delete()
+        .eq("client_id", clientId)
+        .eq("source", "plan_wizard");
+      return error ? { error } : {};
+    }
+
+    /** Debounced replays of invoice calendar when clients.focus_plan_id changes. Universal library only — not c.invoice.custom (same as resolveInvoiceTemplateForEffectivePlan). */
+    let invoiceCalPlanSyncTimers = {};
+    const INVOICE_CAL_PLAN_SYNC_DEBOUNCE_MS = 720;
+
+    function rhythmRuleFromDispatcherContext(dc) {
+      const r = dc && (dc.Rhythm_Rule || dc.rhythmRule);
+      return r && typeof r === "object" ? r : {};
+    }
+
+    function startDatesFromDispatcherContext(dc) {
+      const sd = dc && (dc.start_dates || dc.startDates);
+      if (!sd || typeof sd !== "object") {
+        return { blue: null, yellow: null, red: null, yellow_timing: null };
+      }
+      return {
+        blue: sd.blue ?? null,
+        yellow: sd.yellow ?? null,
+        red: sd.red ?? null,
+        yellow_timing: sd.yellow_timing ?? sd.yellowTiming ?? null,
+      };
+    }
+
+    function scheduleInvoiceCalendarPlanSync(clientId) {
+      const id = String(clientId || "").trim();
+      if (!id) return;
+      try {
+        clearTimeout(invoiceCalPlanSyncTimers[id]);
+      } catch (_) {}
+      invoiceCalPlanSyncTimers[id] = setTimeout(() => {
+        delete invoiceCalPlanSyncTimers[id];
+        syncInvoiceCalendarAfterFocusPlanChange(id).catch((e) => console.warn("invoice calendar plan sync:", e));
+      }, INVOICE_CAL_PLAN_SYNC_DEBOUNCE_MS);
+    }
+
+    async function syncInvoiceCalendarAfterFocusPlanChange(clientId) {
+      const id = String(clientId || "").trim();
+      if (!id) return;
+
+      const { data: authSess } = await sb.auth.getSession();
+      if (!authSess?.session) return;
+
+      let c = allClients.find((cl) => String(cl.id) === String(id));
+      if (!c) return;
+
+      const bpRaw = c.billing_philosophy;
+      const dc =
+        bpRaw && typeof bpRaw === "object" && bpRaw.dispatcherContext && typeof bpRaw.dispatcherContext === "object"
+          ? bpRaw.dispatcherContext
+          : null;
+      if (!dc) {
+        console.info("invoice calendar plan sync: skipped — no billing_philosophy.dispatcherContext on client");
+        return;
+      }
+
+      if (!plansLoaded) await loadPlans();
+      if (!universalInvoiceTemplatesLoaded) await loadUniversalInvoiceTemplates();
+
+      c = allClients.find((cl) => String(cl.id) === String(id)) || c;
+      const resolved = resolveInvoiceTemplateForEffectivePlan(c);
+
+      function refetchInvoiceCalendarUi() {
+        try {
+          if (invoiceCalendarInstance) invoiceCalendarInstance.refetchEvents();
+        } catch (_) {}
+      }
+
+      if (resolved.error === "no_plan" || resolved.error === "no_template") {
+        const clr = await deletePlanWizardInvoiceCalendarForClient(id);
+        if (clr.error) {
+          console.warn("invoice calendar clear:", clr.error);
+          showInvoiceBuilderPlaceholderToast(
+            "Could not clear invoice calendar after plan change.",
+          );
+          return;
+        }
+        showInvoiceBuilderPlaceholderToast(
+          resolved.error === "no_plan"
+            ? "Invoice calendar cleared — no effective plan."
+            : "Invoice calendar cleared — add a universal invoice template for this plan (Invoice templates library), then run Invoice plan diagnostic if needed.",
+        );
+        refetchInvoiceCalendarUi();
+        return;
+      }
+
+      const tplRow = resolved.templateRow;
+      const line_items = Array.isArray(tplRow.line_items) ? tplRow.line_items : [];
+      const synth = {
+        clientId: String(c.id),
+        clientName: String(c.company_name || c.client_name || "Customer").trim() || "Customer",
+        analyzedTemplate: {
+          name: tplRow.name || "(untitled)",
+          line_items,
+        },
+        analysisFacts: extractInvoiceTemplateDiagnosticFacts(line_items),
+        rhythmRule: rhythmRuleFromDispatcherContext(dc),
+        startDates: startDatesFromDispatcherContext(dc),
+      };
+
+      const rawBp = bpRaw && typeof bpRaw === "object" ? bpRaw : {};
+      const baseBp = { ...rawBp };
+      const newPreview = buildDispatcherPreviewPayload(synth.rhythmRule, synth.startDates, {
+        client_id: synth.clientId,
+        client_name: synth.clientName,
+        template_name: synth.analyzedTemplate?.name || null,
+      });
+      baseBp.dispatcherContext = newPreview;
+      baseBp.savedAt = new Date().toISOString();
+
+      const ledger = buildBillingSimulationLedger(synth, INVOICE_CALENDAR_COMMIT_MONTHS);
+      const commitRes = await commitInvoiceCalendarEventsFromSession(synth, baseBp, ledger);
+      if (commitRes.error) {
+        console.warn("invoice calendar replay commit:", commitRes.error);
+        showInvoiceBuilderPlaceholderToast(
+          "Could not refresh invoice calendar after plan change.",
+        );
+        return;
+      }
+
+      const { error: bpErr } = await sb.from("clients").update({ billing_philosophy: baseBp }).eq("id", id);
+      if (bpErr) {
+        console.warn("billing_philosophy dispatcherContext refresh:", bpErr);
+        showInvoiceBuilderPlaceholderToast(
+          "Calendar updated but saving profile snapshot failed — retry or re-run Finalize.",
+        );
+        refetchInvoiceCalendarUi();
+        return;
+      }
+
+      const idx = allClients.findIndex((cl) => String(cl.id) === String(id));
+      if (idx >= 0) allClients[idx] = { ...allClients[idx], billing_philosophy: baseBp };
+      showInvoiceBuilderPlaceholderToast("Invoice calendar updated for the new plan.");
+      refetchInvoiceCalendarUi();
+    }
+
+    function invoiceCalendarColorsFromCharges(charges) {
+      const b = charges.some((c) => c.color === "blue");
+      const y = charges.some((c) => c.color === "yellow");
+      const r = charges.some((c) => c.color === "red");
+      const mask = (b ? 1 : 0) | (y ? 2 : 0) | (r ? 4 : 0);
+      if (mask === 7) return { bg: "#92400e", border: "#451a03" };
+      if (mask === 6) return { bg: "#ea580c", border: "#9a3412" };
+      if (mask === 5) return { bg: "#b45309", border: "#78350f" };
+      if (mask === 3) return { bg: "#6366f1", border: "#4338ca" };
+      if (mask === 4) return { bg: "#dc2626", border: "#991b1b" };
+      if (mask === 2) return { bg: "#ca8a04", border: "#713f12" };
+      if (mask === 1) return { bg: "#2563eb", border: "#1e3a8a" };
+      return { bg: "#6b7280", border: "#374151" };
+    }
+
+    function billingPhilosophySnippet(bp) {
+      if (!bp || typeof bp !== "object") return "—";
+      if (bp.mode === "shifter") return 'Philosophy: Shifter (interval-based; payment philosophy snapshot on this invoice date).';
+      if (bp.mode === "anchor") return 'Philosophy: Anchor (fixed calendar dates; payment philosophy snapshot on this invoice date).';
+      return "Payment philosophy snapshot stored for automation.";
+    }
+
+    async function fetchInvoiceCalendarEventsForRange(startStr, endStr) {
+      const start = startStr.slice(0, 10);
+      const end = endStr.slice(0, 10);
+      const { data, error } = await sb
+        .from("invoice_calendar_events")
+        .select("id, client_id, scheduled_date, status, total_amount, charges, billing_philosophy, template_name")
+        .gte("scheduled_date", start)
+        .lte("scheduled_date", end)
+        .eq("source", "plan_wizard")
+        .order("scheduled_date", { ascending: true });
+      if (error) throw error;
+      return data || [];
+    }
+
+    async function loadInvoiceCalendarEventsForFullCalendar(startStr, endStr) {
+      const rows = await fetchInvoiceCalendarEventsForRange(startStr, endStr);
+      return rows.map((row) => {
+        const c = allClients.find((cl) => String(cl.id) === String(row.client_id));
+        const companyName = c?.company_name || c?.client_name || "Client";
+        const charges = Array.isArray(row.charges) ? row.charges : [];
+        const colors = invoiceCalendarColorsFromCharges(charges);
+        const statusDisplay = row.status === "scheduled" ? "Scheduled" : String(row.status || "");
+        const total = Number(row.total_amount) || 0;
+        return {
+          id: row.id,
+          title: `${companyName} — ${fmtMoney(total)}`,
+          start: row.scheduled_date,
+          allDay: true,
+          backgroundColor: colors.bg,
+          borderColor: colors.border,
+          extendedProps: {
+            companyName,
+            scheduled_date: row.scheduled_date,
+            total_amount: total,
+            status: row.status,
+            statusDisplay,
+            charges,
+            billing_philosophy: row.billing_philosophy,
+            template_name: row.template_name,
+          },
+        };
+      });
+    }
+
+    function openInvoiceCalendarEventModalFromFc(info) {
+      const ov = document.getElementById("invoiceCalendarEventOverlay");
+      const body = document.getElementById("invoiceCalendarEventBody");
+      const titleEl = document.getElementById("invoiceCalEventTitle");
+      if (!ov || !body) return;
+      const p = info.event.extendedProps || {};
+      const dateLabel = formatDueDateFriendly(p.scheduled_date) || p.scheduled_date;
+      if (titleEl) titleEl.textContent = `Invoice — ${dateLabel}`;
+      const charges = Array.isArray(p.charges) ? p.charges : [];
+      const total = Number(p.total_amount) || 0;
+      const pillClass = (col) =>
+        col === "blue" ? "inv-cal-pill-blue" : col === "yellow" ? "inv-cal-pill-yellow" : col === "red" ? "inv-cal-pill-red" : "";
+      const rows = charges
+        .map((c) => {
+          const col = c.color || "";
+          const lab = billingSimShortLabel(c);
+          const amt = fmtMoney(Number(c.amount) || 0);
+          return `<div class="inv-cal-detail-row">
+            <span><span class="inv-cal-pill ${pillClass(col)}">${esc(col || "—")}</span> ${esc(c.label || lab)}</span>
+            <strong>${esc(amt)}</strong>
+          </div>`;
+        })
+        .join("");
+      const phil = billingPhilosophySnippet(p.billing_philosophy);
+      body.innerHTML = `
+        <div class="inv-cal-detail-meta">
+          <div><strong>${esc(p.companyName || "Client")}</strong></div>
+          <div>Status: <strong>${esc(p.statusDisplay || "Scheduled")}</strong> · Total: <strong>${esc(fmtMoney(total))}</strong></div>
+          ${p.template_name ? `<div>Template: ${esc(p.template_name)}</div>` : ""}
+          <div style="margin-top:10px;font-size:12px;color:#6b7280;">${esc(phil)}</div>
+        </div>
+        <div class="inv-diag-box-title" style="margin-bottom:6px;">Charge breakdown</div>
+        ${rows || '<p class="muted">No line items.</p>'}`;
+      ov.classList.add("open");
+    }
+
+    function closeInvoiceCalendarEventModal() {
+      const ov = document.getElementById("invoiceCalendarEventOverlay");
+      if (ov) ov.classList.remove("open");
+    }
+
+    function firstScheduledIsoFromLedger(ledger) {
+      if (!ledger || typeof ledger !== "object") return null;
+      const keys = Object.keys(ledger).filter((iso) => ledger[iso]?.charges?.length);
+      keys.sort();
+      return keys[0] || null;
+    }
+
+    async function finalizeInvoicePlanWizardLaunch() {
+      const session = invoiceDiagWizardSession;
+      if (!session?.clientId) {
+        showInvoiceBuilderPlaceholderToast("Missing client — cannot save.");
+        return;
+      }
+      const { data: authSess } = await sb.auth.getSession();
+      if (!authSess?.session) {
+        showInvoiceBuilderPlaceholderToast("Sign in to save payment philosophy.");
+        return;
+      }
+      const core = collectBillingPhilosophyPayload();
+      const billing_philosophy = {
+        schemaVersion: 1,
+        ...core,
+        savedAt: new Date().toISOString(),
+        dispatcherContext: session.dispatcherPreviewPayload || null,
+      };
+
+      const commitLedger = buildBillingSimulationLedger(session, INVOICE_CALENDAR_COMMIT_MONTHS);
+      const commitRes = await commitInvoiceCalendarEventsFromSession(session, billing_philosophy, commitLedger);
+      if (commitRes.error) {
+        showInvoiceBuilderPlaceholderToast(
+          "Invoice calendar save failed: " + (commitRes.error.message || String(commitRes.error)),
+        );
+        console.error("invoice_calendar_events:", commitRes.error);
+        return;
+      }
+
+      const { error } = await sb.from("clients").update({ billing_philosophy }).eq("id", session.clientId);
+      if (error) {
+        showInvoiceBuilderPlaceholderToast("Client profile save failed: " + (error.message || String(error)));
+        console.error("billing_philosophy update:", error);
+        return;
+      }
+      session.billingPhilosophy = normalizeClientBillingPhilosophy(billing_philosophy);
+      const idx = allClients.findIndex((c) => String(c.id) === String(session.clientId));
+      if (idx >= 0) allClients[idx] = { ...allClients[idx], billing_philosophy };
+
+      showInvoiceBuilderPlaceholderToast("Scheduled invoices saved — opening Invoice Calendar.");
+      const gotoIso = firstScheduledIsoFromLedger(commitLedger);
+      closeInvoiceDiagnosticWizard();
+      switchTab("calendar");
+      switchCalendarSubTab("invoice");
+      setTimeout(() => {
+        if (invoiceCalendarInstance) {
+          try {
+            invoiceCalendarInstance.refetchEvents();
+            if (gotoIso) invoiceCalendarInstance.gotoDate(gotoIso);
+            invoiceCalendarInstance.updateSize();
+          } catch (e) {
+            console.warn("invoice calendar refresh:", e);
+          }
+        }
+      }, 120);
     }
 
     function buildDispatcherCalendarHtml(year, monthIndex, opts) {
@@ -12748,20 +13621,27 @@
 </div>`;
     }
 
-    function buildDispatcherConfirmSummaryHtml(startDates) {
-      const sd = startDates || {};
-      let yellowLine = sd.yellow || "—";
-      if (sd.yellow_timing === "milestone") {
-        yellowLine = "Upon project completion (plan: milestone collection)";
-      } else if (sd.yellow_timing === "installment_rhythm" && sd.yellow) {
-        yellowLine = `${sd.yellow} (recurring installment rhythm)`;
-      }
-      const rows = [
-        ["Blue (due today / setup)", sd.blue || "—"],
-        ["Yellow (financing)", yellowLine],
-        ["Red (subscription)", sd.red || "—"],
-      ];
-      return `<dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`;
+    function buildDispatcherPreviewPayload(rhythmRule, startDates, meta) {
+      const rr = rhythmRule && typeof rhythmRule === "object" ? rhythmRule : {};
+      const sd =
+        startDates && typeof startDates === "object"
+          ? startDates
+          : { blue: null, yellow: null, red: null, yellow_timing: null };
+      const m = meta && typeof meta === "object" ? meta : {};
+      return {
+        Rhythm_Rule: rr,
+        yellow_anchor: rr.yellow_anchor ?? null,
+        red_anchor: rr.red_anchor ?? null,
+        start_dates: { ...sd },
+        billing_simulation: {
+          horizon_months: 6,
+          preview_only: true,
+          finalize_requires_persistence_schema: true,
+        },
+        client_id: m.client_id ?? null,
+        client_name: m.client_name ?? null,
+        template_name: m.template_name ?? null,
+      };
     }
 
     function finalizeDispatcherConfirmation() {
@@ -12774,25 +13654,12 @@
         red: null,
         yellow_timing: null,
       };
-      const previewPayload = {
-        Rhythm_Rule: rhythmRule,
-        yellow_anchor: rhythmRule.yellow_anchor,
-        red_anchor: rhythmRule.red_anchor,
-        start_dates: { ...startDates },
-        billing_simulation: {
-          horizon_months: 6,
-          preview_only: true,
-          finalize_requires_persistence_schema: true,
-        },
+      session.dispatcherPreviewPayload = buildDispatcherPreviewPayload(rhythmRule, startDates, {
         client_id: session.clientId || null,
         client_name: session.clientName || null,
         template_name: session.analyzedTemplate?.name || null,
-      };
-      session.dispatcherPreviewPayload = previewPayload;
-      const pre = document.getElementById("invDiagDispatcherPreview");
-      if (pre) pre.textContent = JSON.stringify(previewPayload, null, 2);
-      const sumEl = document.getElementById("invDiagConfirmSummary");
-      if (sumEl) sumEl.innerHTML = buildDispatcherConfirmSummaryHtml(startDates);
+      });
+      renderBillingSimulator();
     }
 
     function renderDispatcherDateStage() {
@@ -12991,10 +13858,6 @@
         previewStripOpen.hidden = true;
         previewStripOpen.innerHTML = "";
       }
-      const confirmSummaryOpen = document.getElementById("invDiagConfirmSummary");
-      if (confirmSummaryOpen) confirmSummaryOpen.innerHTML = "";
-      const dispatcherPreOpen = document.getElementById("invDiagDispatcherPreview");
-      if (dispatcherPreOpen) dispatcherPreOpen.textContent = "";
       const simMountOpen = document.getElementById("invDiagSimMount");
       if (simMountOpen) simMountOpen.innerHTML = "";
       const simLegendOpen = document.getElementById("invDiagSimLegend");
@@ -13005,11 +13868,15 @@
       if (invDiagDateNext) invDiagDateNext.disabled = true;
       const sumEl = document.getElementById("invDiagTemplateSummary");
       if (sumEl) sumEl.innerHTML = "";
+      const cid = String(clientId || "").trim();
+      const existingClient = cid ? allClients.find((c) => String(c.id) === cid) : null;
       invoiceDiagWizardSession = {
-        clientId: String(clientId || "").trim(),
+        clientId: cid,
         clientName: String(clientName || "").trim() || "This customer",
+        billingPhilosophy: normalizeClientBillingPhilosophy(existingClient && existingClient.billing_philosophy),
       };
       hydrateInvoiceDiagnosticWizardStep1(invoiceDiagWizardSession.clientName, invoiceDiagWizardSession.clientId);
+      syncPaymentPhilosophyFromSession();
       invoiceDiagnosticWizardOverlay.classList.add("open");
     }
 
@@ -13162,6 +14029,7 @@
       invDiagConfirmBack.addEventListener("click", () => {
         const session = invoiceDiagWizardSession;
         if (!session) return;
+        hideBillingSimPopup(true);
         const phases = session.dispatcherPhases || [];
         if (phases.length > 0) {
           const lastIdx = phases.length - 1;
@@ -13184,24 +14052,30 @@
         setInvoiceDiagStep(4);
       });
     }
-    if (invDiagConfirmSimNext) {
-      invDiagConfirmSimNext.addEventListener("click", () => {
-        if (!invoiceDiagWizardSession) return;
-        invoiceDiagWizardSession.stage = "dispatcher_sim";
+    if (invDiagSimClose) {
+      invDiagSimClose.addEventListener("click", closeInvoiceDiagnosticWizard);
+    }
+    if (invDiagSimToPhilosophy) {
+      invDiagSimToPhilosophy.addEventListener("click", () => {
+        syncPaymentPhilosophyFromSession();
         setInvoiceDiagStep(7);
-        renderBillingSimulator();
       });
     }
-    if (invDiagSimBack) {
-      invDiagSimBack.addEventListener("click", () => {
-        if (!invoiceDiagWizardSession) return;
-        hideBillingSimPopup(true);
-        invoiceDiagWizardSession.stage = "dispatcher_confirm";
+    if (invDiagPhilosophyBack) {
+      invDiagPhilosophyBack.addEventListener("click", () => {
         setInvoiceDiagStep(6);
       });
     }
-    if (invDiagSimClose) {
-      invDiagSimClose.addEventListener("click", closeInvoiceDiagnosticWizard);
+    if (invDiagPhilosophyClose) {
+      invDiagPhilosophyClose.addEventListener("click", closeInvoiceDiagnosticWizard);
+    }
+    const invDiagPhilAnchorBtn = document.getElementById("invDiagPhilAnchorBtn");
+    const invDiagPhilShifterBtn = document.getElementById("invDiagPhilShifterBtn");
+    if (invDiagPhilAnchorBtn) {
+      invDiagPhilAnchorBtn.addEventListener("click", () => setPaymentPhilosophyMode("anchor"));
+    }
+    if (invDiagPhilShifterBtn) {
+      invDiagPhilShifterBtn.addEventListener("click", () => setPaymentPhilosophyMode("shifter"));
     }
     if (invDiagFinalizeLaunch) {
       invDiagFinalizeLaunch.addEventListener("click", () => {
@@ -13760,6 +14634,9 @@
       // Reflect in table + calendar
       render();
       refreshCalendar();
+      if (Object.prototype.hasOwnProperty.call(updates, "focus_plan_id")) {
+        scheduleInvoiceCalendarPlanSync(detailId);
+      }
     }
 
     // Right-panel tab clicks
@@ -13921,11 +14798,25 @@
         followup: document.getElementById("f_followup").value,
       };
       closeFilterModal(); render(); refreshCalendar();
+      if (invoiceCalendarInstance) {
+        try {
+          invoiceCalendarInstance.refetchEvents();
+        } catch (_) {}
+      }
     }
     function resetFiltersModal() {
       ["f_business_type","f_manager","f_web_status","f_client_status","f_motivation","f_followup"].forEach((id) => document.getElementById(id).value = "");
     }
-    function clearAllFilters() { filters = { ...DEFAULT_FILTERS }; render(); refreshCalendar(); }
+    function clearAllFilters() {
+      filters = { ...DEFAULT_FILTERS };
+      render();
+      refreshCalendar();
+      if (invoiceCalendarInstance) {
+        try {
+          invoiceCalendarInstance.refetchEvents();
+        } catch (_) {}
+      }
+    }
 
     // ---------- Tabs (List/Calendar) + Calendar ----------
     let calendarInstance = null;
@@ -13968,7 +14859,27 @@
           right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
         },
         height: "auto",
-        events: [],
+        displayEventTime: false,
+        events: async (info, successCallback, failureCallback) => {
+          try {
+            const list = await loadInvoiceCalendarEventsForFullCalendar(info.startStr, info.endStr);
+            successCallback(list);
+          } catch (e) {
+            console.error("invoice calendar:", e);
+            failureCallback(e);
+          }
+        },
+        eventClick: (info) => {
+          info.jsEvent.preventDefault();
+          openInvoiceCalendarEventModalFromFc(info);
+        },
+        eventDidMount: (info) => {
+          const p = info.event.extendedProps || {};
+          const total = fmtMoney(Number(p.total_amount) || 0);
+          const name = p.companyName || "Client";
+          const st = p.statusDisplay || "Scheduled";
+          info.el.setAttribute("title", `${name} — ${total} — Status: ${st}`);
+        },
       });
       invoiceCalendarInstance.render();
     }
@@ -14049,6 +14960,17 @@
         if (!btn || !calendarTabRoot.contains(btn)) return;
         switchCalendarSubTab(btn.dataset.calSub);
       });
+    }
+
+    const invoiceCalendarEventOverlay = document.getElementById("invoiceCalendarEventOverlay");
+    if (invoiceCalendarEventOverlay) {
+      dismissOnBackdropClick(invoiceCalendarEventOverlay, closeInvoiceCalendarEventModal);
+    }
+    const invoiceCalendarEventClose = document.getElementById("invoiceCalendarEventClose");
+    if (invoiceCalendarEventClose) invoiceCalendarEventClose.addEventListener("click", closeInvoiceCalendarEventModal);
+    const invoiceCalendarEventCloseFooter = document.getElementById("invoiceCalendarEventCloseFooter");
+    if (invoiceCalendarEventCloseFooter) {
+      invoiceCalendarEventCloseFooter.addEventListener("click", closeInvoiceCalendarEventModal);
     }
 
     document.getElementById("openWizard").addEventListener("click", openWizard);

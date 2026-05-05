@@ -844,3 +844,38 @@ alter table public.clients add column if not exists stripe_customer_id text;
 create unique index if not exists clients_stripe_customer_id_uidx
   on public.clients (stripe_customer_id)
   where stripe_customer_id is not null;
+
+-- Invoice plan diagnostic — per-client billing runtime (anchor vs shifter, etc.).
+-- Does not modify plan library or invoice templates.
+alter table public.clients add column if not exists billing_philosophy jsonb;
+
+-- =============================================================
+-- Invoice Calendar (plan wizard commits only — not the follow-up calendar)
+-- =============================================================
+create table if not exists public.invoice_calendar_events (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references public.clients(id) on delete cascade,
+  scheduled_date date not null,
+  status text not null default 'scheduled'
+    check (status in ('scheduled', 'paid', 'cancelled')),
+  total_amount numeric(14, 2) not null default 0,
+  charges jsonb not null default '[]'::jsonb,
+  billing_philosophy jsonb,
+  template_name text,
+  source text not null default 'plan_wizard',
+  commit_batch_id uuid not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists invoice_calendar_events_client_date_idx
+  on public.invoice_calendar_events (client_id, scheduled_date);
+create index if not exists invoice_calendar_events_batch_idx
+  on public.invoice_calendar_events (commit_batch_id);
+
+alter table public.invoice_calendar_events enable row level security;
+
+drop policy if exists "team invoice_calendar_events" on public.invoice_calendar_events;
+create policy "team invoice_calendar_events"
+  on public.invoice_calendar_events for all to authenticated
+  using (public.is_team_member())
+  with check (public.is_team_member());
