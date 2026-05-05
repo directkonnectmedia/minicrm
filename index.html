@@ -976,6 +976,101 @@
       cursor: default;
     }
 
+    /* Billing simulator (wizard step 7) */
+    .inv-diag-sim-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      align-items: center;
+      font-size: 12px;
+      color: #374151;
+      margin: 0 0 14px;
+      padding: 10px 12px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+    }
+    .inv-diag-sim-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .inv-diag-sim-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      border: 1px solid rgba(0,0,0,0.12);
+      flex-shrink: 0;
+    }
+    .inv-diag-sim-cal-wrap {
+      max-width: 440px;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 14px 16px 16px;
+      margin-bottom: 12px;
+    }
+    .inv-diag-sim-cal-wrap .inv-diag-cal-nav button {
+      padding: 6px 12px;
+      font-size: 13px;
+      background: #f3f4f6;
+      color: #111827;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .inv-diag-sim-day {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 13px;
+      border: 2px solid transparent;
+      padding: 0;
+      font-family: inherit;
+      cursor: default;
+      box-sizing: border-box;
+    }
+    button.inv-diag-sim-day { cursor: pointer; }
+    button.inv-diag-sim-day:hover {
+      outline: 2px solid #4f46e5;
+      outline-offset: 1px;
+    }
+    .inv-diag-sim-day-plain {
+      color: #9ca3af;
+      font-weight: 600;
+      background: transparent;
+    }
+    .inv-sim-heat-b { background: #3b82f6; color: #fff; border-color: #1d4ed8; }
+    .inv-sim-heat-y { background: #eab308; color: #422006; border-color: #a16207; }
+    .inv-sim-heat-r { background: #ef4444; color: #fff; border-color: #b91c1c; }
+    .inv-sim-heat-by { background: linear-gradient(135deg, #3b82f6 0%, #eab308 100%); color: #111827; border-color: #78350f; }
+    .inv-sim-heat-br { background: linear-gradient(135deg, #3b82f6 0%, #ef4444 100%); color: #fff; border-color: #5b21b6; }
+    .inv-sim-heat-yr { background: #f97316; color: #431407; border-color: #c2410c; }
+    .inv-sim-heat-byr { background: #92400e; color: #fff; border-color: #451a03; }
+
+    .inv-diag-sim-popup {
+      position: fixed;
+      z-index: 12050;
+      min-width: 220px;
+      max-width: 320px;
+      padding: 12px 14px;
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.15);
+      font-size: 13px;
+      line-height: 1.45;
+      color: #111827;
+      pointer-events: none;
+    }
+    .inv-diag-sim-popup-title { font-weight: 700; margin-bottom: 8px; color: #1f2937; }
+    .inv-diag-sim-popup-total { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
+    .inv-diag-sim-popup-line { font-size: 12px; color: #374151; margin-top: 4px; }
+
     .crm-ib-toast.crm-ib-toast-visible {
       opacity: 1;
       transform: translateX(-50%) translateY(0);
@@ -3516,7 +3611,20 @@
           <pre id="invDiagDispatcherPreview" class="inv-diag-rhythm-preview"></pre>
           <div class="inv-diag-actions">
             <button type="button" class="ghost" id="invDiagConfirmBack">Back</button>
-            <button type="button" id="invDiagDispatcherDone">Done</button>
+            <button type="button" id="invDiagConfirmSimNext">Continue to billing simulation</button>
+          </div>
+        </section>
+        <section data-inv-diag-step="7" hidden>
+          <p class="inv-diag-stage-label">Billing simulation</p>
+          <p class="invoice-wiz-hint" style="margin-top:0;">Read-only preview for the next <strong>6 months</strong> from today. Colors combine when multiple bill types fall on the same day.</p>
+          <div id="invDiagSimLegend" class="inv-diag-sim-legend" aria-hidden="true"></div>
+          <div id="invDiagSimMount"></div>
+          <div id="invDiagSimPopup" class="inv-diag-sim-popup" hidden></div>
+          <p class="muted" style="font-size:12px;margin:0 0 10px;">Hover or click a colored day for the money stack. Click again to dismiss a pinned stack.</p>
+          <div class="inv-diag-actions">
+            <button type="button" class="ghost" id="invDiagSimBack">Back</button>
+            <button type="button" class="ghost" id="invDiagSimClose">Close</button>
+            <button type="button" id="invDiagFinalizeLaunch">Finalize &amp; Launch Plan</button>
           </div>
         </section>
       </div>
@@ -11888,11 +11996,16 @@
     const invDiagDateBack = document.getElementById("invDiagDateBack");
     const invDiagDateNext = document.getElementById("invDiagDateNext");
     const invDiagConfirmBack = document.getElementById("invDiagConfirmBack");
-    const invDiagDispatcherDone = document.getElementById("invDiagDispatcherDone");
+    const invDiagConfirmSimNext = document.getElementById("invDiagConfirmSimNext");
+    const invDiagSimBack = document.getElementById("invDiagSimBack");
+    const invDiagSimClose = document.getElementById("invDiagSimClose");
+    const invDiagFinalizeLaunch = document.getElementById("invDiagFinalizeLaunch");
 
     const INV_RHYTHM_WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
     let invoiceDiagWizardSession = null;
+    let billingSimPopupPinned = false;
+    let billingSimPopupPinnedIso = null;
 
     function setInvoiceDiagStep(stepNum) {
       if (!invoiceDiagnosticWizardOverlay) return;
@@ -11922,6 +12035,11 @@
       }
       const confirmSummary = document.getElementById("invDiagConfirmSummary");
       if (confirmSummary) confirmSummary.innerHTML = "";
+      const simMount = document.getElementById("invDiagSimMount");
+      if (simMount) simMount.innerHTML = "";
+      const simLegend = document.getElementById("invDiagSimLegend");
+      if (simLegend) simLegend.innerHTML = "";
+      hideBillingSimPopup(true);
       if (invDiagAnalyze) invDiagAnalyze.disabled = true;
       if (invDiagRhythmNext) invDiagRhythmNext.disabled = true;
       if (invDiagDateNext) invDiagDateNext.disabled = true;
@@ -12293,6 +12411,312 @@
       return out;
     }
 
+    function advanceBillingRhythmStep(isoStr, detail) {
+      const parts = isoStr.split("-").map((x) => parseInt(x, 10));
+      if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return null;
+      const [y0, m0, d0] = parts;
+      let cur = new Date(y0, m0 - 1, d0, 12, 0, 0);
+      if (!detail || detail.type === "daily") {
+        cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1, 12, 0, 0);
+        return formatIsoLocalFromDate(cur);
+      }
+      if (detail.type === "monthly") {
+        const dom = Number(detail.day_of_month) || cur.getDate();
+        return formatIsoLocalFromDate(addMonthsKeepDom(cur, 1, dom));
+      }
+      if (detail.type === "weekly") {
+        cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 7, 12, 0, 0);
+        return formatIsoLocalFromDate(cur);
+      }
+      if (detail.type === "biweekly") {
+        cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 14, 12, 0, 0);
+        return formatIsoLocalFromDate(cur);
+      }
+      return null;
+    }
+
+    function pushBillingOccurrencesInRange(isoStart, detail, todayIso, endIso, maxEvents) {
+      const out = [];
+      let cur = isoStart;
+      let guard = 0;
+      while (cur && cur <= endIso && guard < 500) {
+        if (cur >= todayIso) {
+          out.push(cur);
+          if (maxEvents != null && out.length >= maxEvents) break;
+        }
+        const next = advanceBillingRhythmStep(cur, detail);
+        if (!next || next <= cur) break;
+        cur = next;
+        guard++;
+      }
+      return out;
+    }
+
+    function extractSimulatorAmountsFromLineItems(line_items) {
+      let blue = 0;
+      let yellow = 0;
+      const recurring = [];
+      for (const li of line_items || []) {
+        const desc = String(li.description || "");
+        const amt = Number(li.amount) || 0;
+        if (/recurring/i.test(desc)) {
+          recurring.push({ description: desc, amount: amt });
+          continue;
+        }
+        const pill = String(li.status_pill || "").trim().toUpperCase();
+        if (pill === "DUE TODAY") blue += amt;
+        else if (pill === "BALANCE DUE" || pill === "OVERDUE") yellow += amt;
+      }
+      const redTotal = recurring.reduce((a, r) => a + r.amount, 0);
+      return { blue, yellow, redTotal, recurring };
+    }
+
+    function resolveYellowInstallmentCountForSim(line_items) {
+      const maxInst = getMaxInstallmentScheduleTotal(line_items);
+      if (maxInst >= 2) return maxInst;
+      const chunks = countBalanceDueNonRecurringLines(line_items);
+      return Math.max(1, chunks);
+    }
+
+    function getBillingSimHorizonBounds() {
+      const t = new Date();
+      t.setHours(12, 0, 0, 0);
+      const end = new Date(t);
+      end.setMonth(end.getMonth() + 6);
+      return { todayIso: formatIsoLocalFromDate(t), endIso: formatIsoLocalFromDate(end) };
+    }
+
+    function billingSimLedgerAdd(ledger, iso, color, label, amount, todayIso, endIso) {
+      const n = Number(amount) || 0;
+      if (!iso || !(n > 0)) return;
+      if (iso < todayIso || iso > endIso) return;
+      if (!ledger[iso]) ledger[iso] = { charges: [] };
+      ledger[iso].charges.push({ color, label, amount: n });
+    }
+
+    function buildBillingSimulationLedger(session) {
+      const ledger = {};
+      const line_items = session?.analyzedTemplate?.line_items || [];
+      const amt = extractSimulatorAmountsFromLineItems(line_items);
+      const sd = session?.startDates || {};
+      const yt = sd.yellow_timing;
+      const rhythmRule = session?.rhythmRule || {};
+      const { todayIso, endIso } = getBillingSimHorizonBounds();
+
+      if (sd.blue && amt.blue > 0) {
+        billingSimLedgerAdd(ledger, sd.blue, "blue", "Setup / due today", amt.blue, todayIso, endIso);
+      }
+
+      const yellowInstallmentMode =
+        yt === "installment_rhythm" || (yt == null && shouldIncludeFinanceRhythmCard(line_items));
+
+      if (yt === "milestone") {
+        /* Yellow tied to project completion — no fixed calendar charges in sim */
+      } else if (yellowInstallmentMode && sd.yellow && amt.yellow > 0) {
+        const detail = rhythmDetailForYellowFilter(rhythmRule);
+        const payN = Math.max(2, resolveYellowInstallmentCountForSim(line_items));
+        const per = payN > 0 ? amt.yellow / payN : amt.yellow;
+        const dates = detail ? pushBillingOccurrencesInRange(sd.yellow, detail, todayIso, endIso, payN) : [];
+        dates.forEach((iso, idx) => {
+          billingSimLedgerAdd(
+            ledger,
+            iso,
+            "yellow",
+            `Financing (${idx + 1} of ${payN})`,
+            per,
+            todayIso,
+            endIso,
+          );
+        });
+      } else if (sd.yellow && amt.yellow > 0) {
+        billingSimLedgerAdd(ledger, sd.yellow, "yellow", "Financing (balance)", amt.yellow, todayIso, endIso);
+      }
+
+      if (sd.red && amt.redTotal > 0) {
+        const detail = rhythmDetailForRedFilter(rhythmRule);
+        const dates = detail ? pushBillingOccurrencesInRange(sd.red, detail, todayIso, endIso, null) : [];
+        dates.forEach((iso) => {
+          billingSimLedgerAdd(ledger, iso, "red", "Subscription", amt.redTotal, todayIso, endIso);
+        });
+      }
+
+      return ledger;
+    }
+
+    function simulatorHeatClassFromCharges(charges) {
+      const b = charges.some((c) => c.color === "blue");
+      const y = charges.some((c) => c.color === "yellow");
+      const r = charges.some((c) => c.color === "red");
+      const mask = (b ? 1 : 0) | (y ? 2 : 0) | (r ? 4 : 0);
+      if (mask === 7) return "inv-sim-heat-byr";
+      if (mask === 6) return "inv-sim-heat-yr";
+      if (mask === 5) return "inv-sim-heat-br";
+      if (mask === 3) return "inv-sim-heat-by";
+      if (mask === 4) return "inv-sim-heat-r";
+      if (mask === 2) return "inv-sim-heat-y";
+      if (mask === 1) return "inv-sim-heat-b";
+      return "";
+    }
+
+    function buildBillingSimulatorMonthHtml(year, monthIndex, ledger) {
+      const first = new Date(year, monthIndex, 1, 12, 0, 0);
+      const startPad = (first.getDay() + 6) % 7;
+      const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+      const label = first.toLocaleString(undefined, { month: "long", year: "numeric" });
+      let cells = "";
+      const dow = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      const dowRow = dow.map((d) => `<div class="inv-diag-cal-dow">${esc(d)}</div>`).join("");
+      for (let i = 0; i < startPad; i++) {
+        cells += `<div class="inv-diag-cal-day inv-diag-cal-day-empty" aria-hidden="true"></div>`;
+      }
+      for (let d = 1; d <= daysInMonth; d++) {
+        const iso = formatIsoLocalFromDate(new Date(year, monthIndex, d, 12, 0, 0));
+        const entry = ledger[iso];
+        if (entry && entry.charges && entry.charges.length) {
+          const heat = simulatorHeatClassFromCharges(entry.charges);
+          cells += `<button type="button" class="inv-diag-sim-day ${heat}" data-sim-iso="${iso}">${d}</button>`;
+        } else {
+          cells += `<div class="inv-diag-sim-day inv-diag-sim-day-plain">${d}</div>`;
+        }
+      }
+      return `<div class="inv-diag-sim-cal-wrap">
+  <div class="inv-diag-cal-nav">
+    <button type="button" class="inv-diag-sim-nav-btn" data-sim-dir="prev">←</button>
+    <span class="inv-diag-cal-month-label">${esc(label)}</span>
+    <button type="button" class="inv-diag-sim-nav-btn" data-sim-dir="next">→</button>
+  </div>
+  <div class="inv-diag-cal-grid">${dowRow}${cells}</div>
+</div>`;
+    }
+
+    function renderBillingSimulatorLegendHtml() {
+      const items = [
+        ["inv-sim-heat-b", "Blue — setup / due today"],
+        ["inv-sim-heat-y", "Yellow — financing"],
+        ["inv-sim-heat-r", "Red — subscription"],
+        ["inv-sim-heat-yr", "Orange — financing + subscription"],
+        ["inv-sim-heat-by", "Blue + yellow"],
+        ["inv-sim-heat-br", "Blue + subscription"],
+        ["inv-sim-heat-byr", "Brown — all three"],
+      ];
+      return items
+        .map(
+          ([cls, lab]) =>
+            `<span><span class="inv-diag-sim-swatch ${cls}" aria-hidden="true"></span>${esc(lab)}</span>`,
+        )
+        .join("");
+    }
+
+    function hideBillingSimPopup(force) {
+      const popup = document.getElementById("invDiagSimPopup");
+      if (!popup) return;
+      if (force || !billingSimPopupPinned) {
+        popup.hidden = true;
+        if (force) {
+          billingSimPopupPinned = false;
+          billingSimPopupPinnedIso = null;
+        }
+      }
+    }
+
+    function showBillingSimPopup(iso, clientX, clientY) {
+      const popup = document.getElementById("invDiagSimPopup");
+      const session = invoiceDiagWizardSession;
+      if (!popup || !session?.billingSimLedger) return;
+      const row = session.billingSimLedger[iso];
+      if (!row?.charges?.length) return;
+      const total = row.charges.reduce((a, c) => a + c.amount, 0);
+      const lines = row.charges
+        .map(
+          (c) =>
+            `<div class="inv-diag-sim-popup-line">${esc(c.label)}: <strong>${esc(fmtMoney(c.amount))}</strong></div>`,
+        )
+        .join("");
+      const title = formatDueDateFriendly(iso) || iso;
+      popup.innerHTML = `<div class="inv-diag-sim-popup-title">${esc(title)}</div><div class="inv-diag-sim-popup-total">Total: <strong>${esc(fmtMoney(total))}</strong></div>${lines}`;
+      popup.hidden = false;
+      const w = 280;
+      let left = (clientX || 0) + 14;
+      let top = (clientY || 0) + 14;
+      popup.style.width = `${w}px`;
+      popup.style.left = `${Math.max(8, Math.min(left, window.innerWidth - w - 16))}px`;
+      popup.style.top = `${Math.max(8, Math.min(top, window.innerHeight - 200))}px`;
+    }
+
+    function renderBillingSimulator() {
+      const session = invoiceDiagWizardSession;
+      const mount = document.getElementById("invDiagSimMount");
+      const legend = document.getElementById("invDiagSimLegend");
+      if (!session || !mount) return;
+      billingSimPopupPinned = false;
+      billingSimPopupPinnedIso = null;
+      hideBillingSimPopup(true);
+
+      session.billingSimLedger = buildBillingSimulationLedger(session);
+
+      if (legend) legend.innerHTML = renderBillingSimulatorLegendHtml();
+
+      if (!session.billingSimCalYM) {
+        const now = new Date();
+        session.billingSimCalYM = { y: now.getFullYear(), m: now.getMonth() };
+      }
+      const calY = session.billingSimCalYM.y;
+      const calM = session.billingSimCalYM.m;
+
+      mount.innerHTML = buildBillingSimulatorMonthHtml(calY, calM, session.billingSimLedger);
+
+      mount.querySelectorAll(".inv-diag-sim-nav-btn[data-sim-dir]").forEach((btn) => {
+        btn.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          const dir = btn.getAttribute("data-sim-dir");
+          let ny = calY;
+          let nm = calM;
+          if (dir === "prev") {
+            nm -= 1;
+            if (nm < 0) {
+              nm = 11;
+              ny -= 1;
+            }
+          } else {
+            nm += 1;
+            if (nm > 11) {
+              nm = 0;
+              ny += 1;
+            }
+          }
+          session.billingSimCalYM = { y: ny, m: nm };
+          renderBillingSimulator();
+        });
+      });
+
+      mount.querySelectorAll(".inv-diag-sim-day[data-sim-iso]").forEach((btn) => {
+        const iso = btn.getAttribute("data-sim-iso");
+        btn.addEventListener("mouseenter", (ev) => {
+          if (!billingSimPopupPinned) showBillingSimPopup(iso, ev.clientX, ev.clientY);
+        });
+        btn.addEventListener("mouseleave", () => {
+          if (!billingSimPopupPinned) hideBillingSimPopup(false);
+        });
+        btn.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          if (billingSimPopupPinnedIso === iso) {
+            hideBillingSimPopup(true);
+          } else {
+            billingSimPopupPinned = true;
+            billingSimPopupPinnedIso = iso;
+            showBillingSimPopup(iso, ev.clientX, ev.clientY);
+          }
+        });
+      });
+    }
+
+    /** CRM calendar persistence requires schema + API — not implemented in this codebase. */
+    function finalizeInvoicePlanWizardLaunch() {
+      showInvoiceBuilderPlaceholderToast(
+        "Billing calendar persistence is not configured yet. There is no dedicated table/API in this repo for committing simulated invoice dates. Confirm the desired Supabase schema (e.g. client_billing_events) and we can wire Finalize next.",
+      );
+    }
+
     function buildDispatcherCalendarHtml(year, monthIndex, opts) {
       const { selectableFn, selectedIso } = opts;
       const first = new Date(year, monthIndex, 1, 12, 0, 0);
@@ -12355,6 +12779,11 @@
         yellow_anchor: rhythmRule.yellow_anchor,
         red_anchor: rhythmRule.red_anchor,
         start_dates: { ...startDates },
+        billing_simulation: {
+          horizon_months: 6,
+          preview_only: true,
+          finalize_requires_persistence_schema: true,
+        },
         client_id: session.clientId || null,
         client_name: session.clientName || null,
         template_name: session.analyzedTemplate?.name || null,
@@ -12566,6 +12995,11 @@
       if (confirmSummaryOpen) confirmSummaryOpen.innerHTML = "";
       const dispatcherPreOpen = document.getElementById("invDiagDispatcherPreview");
       if (dispatcherPreOpen) dispatcherPreOpen.textContent = "";
+      const simMountOpen = document.getElementById("invDiagSimMount");
+      if (simMountOpen) simMountOpen.innerHTML = "";
+      const simLegendOpen = document.getElementById("invDiagSimLegend");
+      if (simLegendOpen) simLegendOpen.innerHTML = "";
+      hideBillingSimPopup(true);
       setInvoiceDiagStep(1);
       if (invDiagAnalyze) invDiagAnalyze.disabled = true;
       if (invDiagDateNext) invDiagDateNext.disabled = true;
@@ -12727,24 +13161,53 @@
     if (invDiagConfirmBack) {
       invDiagConfirmBack.addEventListener("click", () => {
         const session = invoiceDiagWizardSession;
-        if (!session?.dispatcherPhases?.length) return;
-        const phases = session.dispatcherPhases;
-        const lastIdx = phases.length - 1;
-        const lastPhase = phases[lastIdx];
-        const key = dispatcherPhaseToStartDateKey(lastPhase);
-        session.dispatcherPhaseIndex = lastIdx;
-        session.dispatcherPendingIso = key ? session.startDates[key] : null;
-        if (key) {
-          session.startDates[key] = null;
-          if (key === "yellow") session.startDates.yellow_timing = null;
+        if (!session) return;
+        const phases = session.dispatcherPhases || [];
+        if (phases.length > 0) {
+          const lastIdx = phases.length - 1;
+          const lastPhase = phases[lastIdx];
+          const key = dispatcherPhaseToStartDateKey(lastPhase);
+          session.dispatcherPhaseIndex = lastIdx;
+          session.dispatcherPendingIso = key ? session.startDates[key] : null;
+          if (key) {
+            session.startDates[key] = null;
+            if (key === "yellow") session.startDates.yellow_timing = null;
+          }
+          session.dispatcherCalYM = null;
+          session.stage = "dispatcher_dates";
+          renderDispatcherDateStage();
+          setInvoiceDiagStep(5);
+          return;
         }
-        session.dispatcherCalYM = null;
-        session.stage = "dispatcher_dates";
-        renderDispatcherDateStage();
-        setInvoiceDiagStep(5);
+        session.stage = "rhythm_setup";
+        renderRhythmSetupStage();
+        setInvoiceDiagStep(4);
       });
     }
-    if (invDiagDispatcherDone) invDiagDispatcherDone.addEventListener("click", closeInvoiceDiagnosticWizard);
+    if (invDiagConfirmSimNext) {
+      invDiagConfirmSimNext.addEventListener("click", () => {
+        if (!invoiceDiagWizardSession) return;
+        invoiceDiagWizardSession.stage = "dispatcher_sim";
+        setInvoiceDiagStep(7);
+        renderBillingSimulator();
+      });
+    }
+    if (invDiagSimBack) {
+      invDiagSimBack.addEventListener("click", () => {
+        if (!invoiceDiagWizardSession) return;
+        hideBillingSimPopup(true);
+        invoiceDiagWizardSession.stage = "dispatcher_confirm";
+        setInvoiceDiagStep(6);
+      });
+    }
+    if (invDiagSimClose) {
+      invDiagSimClose.addEventListener("click", closeInvoiceDiagnosticWizard);
+    }
+    if (invDiagFinalizeLaunch) {
+      invDiagFinalizeLaunch.addEventListener("click", () => {
+        finalizeInvoicePlanWizardLaunch();
+      });
+    }
 
     // ---- Saved invoice preview (view + manual mark-as-paid escape hatch) ----
     function closeInvoicePreview() {
