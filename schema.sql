@@ -582,10 +582,18 @@ create policy "portal clients read published invoices"
   on public.invoices for select to authenticated
   using (
     not public.is_team_member()
-    and client_id in (
-      select id from public.clients where lower(email) = lower(auth.email())
-    )
     and portal_published_at is not null
+    and exists (
+      select 1
+      from public.clients c
+      where c.id = invoices.client_id
+        and c.email is not null
+        and btrim(c.email) <> ''
+        and lower(btrim(c.email)) = lower(btrim(coalesce(
+          nullif(btrim((auth.jwt() ->> 'email')), ''),
+          nullif(btrim(auth.email()::text), '')
+        )))
+    )
   );
 
 drop trigger if exists invoices_set_updated_at on public.invoices;

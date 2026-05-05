@@ -41,7 +41,38 @@ async function getUserFromJwt(jwt) {
     },
   });
   if (!r.ok) return null;
-  return readJson(r);
+  const raw = await readJson(r);
+  if (!raw) return null;
+  // Some auth stacks wrap as { user: { … } }; CRM session JWT uses the same shape as Postgres is_team_member().
+  if (raw.user && typeof raw.user === "object") return raw.user;
+  return raw;
+}
+
+/** Base64url-decode JWT payload (same claims RLS / is_team_member() use). */
+function decodeJwtPayload(jwt) {
+  try {
+    const parts = String(jwt || "").split(".");
+    if (parts.length < 2) return null;
+    let b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const pad = b64.length % 4;
+    if (pad) b64 += "=".repeat(4 - pad);
+    const json = Buffer.from(b64, "base64").toString("utf8");
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+function isTeamFromJwtPayload(payload) {
+  if (!payload || typeof payload !== "object") return false;
+  const allowed = new Set(["admin", "sales", "web_designer"]);
+  const um = payload.user_metadata || {};
+  const am = payload.app_metadata || {};
+  if (Array.isArray(um.roles) && um.roles.some((r) => allowed.has(r))) return true;
+  if (typeof um.role === "string" && allowed.has(um.role)) return true;
+  if (Array.isArray(am.roles) && am.roles.some((r) => allowed.has(r))) return true;
+  if (typeof am.role === "string" && allowed.has(am.role)) return true;
+  return false;
 }
 
 function isTeamUser(u) {
@@ -78,8 +109,13 @@ export default async function handler(req, res) {
 
   const user = await getUserFromJwt(jwt);
   if (!user) return res.status(401).json({ error: "invalid or expired session" });
-  if (!isTeamUser(user)) {
-    return res.status(403).json({ error: "team members only" });
+  const fromClaims = isTeamFromJwtPayload(decodeJwtPayload(jwt));
+  const fromUser = isTeamUser(user);
+  if (!fromClaims && !fromUser) {
+    return res.status(403).json({
+      error: "team members only",
+      hint: "JWT must include user_metadata.roles (or role) admin, sales, or web_designer — same as CRM login.",
+    });
   }
 
   const body =

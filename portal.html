@@ -1055,7 +1055,7 @@
     }
 
     // Tab switching
-    document.getElementById("portalTabs").addEventListener("click", (e) => {
+    document.getElementById("portalTabs").addEventListener("click", async (e) => {
       const btn = e.target.closest(".portal-tab");
       if (!btn) return;
       const tab = btn.dataset.tab;
@@ -1063,6 +1063,11 @@
       document.querySelectorAll(".portal-tab-panel").forEach((p) => {
         p.classList.toggle("active", p.dataset.tabPanel === tab);
       });
+      if (tab === "invoice" && currentClient) {
+        const invResult = await fetchInvoicesForClient(currentClient.id);
+        currentInvoices = invResult.rows || [];
+        renderInvoiceList(currentInvoices, invResult.error);
+      }
     });
 
     // Sign-out (live)
@@ -1070,6 +1075,7 @@
       try { await sb.auth.signOut(); } catch (err) { console.warn("Sign out failed:", err); }
       currentClient = null;
       currentContracts = [];
+      currentInvoices = [];
       signinEmail.value = "";
       showView("signin");
       setTimeout(() => signinEmail.focus(), 50);
@@ -1618,18 +1624,34 @@
     }
 
     async function fetchInvoicesForClient(clientId) {
-      if (!clientId) return [];
-      const { data, error } = await sb
+      if (!clientId) return { rows: [], error: null };
+
+      let { data, error } = await sb
         .from("invoices")
         .select("id, receipt_no, issued_at, status, portal_published_at, rendered_html")
         .eq("client_id", clientId)
         .not("portal_published_at", "is", null)
         .order("portal_published_at", { ascending: false });
+
       if (error) {
         console.warn("Invoice fetch failed:", error);
-        return [];
+        const r2 = await sb
+          .from("invoices")
+          .select("id, receipt_no, issued_at, status, portal_published_at, rendered_html")
+          .eq("client_id", clientId)
+          .order("portal_published_at", { ascending: false });
+        if (r2.error) {
+          return {
+            rows: [],
+            error:
+              (r2.error.message || "Unknown error") +
+              " If invoices still do not show, open Supabase and run the latest invoice portal policy from schema.sql — and ensure this client's Email matches the address you use to sign into the portal.",
+          };
+        }
+        const filtered = (r2.data || []).filter((inv) => inv.portal_published_at != null);
+        return { rows: filtered, error: null };
       }
-      return data || [];
+      return { rows: data || [], error: null };
     }
 
     function invoicePortalMetaLine(inv) {
@@ -1656,9 +1678,18 @@
       return parts.map((p) => `<span>${p}</span>`).join(" ");
     }
 
-    function renderInvoiceList(rows) {
+    function renderInvoiceList(rows, loadError) {
       const list = document.getElementById("invoiceList");
       if (!list) return;
+      if (loadError) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <span class="empty-state-icon">&#x26A0;&#xFE0F;</span>
+            <div class="empty-state-title">Could not load invoices</div>
+            <div style="font-size:13px;color:#6b7280;line-height:1.5;">${escapeHtml(loadError)}</div>
+          </div>`;
+        return;
+      }
       if (!rows || rows.length === 0) {
         list.innerHTML = `
           <div class="empty-state">
@@ -1793,13 +1824,14 @@
 
       currentClient = client;
       currentContracts = await fetchContractsForClient(client.id);
-      currentInvoices = await fetchInvoicesForClient(client.id);
+      const invResult = await fetchInvoicesForClient(client.id);
+      currentInvoices = invResult.rows || [];
       renderPortalHeader({
         company_name: client.company_name || email,
         email: email,
       });
       renderContractList(currentContracts);
-      renderInvoiceList(currentInvoices);
+      renderInvoiceList(currentInvoices, invResult.error);
       showView("portal");
     }
 
