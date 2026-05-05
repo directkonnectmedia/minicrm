@@ -1,8 +1,13 @@
 /**
  * GET/POST /api/cron/publish-invoices
  *
- * Vercel Cron calls this every minute. Publishes queued invoices whose
- * scheduled_dispatch_time is due: sets portal_published_at + portal_dispatch_status=pushed.
+ * Publishes queued invoices whose scheduled_dispatch_time is due
+ * (portal_dispatch_status=queued, portal_published_at null).
+ *
+ * **Scheduling:** Vercel Hobby allows at most one Cron Job run per day.
+ * For minute-level runs, either upgrade to Pro and add to vercel.json:
+ *   "crons": [{ "path": "/api/cron/publish-invoices", "schedule": "* * * * *" }]
+ * or use an external cron (e.g. cron-job.org) to GET this route every minute with ?secret=.
  *
  * Auth: Authorization: Bearer <CRON_SECRET> or ?secret=<CRON_SECRET>
  * Env: CRON_SECRET, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL (optional default)
