@@ -13458,9 +13458,24 @@
         return;
       }
 
-      const { error: bpErr } = await sb.from("clients").update({ billing_philosophy: baseBp }).eq("id", id);
-      if (bpErr) {
-        console.warn("billing_philosophy dispatcherContext refresh:", bpErr);
+      try {
+        const res = await fetch("/api/clients/update-philosophy", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authSess.session.access_token}`,
+          },
+          body: JSON.stringify({
+            clientId: id,
+            billing_philosophy: baseBp,
+          }),
+        });
+        
+        if (!res.ok) {
+          throw new Error("API request failed");
+        }
+      } catch (bpErr) {
+        console.warn("billing_philosophy dispatcherContext refresh via API:", bpErr);
         showInvoiceBuilderPlaceholderToast(
           "Calendar updated but saving profile snapshot failed — retry or re-run Finalize.",
         );
@@ -14077,12 +14092,29 @@
         return;
       }
 
-      const { error } = await sb.from("clients").update({ billing_philosophy }).eq("id", session.clientId);
-      if (error) {
+      try {
+        const res = await fetch("/api/clients/update-philosophy", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authSess.session.access_token}`,
+          },
+          body: JSON.stringify({
+            clientId: session.clientId,
+            billing_philosophy,
+          }),
+        });
+        
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || res.statusText || "Failed to update client profile");
+        }
+      } catch (error) {
         showInvoiceBuilderPlaceholderToast("Client profile save failed: " + (error.message || String(error)));
-        console.error("billing_philosophy update:", error);
+        console.error("billing_philosophy update via API:", error);
         return;
       }
+
       session.billingPhilosophy = normalizeClientBillingPhilosophy(billing_philosophy);
       const idx = allClients.findIndex((c) => String(c.id) === String(session.clientId));
       if (idx >= 0) allClients[idx] = { ...allClients[idx], billing_philosophy };
