@@ -13845,10 +13845,20 @@
           loadClientInvoices(calRow.client_id).then(() => renderInvoiceBuilder());
         }
 
+        const portalEmail = j.portalTarget?.normalized_email || j.portalTarget?.client_email || "";
+        const duplicateCount = Number(j.portalTarget?.duplicate_client_count) || 0;
+        const duplicateHint =
+          duplicateCount > 1
+            ? ` Warning: ${duplicateCount} CRM clients use this portal email.`
+            : "";
         showInvoiceBuilderPlaceholderToast(
           publishNow
-            ? "Invoice is live in the Client Portal."
-            : "Portal dispatch queued for the scheduled time.",
+            ? portalEmail
+              ? `Invoice is live in the Client Portal for ${portalEmail}.${duplicateHint}`
+              : "Invoice was published, but this client does not have a portal email."
+            : portalEmail
+              ? `Portal dispatch queued for ${portalEmail}.${duplicateHint}`
+              : "Portal dispatch queued, but this client does not have a portal email.",
         );
         closeInvoiceCalendarEventModal();
         if (invoiceCalendarInstance) invoiceCalendarInstance.refetchEvents();

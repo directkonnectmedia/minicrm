@@ -33,6 +33,10 @@ const restHeaders = () => ({
   "Content-Type": "application/json",
 });
 
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
 async function getUserFromJwt(jwt) {
   const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: {
@@ -213,9 +217,39 @@ export default async function handler(req, res) {
     }
   }
 
+  const clientRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/clients?id=eq.${encodeURIComponent(saved.client_id)}&select=id,company_name,email,created_at`,
+    { headers: restHeaders() },
+  );
+  const clientJson = await readJson(clientRes);
+  const client = clientRes.ok && Array.isArray(clientJson) ? clientJson[0] || null : null;
+  const portalEmail = normalizeEmail(client?.email);
+  let duplicateClientCount = 0;
+  let duplicateClientIds = [];
+  if (portalEmail) {
+    const dupRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/clients?select=id,email&email=ilike.${encodeURIComponent(`*${portalEmail}*`)}`,
+      { headers: restHeaders() },
+    );
+    const dupJson = await readJson(dupRes);
+    const dupRows = Array.isArray(dupJson)
+      ? dupJson.filter((row) => normalizeEmail(row.email) === portalEmail)
+      : [];
+    duplicateClientCount = dupRows.length;
+    duplicateClientIds = dupRows.map((row) => row.id);
+  }
+
   return res.status(200).json({
     ok: true,
     invoice: saved,
     publishNow,
+    portalTarget: {
+      client_id: saved.client_id,
+      client_email: client?.email || null,
+      normalized_email: portalEmail || null,
+      portal_published_at: saved.portal_published_at || null,
+      duplicate_client_count: duplicateClientCount,
+      duplicate_client_ids: duplicateClientIds,
+    },
   });
 }

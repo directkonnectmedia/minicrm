@@ -1064,7 +1064,7 @@
         p.classList.toggle("active", p.dataset.tabPanel === tab);
       });
       if (tab === "invoice" && currentClient) {
-        const invResult = await fetchInvoicesForClient(currentClient.id);
+        const invResult = await fetchInvoicesForClient(currentClient._portalClientIds || currentClient.id);
         currentInvoices = invResult.rows || [];
         renderInvoiceList(currentInvoices, invResult.error);
       }
@@ -1576,17 +1576,25 @@
     // email matches. If multiple rows happen to share an email (rare),
     // we pick the most recent.
     async function fetchClientForEmail(email) {
+      const normalizedEmail = String(email || "").trim().toLowerCase();
       const { data, error } = await sb
         .from("clients")
-        .select("id, company_name, email, finished_website, web_status, client_status, manager")
-        .eq("email", email.toLowerCase())
+        .select("id, company_name, email, finished_website, web_status, client_status, manager, created_at")
+        .ilike("email", `%${normalizedEmail}%`)
         .order("created_at", { ascending: false })
-        .limit(1);
       if (error) {
         console.warn("Client lookup failed:", error);
         return null;
       }
-      return (data && data[0]) || null;
+      const matches = (data || []).filter(
+        (row) => String(row.email || "").trim().toLowerCase() === normalizedEmail,
+      );
+      const client = matches[0] || null;
+      if (client) {
+        client._portalClientIds = matches.map((row) => row.id).filter(Boolean);
+        client._duplicateClientCount = matches.length;
+      }
+      return client;
     }
 
     // Pull every signed_contracts row for a given client_id, newest first.
@@ -1624,22 +1632,26 @@
     }
 
     async function fetchInvoicesForClient(clientId) {
-      if (!clientId) return { rows: [], error: null };
+      const clientIds = Array.isArray(clientId) ? clientId.filter(Boolean) : [clientId].filter(Boolean);
+      if (!clientIds.length) return { rows: [], error: null };
 
-      let { data, error } = await sb
+      const applyClientFilter = (query) =>
+        clientIds.length === 1 ? query.eq("client_id", clientIds[0]) : query.in("client_id", clientIds);
+
+      let query = sb
         .from("invoices")
         .select("id, receipt_no, issued_at, status, portal_published_at, rendered_html")
-        .eq("client_id", clientId)
         .not("portal_published_at", "is", null)
         .order("portal_published_at", { ascending: false });
+      let { data, error } = await applyClientFilter(query);
 
       if (error) {
         console.warn("Invoice fetch failed:", error);
-        const r2 = await sb
+        let fallbackQuery = sb
           .from("invoices")
           .select("id, receipt_no, issued_at, status, portal_published_at, rendered_html")
-          .eq("client_id", clientId)
           .order("portal_published_at", { ascending: false });
+        const r2 = await applyClientFilter(fallbackQuery);
         if (r2.error) {
           return {
             rows: [],
@@ -1824,7 +1836,7 @@
 
       currentClient = client;
       currentContracts = await fetchContractsForClient(client.id);
-      const invResult = await fetchInvoicesForClient(client.id);
+      const invResult = await fetchInvoicesForClient(client._portalClientIds || client.id);
       currentInvoices = invResult.rows || [];
       renderPortalHeader({
         company_name: client.company_name || email,
