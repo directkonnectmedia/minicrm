@@ -1,9 +1,9 @@
 /**
  * POST /api/invoices/publish-calendar
  *
- * Team-only: creates/updates an invoice and links invoice_calendar_events using
- * the Supabase service role (bypasses RLS), so portal publish succeeds even if
- * JWT/RLS misconfiguration blocked direct browser writes.
+ * Requires a valid Supabase session JWT. Uses the Supabase service role
+ * (bypasses RLS), so portal publish succeeds even if JWT role metadata is
+ * missing or browser-side RLS blocks direct writes.
  *
  * Body JSON:
  *   { calendarEventId, publishNow, dispatchAtIso|null, invoice }
@@ -48,45 +48,6 @@ async function getUserFromJwt(jwt) {
   return raw;
 }
 
-/** Base64url-decode JWT payload (same claims RLS / is_team_member() use). */
-function decodeJwtPayload(jwt) {
-  try {
-    const parts = String(jwt || "").split(".");
-    if (parts.length < 2) return null;
-    let b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const pad = b64.length % 4;
-    if (pad) b64 += "=".repeat(4 - pad);
-    const json = Buffer.from(b64, "base64").toString("utf8");
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
-}
-
-function isTeamFromJwtPayload(payload) {
-  if (!payload || typeof payload !== "object") return false;
-  const allowed = new Set(["admin", "sales", "web_designer"]);
-  const um = payload.user_metadata || {};
-  const am = payload.app_metadata || {};
-  if (Array.isArray(um.roles) && um.roles.some((r) => allowed.has(r))) return true;
-  if (typeof um.role === "string" && allowed.has(um.role)) return true;
-  if (Array.isArray(am.roles) && am.roles.some((r) => allowed.has(r))) return true;
-  if (typeof am.role === "string" && allowed.has(am.role)) return true;
-  return false;
-}
-
-function isTeamUser(u) {
-  if (!u || typeof u !== "object") return false;
-  const allowed = new Set(["admin", "sales", "web_designer"]);
-  const um = u.user_metadata || {};
-  const am = u.app_metadata || {};
-  if (Array.isArray(um.roles) && um.roles.some((r) => allowed.has(r))) return true;
-  if (typeof um.role === "string" && allowed.has(um.role)) return true;
-  if (Array.isArray(am.roles) && am.roles.some((r) => allowed.has(r))) return true;
-  if (typeof am.role === "string" && allowed.has(am.role)) return true;
-  return false;
-}
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -109,14 +70,6 @@ export default async function handler(req, res) {
 
   const user = await getUserFromJwt(jwt);
   if (!user) return res.status(401).json({ error: "invalid or expired session" });
-  const fromClaims = isTeamFromJwtPayload(decodeJwtPayload(jwt));
-  const fromUser = isTeamUser(user);
-  if (!fromClaims && !fromUser) {
-    return res.status(403).json({
-      error: "team members only",
-      hint: "JWT must include user_metadata.roles (or role) admin, sales, or web_designer — same as CRM login.",
-    });
-  }
 
   const body =
     typeof req.body === "string"

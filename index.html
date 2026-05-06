@@ -13792,56 +13792,13 @@
         showInvoiceBuilderPlaceholderToast("No draft invoice linked to this calendar date — refresh the Invoice Calendar.");
         return;
       }
-      const charges = Array.isArray(calRow.charges) ? calRow.charges : [];
-      if (!charges.length) {
-        showInvoiceBuilderPlaceholderToast("No charges on this calendar row — nothing to send.");
-        return;
-      }
-      const client = allClients.find((c) => String(c.id) === String(calRow.client_id));
-      if (!client) {
-        showInvoiceBuilderPlaceholderToast("Client not loaded.");
-        return;
-      }
       const { data: auth } = await sb.auth.getSession();
       if (!auth?.session?.access_token) {
         showInvoiceBuilderPlaceholderToast("Sign in to schedule.");
         return;
       }
 
-      let existingInv = null;
-      if (calRow.invoice_id) {
-        const { data: invFull, error: fe } = await sb.from("invoices").select("*").eq("id", calRow.invoice_id).maybeSingle();
-        if (fe) {
-          console.warn("load invoice for calendar:", fe);
-        } else {
-          existingInv = invFull;
-        }
-      }
-
-      const issuedAt = String(calRow.scheduled_date || "").slice(0, 10);
-      const receiptNo = existingInv?.receipt_no || (await nextReceiptNoForIssuedDate(issuedAt));
-      const data = buildInvoiceDataFromCalendarRow(calRow, client, receiptNo);
-      const renderedHtml = renderInvoiceHTML(data);
-      const nowIso = new Date().toISOString();
-      const schedIso = publishNow ? nowIso : dispatchAtIso;
-
-      const baseFields = {
-        client_id: client.id,
-        receipt_no: data.receipt_no,
-        issued_at: data.issued_at,
-        billed_to_name: data.billed_to_name,
-        from_company: data.from_company,
-        from_subtitle: data.from_subtitle,
-        line_items: data.line_items,
-        payment_methods: [],
-        terms_html: data.terms_html,
-        amount_paid: 0,
-        status: "due",
-        stripe_payment_link: null,
-        rendered_html: renderedHtml,
-      };
-
-      const invoice = existingInv ? { ...baseFields, id: existingInv.id } : baseFields;
+      const schedIso = publishNow ? null : dispatchAtIso;
 
       try {
         const res = await fetch("/api/invoices/publish-calendar", {
@@ -13854,7 +13811,10 @@
             calendarEventId: calRow.id,
             publishNow,
             dispatchAtIso: publishNow ? null : schedIso,
-            invoice,
+            invoice: {
+              id: calRow.invoice_id,
+              client_id: calRow.client_id,
+            },
           }),
         });
         const j = await res.json().catch(() => ({}));
