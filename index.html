@@ -11532,17 +11532,23 @@
     // Format: DCL-YYYYMMDD-NNN. Generated at save time so abandoned
     // drafts don't burn numbers. The unique index on receipt_no
     // protects against the rare double-save race.
-    async function nextReceiptNo() {
-      const today = new Date().toISOString().slice(0, 10);
-      const stamp = today.replace(/-/g, "");
+    /** Receipt numbers use the invoice issue date (scheduled calendar date for drafts). */
+    async function nextReceiptNoForIssuedDate(issuedDateYmd) {
+      const raw = String(issuedDateYmd || "").trim().slice(0, 10);
+      const day = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : new Date().toISOString().slice(0, 10);
+      const stamp = day.replace(/-/g, "");
       const { count, error } = await sb.from("invoices")
         .select("id", { count: "exact", head: true })
-        .eq("issued_at", today);
+        .eq("issued_at", day);
       if (error) {
         console.warn("nextReceiptNo count failed:", error);
       }
       const seq = String((count || 0) + 1).padStart(3, "0");
       return `DCL-${stamp}-${seq}`;
+    }
+
+    async function nextReceiptNo() {
+      return nextReceiptNoForIssuedDate(new Date().toISOString().slice(0, 10));
     }
 
     async function loadClientInvoices(clientId) {
@@ -13234,6 +13240,20 @@
       });
     }
 
+    async function deleteOrphanedPlanWizardDraftInvoices(invoiceIds) {
+      const ids = [...new Set((invoiceIds || []).filter(Boolean))];
+      for (const iid of ids) {
+        const { error } = await sb
+          .from("invoices")
+          .delete()
+          .eq("id", iid)
+          .eq("portal_dispatch_status", "pending_time")
+          .is("portal_published_at", null)
+          .is("scheduled_dispatch_time", null);
+        if (error) console.warn("orphan plan-wizard draft delete:", error);
+      }
+    }
+
     async function commitInvoiceCalendarEventsFromSession(session, billingPhilosophyDoc, ledgerOpt) {
       if (!session?.clientId) return { error: new Error("missing client") };
       const ledger =
@@ -13259,12 +13279,38 @@
           commit_batch_id: batchId,
         });
       }
+
+      const { data: prevEvRows } = await sb
+        .from("invoice_calendar_events")
+        .select("invoice_id")
+        .eq("client_id", session.clientId)
+        .eq("source", "plan_wizard");
+      const prevDraftInvoiceIds = [...new Set((prevEvRows || []).map((r) => r.invoice_id).filter(Boolean))];
+
+      const client =
+        allClients.find((cl) => String(cl.id) === String(session.clientId)) || {
+          id: session.clientId,
+          client_name: session.clientName,
+          company_name: session.clientName,
+        };
+
       if (rows.length) {
         const insertChunk = 400;
         for (let i = 0; i < rows.length; i += insertChunk) {
           const chunk = rows.slice(i, i + insertChunk);
-          const { error: insErr } = await sb.from("invoice_calendar_events").insert(chunk);
+          const { data: insertedCal, error: insErr } = await sb
+            .from("invoice_calendar_events")
+            .insert(chunk)
+            .select("id, client_id, scheduled_date, charges, total_amount");
           if (insErr) return { error: insErr };
+          const calRows = insertedCal || [];
+          for (const calRow of calRows) {
+            const draftRes = await createDraftInvoiceForCalendarEvent(calRow, client);
+            if (draftRes.error) {
+              console.error("draft invoice for calendar event:", draftRes.error);
+              return { error: draftRes.error };
+            }
+          }
         }
       }
       const { error: delErr } = await sb
@@ -13274,6 +13320,8 @@
         .eq("source", "plan_wizard")
         .neq("commit_batch_id", batchId);
       if (delErr) return { error: delErr };
+
+      await deleteOrphanedPlanWizardDraftInvoices(prevDraftInvoiceIds);
       return {};
     }
 
@@ -13505,30 +13553,87 @@
 
     let invoiceCalModalCtx = null;
 
+    async function loadInvoicesMapForCalendar(invIds) {
+      const ids = [...new Set((invIds || []).filter(Boolean))];
+      if (!ids.length) return {};
+      const { data: invs, error: ie } = await sb
+        .from("invoices")
+        .select(
+          "id, client_id, portal_dispatch_status, portal_published_at, scheduled_dispatch_time, line_items, billed_to_name, receipt_no, issued_at, from_company, from_subtitle, terms_html, amount_paid, status, rendered_html",
+        )
+        .in("id", ids);
+      if (ie) console.warn("invoice join for calendar:", ie);
+      return Object.fromEntries((invs || []).map((x) => [String(x.id), x]));
+    }
+
+    /**
+     * Ensures every plan-wizard calendar row points at a draft invoice with line items.
+     * Runs when loading the Invoice Calendar (self-heal for rows created before draft linking).
+     */
+    async function repairMissingInvoiceDraftsForCalendarRows(rows, invById) {
+      let repaired = false;
+      for (const r of rows) {
+        const inv = r.invoice_id ? invById[String(r.invoice_id)] : null;
+        const emptyLines = !inv || !Array.isArray(inv.line_items) || inv.line_items.length === 0;
+        const needsRepair = !r.invoice_id || !inv || emptyLines;
+        if (!needsRepair) continue;
+
+        const charges = Array.isArray(r.charges) ? r.charges : [];
+        const tot = charges.reduce((a, c) => a + (Number(c.amount) || 0), 0);
+        if (!charges.length || !(tot > 0)) continue;
+
+        const client = allClients.find((cl) => String(cl.id) === String(r.client_id));
+        if (!client) continue;
+
+        if (r.invoice_id && inv && emptyLines) {
+          const { error: delE } = await sb
+            .from("invoices")
+            .delete()
+            .eq("id", r.invoice_id)
+            .eq("portal_dispatch_status", "pending_time")
+            .is("portal_published_at", null)
+            .is("scheduled_dispatch_time", null);
+          if (!delE) {
+            await sb.from("invoice_calendar_events").update({ invoice_id: null }).eq("id", r.id);
+            r.invoice_id = null;
+          }
+        } else if (r.invoice_id && !inv) {
+          await sb.from("invoice_calendar_events").update({ invoice_id: null }).eq("id", r.id);
+          r.invoice_id = null;
+        }
+
+        const res = await createDraftInvoiceForCalendarEvent(r, client);
+        if (!res.error) repaired = true;
+      }
+      return repaired;
+    }
+
     async function fetchInvoiceCalendarEventsForRange(startStr, endStr) {
       const start = startStr.slice(0, 10);
       const end = endStr.slice(0, 10);
-      const { data, error } = await sb
-        .from("invoice_calendar_events")
-        .select(
-          "id, client_id, scheduled_date, status, total_amount, charges, billing_philosophy, template_name, invoice_id, scheduled_dispatch_time",
-        )
-        .gte("scheduled_date", start)
-        .lte("scheduled_date", end)
-        .eq("source", "plan_wizard")
-        .order("scheduled_date", { ascending: true });
-      if (error) throw error;
-      const rows = data || [];
-      const invIds = [...new Set(rows.map((r) => r.invoice_id).filter(Boolean))];
-      let invById = {};
-      if (invIds.length) {
-        const { data: invs, error: ie } = await sb
-          .from("invoices")
-          .select("id, portal_dispatch_status, portal_published_at, scheduled_dispatch_time")
-          .in("id", invIds);
-        if (ie) console.warn("invoice join for calendar:", ie);
-        invById = Object.fromEntries((invs || []).map((x) => [String(x.id), x]));
+
+      async function queryEvents() {
+        const { data, error } = await sb
+          .from("invoice_calendar_events")
+          .select(
+            "id, client_id, scheduled_date, status, total_amount, charges, billing_philosophy, template_name, invoice_id, scheduled_dispatch_time",
+          )
+          .gte("scheduled_date", start)
+          .lte("scheduled_date", end)
+          .eq("source", "plan_wizard")
+          .order("scheduled_date", { ascending: true });
+        if (error) throw error;
+        return data || [];
       }
+
+      let rows = await queryEvents();
+      let invById = await loadInvoicesMapForCalendar(rows.map((r) => r.invoice_id));
+      const repaired = await repairMissingInvoiceDraftsForCalendarRows(rows, invById);
+      if (repaired) {
+        rows = await queryEvents();
+        invById = await loadInvoicesMapForCalendar(rows.map((r) => r.invoice_id));
+      }
+
       return rows.map((r) => ({
         ...r,
         _inv: r.invoice_id ? invById[String(r.invoice_id)] : null,
@@ -13572,6 +13677,7 @@
             scheduled_dispatch_time: row.scheduled_dispatch_time,
             dispatchPhase: phase,
             rawCalendarRow: row,
+            invoiceSnapshot: row._inv,
           },
         };
       });
@@ -13601,10 +13707,58 @@
       };
     }
 
+    /**
+     * Persist a draft invoice row for a plan-wizard calendar event and link invoice_id.
+     * Drafts use portal_dispatch_status pending_time until the team queues portal dispatch.
+     */
+    async function createDraftInvoiceForCalendarEvent(calRow, client) {
+      if (!calRow?.id || !client?.id) return { error: new Error("missing calendar row or client") };
+      const charges = Array.isArray(calRow.charges) ? calRow.charges : [];
+      const sum = charges.reduce((a, c) => a + (Number(c.amount) || 0), 0);
+      if (!charges.length || !(sum > 0)) return { error: new Error("calendar row has no billable charges") };
+
+      const receiptNo = await nextReceiptNoForIssuedDate(String(calRow.scheduled_date || "").slice(0, 10));
+      const data = buildInvoiceDataFromCalendarRow(calRow, client, receiptNo);
+      const renderedHtml = renderInvoiceHTML(data);
+      const row = {
+        client_id: client.id,
+        receipt_no: data.receipt_no,
+        issued_at: data.issued_at,
+        billed_to_name: data.billed_to_name,
+        from_company: data.from_company,
+        from_subtitle: data.from_subtitle,
+        line_items: data.line_items,
+        payment_methods: [],
+        terms_html: data.terms_html,
+        amount_paid: 0,
+        status: "due",
+        stripe_payment_link: null,
+        rendered_html: renderedHtml,
+        portal_dispatch_status: "pending_time",
+        portal_published_at: null,
+        scheduled_dispatch_time: null,
+      };
+      const { data: inserted, error } = await sb.from("invoices").insert(row).select("id").single();
+      if (error) return { error };
+      const { error: linkErr } = await sb
+        .from("invoice_calendar_events")
+        .update({ invoice_id: inserted.id })
+        .eq("id", calRow.id);
+      if (linkErr) {
+        await sb.from("invoices").delete().eq("id", inserted.id);
+        return { error: linkErr };
+      }
+      return { invoice_id: inserted.id };
+    }
+
     async function persistInvoiceCalendarPortalDispatch({ publishNow, dispatchAtIso }) {
       const ctx = invoiceCalModalCtx;
       if (!ctx?.rawCalendarRow) return;
       const calRow = ctx.rawCalendarRow;
+      if (!calRow.invoice_id) {
+        showInvoiceBuilderPlaceholderToast("No draft invoice linked to this calendar date — refresh the Invoice Calendar.");
+        return;
+      }
       const charges = Array.isArray(calRow.charges) ? calRow.charges : [];
       if (!charges.length) {
         showInvoiceBuilderPlaceholderToast("No charges on this calendar row — nothing to send.");
@@ -13631,7 +13785,8 @@
         }
       }
 
-      const receiptNo = existingInv?.receipt_no || (await nextReceiptNo());
+      const issuedAt = String(calRow.scheduled_date || "").slice(0, 10);
+      const receiptNo = existingInv?.receipt_no || (await nextReceiptNoForIssuedDate(issuedAt));
       const data = buildInvoiceDataFromCalendarRow(calRow, client, receiptNo);
       const renderedHtml = renderInvoiceHTML(data);
       const nowIso = new Date().toISOString();
@@ -13712,6 +13867,13 @@
       }
     }
 
+    function invoiceCalModalPillClassFromLine(li) {
+      const pill = String(li.status_pill || "");
+      if (pill === "DUE TODAY") return "inv-cal-pill-blue";
+      if (pill === "BALANCE DUE") return "inv-cal-pill-yellow";
+      return "inv-cal-pill-red";
+    }
+
     function openInvoiceCalendarEventModalFromFc(info) {
       const ov = document.getElementById("invoiceCalendarEventOverlay");
       const body = document.getElementById("invoiceCalendarEventBody");
@@ -13721,26 +13883,77 @@
       const raw = p.rawCalendarRow || {};
       invoiceCalModalCtx = { eventId: info.event.id, extendedProps: p, rawCalendarRow: raw };
 
+      const inv = p.invoiceSnapshot || null;
+      const lineItems = inv && Array.isArray(inv.line_items) ? inv.line_items : [];
+      const invoiceTotalFromLines = lineItems.reduce((a, li) => a + (Number(li.amount) || 0), 0);
+      const hasPortalPayload = !!(
+        raw.invoice_id &&
+        inv &&
+        lineItems.length &&
+        invoiceTotalFromLines > 0
+      );
+
       const dateLabel = formatDueDateFriendly(p.scheduled_date) || p.scheduled_date;
       if (titleEl) titleEl.textContent = `Invoice — ${dateLabel}`;
       const charges = Array.isArray(p.charges) ? p.charges : [];
-      const total = Number(p.total_amount) || 0;
-      const pillClass = (col) =>
-        col === "blue" ? "inv-cal-pill-blue" : col === "yellow" ? "inv-cal-pill-yellow" : col === "red" ? "inv-cal-pill-red" : "";
-      const rows = charges
-        .map((c) => {
-          const col = c.color || "";
-          const lab = billingSimShortLabel(c);
-          const amt = fmtMoney(Number(c.amount) || 0);
-          return `<div class="inv-cal-detail-row">
-            <span><span class="inv-cal-pill ${pillClass(col)}">${esc(col || "—")}</span> ${esc(c.label || lab)}</span>
+      const pillClassFromCharge = (col) =>
+        col === "blue"
+          ? "inv-cal-pill-blue"
+          : col === "yellow"
+            ? "inv-cal-pill-yellow"
+            : col === "red"
+              ? "inv-cal-pill-red"
+              : "";
+
+      let breakdownRows = "";
+      if (lineItems.length) {
+        breakdownRows = lineItems
+          .map((li) => {
+            const pillCls = invoiceCalModalPillClassFromLine(li);
+            const amt = fmtMoney(Number(li.amount) || 0);
+            const sub = li.subtitle ? ` <span class="muted" style="font-size:12px;">${esc(li.subtitle)}</span>` : "";
+            return `<div class="inv-cal-detail-row">
+            <span><span class="inv-cal-pill ${pillCls}">${esc(li.status_pill || "—")}</span> ${esc(li.description || "")}${sub}</span>
             <strong>${esc(amt)}</strong>
           </div>`;
-        })
-        .join("");
+          })
+          .join("");
+      } else {
+        breakdownRows = charges
+          .map((c) => {
+            const col = c.color || "";
+            const lab = billingSimShortLabel(c);
+            const amt = fmtMoney(Number(c.amount) || 0);
+            return `<div class="inv-cal-detail-row">
+            <span><span class="inv-cal-pill ${pillClassFromCharge(col)}">${esc(col || "—")}</span> ${esc(c.label || lab)}</span>
+            <strong>${esc(amt)}</strong>
+          </div>`;
+          })
+          .join("");
+      }
+
+      const total = lineItems.length ? invoiceTotalFromLines : Number(p.total_amount) || 0;
+
+      const invoiceMetaExtra =
+        inv && inv.receipt_no
+          ? `<div>Receipt: <strong>${esc(inv.receipt_no)}</strong> · Bill to: <strong>${esc(inv.billed_to_name || "—")}</strong></div>
+          <div style="margin-top:4px;">Branding: <strong>${esc(inv.from_company || "")}</strong> · ${esc(inv.from_subtitle || "")}</div>`
+          : `<div style="margin-top:8px;color:#b45309;font-size:13px;">Draft invoice not loaded — leave this modal and reopen after the calendar refreshes, or run <strong>Finalize &amp; Launch</strong> again.</div>`;
+
+      const previewSection =
+        inv && inv.rendered_html && hasPortalPayload
+          ? `<details style="margin-top:14px;"><summary style="cursor:pointer;font-weight:600;color:#374151;">Full invoice preview</summary>
+          <div style="margin-top:10px;max-height:280px;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;padding:12px;background:#fafafa;">
+            ${inv.rendered_html}
+          </div>
+        </details>`
+          : "";
+
       const phil = billingPhilosophySnippet(p.billing_philosophy);
       const dateCat = calendarEventDateCategory(p.scheduled_date);
       const phase = p.dispatchPhase || "unset";
+      const sendDisabled = hasPortalPayload ? "" : " disabled";
+
       let actionHtml = "";
       if (phase === "pushed") {
         actionHtml = `<p class="muted" style="margin-top:12px;">This invoice is already visible in the <strong>Client Portal</strong>.</p>`;
@@ -13749,12 +13962,17 @@
       } else if (dateCat === "today") {
         actionHtml = `
           <div class="inv-cal-dispatch-actions" style="margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb;">
-            <button type="button" class="primary" id="invCalBtnSendNow">Send to Portal Now</button>
+            <button type="button" class="primary" id="invCalBtnSendNow"${sendDisabled}>Send to Portal Now</button>
             <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
               <label style="font-size:13px;color:#374151;">Schedule for later today <span class="muted">(${esc(CRM_DISPATCH_TZ_LABEL)})</span></label>
               <input type="time" id="invCalTimeInput" value="17:00" style="padding:8px 10px;border-radius:8px;border:1px solid #d1d5db;" />
-              <button type="button" class="ghost" id="invCalBtnLaterToday">Schedule</button>
+              <button type="button" class="ghost" id="invCalBtnLaterToday"${sendDisabled}>Schedule</button>
             </div>
+            ${
+              !hasPortalPayload
+                ? `<p class="muted" style="margin-top:10px;font-size:13px;">Portal send stays disabled until a draft invoice record exists for this date.</p>`
+                : ""
+            }
           </div>`;
       } else {
         actionHtml = `
@@ -13762,8 +13980,13 @@
             <label style="display:block;font-weight:600;margin-bottom:8px;color:#374151;">Schedule Portal Dispatch Time <span class="muted">(${esc(CRM_DISPATCH_TZ_LABEL)})</span></label>
             <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
               <input type="time" id="invCalTimeInput" value="10:00" style="padding:8px 10px;border-radius:8px;border:1px solid #d1d5db;" />
-              <button type="button" class="primary" id="invCalBtnFutureQueue">Queue for portal</button>
+              <button type="button" class="primary" id="invCalBtnFutureQueue"${sendDisabled}>Queue for portal</button>
             </div>
+            ${
+              !hasPortalPayload
+                ? `<p class="muted" style="margin-top:10px;font-size:13px;">Portal queue stays disabled until a draft invoice record exists for this date.</p>`
+                : ""
+            }
           </div>`;
       }
 
@@ -13772,20 +13995,22 @@
           <div><strong>${esc(p.companyName || "Client")}</strong></div>
           <div>Portal: <strong>${esc(p.statusDisplay || "—")}</strong> · Total: <strong>${esc(fmtMoney(total))}</strong></div>
           ${p.template_name ? `<div>Template: ${esc(p.template_name)}</div>` : ""}
+          ${invoiceMetaExtra}
           <div style="margin-top:10px;font-size:12px;color:#6b7280;">${esc(phil)}</div>
         </div>
-        <div class="inv-diag-box-title" style="margin-bottom:6px;">Charge breakdown</div>
-        ${rows || '<p class="muted">No line items.</p>'}
+        <div class="inv-diag-box-title" style="margin-bottom:6px;">Plan breakdown</div>
+        ${breakdownRows || '<p class="muted">No line items.</p>'}
+        ${previewSection}
         ${actionHtml}`;
 
       const sendNow = document.getElementById("invCalBtnSendNow");
-      if (sendNow) {
+      if (sendNow && hasPortalPayload) {
         sendNow.addEventListener("click", () => {
           void persistInvoiceCalendarPortalDispatch({ publishNow: true, dispatchAtIso: null });
         });
       }
       const laterToday = document.getElementById("invCalBtnLaterToday");
-      if (laterToday) {
+      if (laterToday && hasPortalPayload) {
         laterToday.addEventListener("click", () => {
           const inp = document.getElementById("invCalTimeInput");
           const hm = inp && inp.value ? inp.value : "17:00";
@@ -13799,7 +14024,7 @@
         });
       }
       const fut = document.getElementById("invCalBtnFutureQueue");
-      if (fut) {
+      if (fut && hasPortalPayload) {
         fut.addEventListener("click", () => {
           const inp = document.getElementById("invCalTimeInput");
           const hm = inp && inp.value ? inp.value : "10:00";
