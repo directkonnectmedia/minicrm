@@ -13732,6 +13732,9 @@
       const sum = charges.reduce((a, c) => a + (Number(c.amount) || 0), 0);
       if (!charges.length || !(sum > 0)) return { error: new Error("calendar row has no billable charges") };
 
+      const { data: auth } = await sb.auth.getSession();
+      if (!auth?.session?.access_token) return { error: new Error("sign in required") };
+
       const receiptNo = await nextReceiptNoForIssuedDate(String(calRow.scheduled_date || "").slice(0, 10));
       const data = buildInvoiceDataFromCalendarRow(calRow, client, receiptNo);
       const renderedHtml = renderInvoiceHTML(data);
@@ -13753,17 +13756,32 @@
         portal_published_at: null,
         scheduled_dispatch_time: null,
       };
-      const { data: inserted, error } = await sb.from("invoices").insert(row).select("id").single();
-      if (error) return { error };
-      const { error: linkErr } = await sb
-        .from("invoice_calendar_events")
-        .update({ invoice_id: inserted.id })
-        .eq("id", calRow.id);
-      if (linkErr) {
-        await sb.from("invoices").delete().eq("id", inserted.id);
-        return { error: linkErr };
+
+      try {
+        const res = await fetch("/api/invoices/create-calendar-draft", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${auth.session.access_token}`,
+          },
+          body: JSON.stringify({
+            calendarEventId: calRow.id,
+            issuedAt: data.issued_at,
+            invoice: row,
+          }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok || !j.invoice?.id) {
+          const hint =
+            (j.detail && (j.detail.message || j.detail.hint)) ||
+            (typeof j.detail === "string" ? j.detail : "") ||
+            "";
+          throw new Error((j.error || res.statusText || "draft invoice save failed") + (hint ? ` — ${hint}` : ""));
+        }
+        return { invoice_id: j.invoice.id };
+      } catch (error) {
+        return { error };
       }
-      return { invoice_id: inserted.id };
     }
 
     async function persistInvoiceCalendarPortalDispatch({ publishNow, dispatchAtIso }) {
