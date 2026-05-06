@@ -90,7 +90,7 @@ export default async function handler(req, res) {
   }
 
   const invoicesRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/invoices?select=id,client_id,receipt_no,issued_at,status,portal_published_at,rendered_html&client_id=in.(${clientIds.join(",")})&portal_published_at=not.is.null&order=portal_published_at.desc`,
+    `${SUPABASE_URL}/rest/v1/invoices?select=id,client_id,receipt_no,issued_at,status,portal_published_at,stripe_payment_link,rendered_html&client_id=in.(${clientIds.join(",")})&portal_published_at=not.is.null&order=portal_published_at.desc`,
     { headers: restHeaders() },
   );
   const invoicesJson = await readJson(invoicesRes);

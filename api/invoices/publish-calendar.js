@@ -9,12 +9,13 @@
  *   { calendarEventId, publishNow, dispatchAtIso|null, invoice }
  *   `invoice` = row for insert (no id) or update (include id)
  *
- * Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ * Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY
  */
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL || "https://ljghuyeugzmduzzvngkc.supabase.co";
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 
 async function readJson(res) {
   const text = await res.text();
@@ -35,6 +36,109 @@ const restHeaders = () => ({
 
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
+}
+
+function escapeHtmlAttr(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function requestOrigin(req) {
+  const proto = req.headers["x-forwarded-proto"] || "https";
+  const host = req.headers["x-forwarded-host"] || req.headers.host;
+  return host ? `${proto}://${host}` : "https://minicrm-kappa.vercel.app";
+}
+
+function invoiceLineItemsForStripe(invoice) {
+  const lines = Array.isArray(invoice?.line_items) ? invoice.line_items : [];
+  return lines
+    .map((line) => {
+      const amount = Number(line.amount) || 0;
+      const unitAmount = Math.round(amount * 100);
+      if (!(unitAmount > 0)) return null;
+      return {
+        name: String(line.description || "Invoice line item").trim() || "Invoice line item",
+        description: String(line.subtitle || line.status_pill || "").trim(),
+        unitAmount,
+      };
+    })
+    .filter(Boolean);
+}
+
+async function createStripeCheckoutSession({ invoice, client, req }) {
+  if (!STRIPE_SECRET_KEY) {
+    throw new Error("STRIPE_SECRET_KEY is not configured. Add it in Vercel and redeploy.");
+  }
+
+  const stripeLines = invoiceLineItemsForStripe(invoice);
+  if (!stripeLines.length) {
+    throw new Error("Invoice has no positive line items for Stripe Checkout.");
+  }
+
+  const origin = requestOrigin(req);
+  const params = new URLSearchParams();
+  params.set("mode", "payment");
+  params.set("success_url", `${origin}/portal.html?stripe=success&invoice=${encodeURIComponent(invoice.id)}`);
+  params.set("cancel_url", `${origin}/portal.html?stripe=cancel&invoice=${encodeURIComponent(invoice.id)}`);
+  params.set("client_reference_id", invoice.id);
+
+  const clientEmail = normalizeEmail(client?.email);
+  if (clientEmail) params.set("customer_email", clientEmail);
+
+  params.set("metadata[invoice_id]", invoice.id);
+  params.set("metadata[client_id]", invoice.client_id || "");
+  params.set("metadata[receipt_no]", invoice.receipt_no || "");
+  params.set("payment_intent_data[metadata][invoice_id]", invoice.id);
+  params.set("payment_intent_data[metadata][client_id]", invoice.client_id || "");
+  params.set("payment_intent_data[metadata][receipt_no]", invoice.receipt_no || "");
+
+  stripeLines.forEach((line, index) => {
+    params.set(`line_items[${index}][quantity]`, "1");
+    params.set(`line_items[${index}][price_data][currency]`, "usd");
+    params.set(`line_items[${index}][price_data][unit_amount]`, String(line.unitAmount));
+    params.set(`line_items[${index}][price_data][product_data][name]`, line.name);
+    if (line.description) {
+      params.set(`line_items[${index}][price_data][product_data][description]`, line.description);
+    }
+  });
+
+  const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${STRIPE_SECRET_KEY}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Idempotency-Key": `minicrm-invoice-checkout-${invoice.id}`,
+    },
+    body: params.toString(),
+  });
+  const stripeJson = await readJson(stripeRes);
+  if (!stripeRes.ok) {
+    const msg =
+      stripeJson?.error?.message ||
+      (typeof stripeJson?.raw === "string" ? stripeJson.raw : null) ||
+      `Stripe Checkout failed (${stripeRes.status})`;
+    throw new Error(msg);
+  }
+  if (!stripeJson?.url) throw new Error("Stripe did not return a checkout URL.");
+  return stripeJson;
+}
+
+function injectStripeLinkIntoInvoiceHtml(html, stripeUrl) {
+  const source = String(html || "");
+  if (!source || !stripeUrl) return source;
+  const safeUrl = escapeHtmlAttr(stripeUrl);
+  let out = source;
+  out = out.replace(/border:2px dashed #9ca3af/g, "border:2px solid #635BFF");
+  out = out.replace(/background:#9ca3af;color:#ffffff/g, "background:#635BFF;color:#ffffff");
+  out = out.replace(
+    /<span style="([^"]*)cursor:not-allowed;?([^"]*)">Pay with Stripe<\/span>/,
+    `<a href="${safeUrl}" target="_blank" rel="noopener" style="$1$2text-decoration:none;">Pay with Stripe</a>`,
+  );
+  out = out.replace("Pay link will appear once configured.", "Secure checkout powered by Stripe");
+  return out;
 }
 
 async function getUserFromJwt(jwt) {
@@ -181,6 +285,51 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "save did not return invoice row" });
   }
 
+  const clientRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/clients?id=eq.${encodeURIComponent(saved.client_id)}&select=id,company_name,email,created_at`,
+    { headers: restHeaders() },
+  );
+  const clientJson = await readJson(clientRes);
+  const client = clientRes.ok && Array.isArray(clientJson) ? clientJson[0] || null : null;
+
+  if (!saved.stripe_payment_link) {
+    let checkoutSession;
+    try {
+      checkoutSession = await createStripeCheckoutSession({ invoice: saved, client, req });
+    } catch (err) {
+      return res.status(500).json({
+        error: "stripe checkout creation failed",
+        detail: err.message || String(err),
+      });
+    }
+
+    const stripePatch = {
+      stripe_payment_link: checkoutSession.url,
+      stripe_status: "checkout_created",
+      rendered_html: injectStripeLinkIntoInvoiceHtml(saved.rendered_html, checkoutSession.url),
+    };
+    const stripePatchRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/invoices?id=eq.${encodeURIComponent(saved.id)}`,
+      {
+        method: "PATCH",
+        headers: {
+          ...restHeaders(),
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify(stripePatch),
+      },
+    );
+    const stripePatchJson = await readJson(stripePatchRes);
+    if (!stripePatchRes.ok) {
+      return res.status(500).json({
+        error: "stripe checkout created but invoice update failed",
+        detail: stripePatchJson,
+      });
+    }
+    const patched = Array.isArray(stripePatchJson) ? stripePatchJson[0] : stripePatchJson;
+    if (patched?.id) saved = patched;
+  }
+
   const calPatch = {
     invoice_id: saved.id,
     scheduled_dispatch_time: schedIso,
@@ -217,12 +366,6 @@ export default async function handler(req, res) {
     }
   }
 
-  const clientRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/clients?id=eq.${encodeURIComponent(saved.client_id)}&select=id,company_name,email,created_at`,
-    { headers: restHeaders() },
-  );
-  const clientJson = await readJson(clientRes);
-  const client = clientRes.ok && Array.isArray(clientJson) ? clientJson[0] || null : null;
   const portalEmail = normalizeEmail(client?.email);
   let duplicateClientCount = 0;
   let duplicateClientIds = [];
