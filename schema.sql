@@ -929,6 +929,9 @@ alter table public.clients add column if not exists stripe_next_invoice_at times
 alter table public.clients add column if not exists stripe_billing_synced_at timestamptz;
 alter table public.clients add column if not exists stripe_billing_alert text;
 
+-- Admin asks client to add a card: portal shows a CTA until cleared after Stripe return.
+alter table public.clients add column if not exists payment_method_requested_at timestamptz;
+
 alter table public.clients drop constraint if exists clients_billing_collection_mode_check;
 alter table public.clients add constraint clients_billing_collection_mode_check
   check (billing_collection_mode in ('auto_pay', 'manual'));

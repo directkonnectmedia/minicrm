@@ -236,6 +236,23 @@
     .portal-welcome h1 { margin: 0 0 4px; font-size: 24px; font-weight: 700; color: #111827; }
     .portal-welcome p  { margin: 0; color: #6b7280; font-size: 14px; }
 
+    .portal-pm-banner {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+    }
+    .portal-pm-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .portal-pm-text strong { display: block; color: #1e3a8a; font-size: 15px; margin-bottom: 4px; }
+    .portal-pm-text p { margin: 0; font-size: 14px; color: #1e40af; line-height: 1.5; max-width: 520px; }
+
     /* ---------- Tabs ---------- */
     .portal-tabs {
       display: flex;
@@ -753,6 +770,8 @@
         <h1 id="portalWelcomeTitle">Welcome, Acme Roofing</h1>
         <p>Your contracts and billing live here. We'll add more as your project moves.</p>
       </div>
+
+      <div id="portalPaymentMethodBanner" class="portal-pm-banner" hidden></div>
 
       <div class="portal-tabs" id="portalTabs">
         <button class="portal-tab active" data-tab="contract" type="button">Contract</button>
@@ -1586,7 +1605,9 @@
       const normalizedEmail = String(email || "").trim().toLowerCase();
       const { data, error } = await sb
         .from("clients")
-        .select("id, company_name, email, finished_website, web_status, client_status, manager, created_at")
+        .select(
+          "id, company_name, email, finished_website, web_status, client_status, manager, created_at, stripe_customer_id, payment_method_requested_at, stripe_default_payment_method_present",
+        )
         .ilike("email", `%${normalizedEmail}%`)
         .order("created_at", { ascending: false })
       if (error) {
@@ -1602,6 +1623,89 @@
         client._duplicateClientCount = matches.length;
       }
       return client;
+    }
+
+    async function consumeBillingReturnParams() {
+      const url = new URL(window.location.href);
+      const billing = url.searchParams.get("billing");
+      if (!billing) return;
+
+      let token = null;
+      try {
+        const { data } = await sb.auth.getSession();
+        token = data?.session?.access_token || null;
+      } catch {}
+
+      if (token && billing === "payment_method_added") {
+        try {
+          const r = await fetch("/api/portal/payment-method-setup", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ op: "clear" }),
+          });
+          if (!r.ok) console.warn("payment-method clear:", await r.text());
+        } catch (e) {
+          console.warn("payment-method clear failed:", e);
+        }
+      }
+
+      url.searchParams.delete("billing");
+      window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+    }
+
+    function renderPaymentMethodBanner() {
+      const el = document.getElementById("portalPaymentMethodBanner");
+      if (!el) return;
+      if (!currentClient || !currentClient.payment_method_requested_at) {
+        el.hidden = true;
+        el.innerHTML = "";
+        return;
+      }
+      if (!String(currentClient.stripe_customer_id || "").trim()) {
+        el.hidden = true;
+        el.innerHTML = "";
+        return;
+      }
+      el.hidden = false;
+      el.innerHTML = `
+        <div class="portal-pm-inner">
+          <div class="portal-pm-text">
+            <strong>Payment method needed</strong>
+            <p>Your account manager asked you to add or update the card on file. Click below to open our secure Stripe page.</p>
+          </div>
+          <button type="button" class="contract-view-btn primary" id="portalAddPaymentMethodBtn">Add payment method</button>
+        </div>
+      `;
+      const btn = document.getElementById("portalAddPaymentMethodBtn");
+      if (btn) btn.addEventListener("click", handlePortalMintPaymentMethod, { once: true });
+    }
+
+    async function handlePortalMintPaymentMethod() {
+      const btn = document.getElementById("portalAddPaymentMethodBtn");
+      if (btn) btn.disabled = true;
+      try {
+        const { data } = await sb.auth.getSession();
+        const token = data?.session?.access_token;
+        if (!token) throw new Error("Sign in again.");
+        const r = await fetch("/api/portal/payment-method-setup", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ op: "mint" }),
+        });
+        const json = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(json.error || "Could not start payment setup.");
+        if (json.url) window.location.href = json.url;
+        else throw new Error("No secure link returned.");
+      } catch (e) {
+        alert(e.message || String(e));
+        if (btn) btn.disabled = false;
+      }
     }
 
     // Pull every signed_contracts row for a given client_id, newest first.
@@ -1838,6 +1942,7 @@
 
     async function boot() {
       await consumeMagicLinkCode();
+      await consumeBillingReturnParams();
 
       let session = null;
       try {
@@ -1874,6 +1979,7 @@
         company_name: client.company_name || email,
         email: email,
       });
+      renderPaymentMethodBanner();
       renderContractList(currentContracts);
       renderInvoiceList(currentInvoices, invResult.error);
       showView("portal");

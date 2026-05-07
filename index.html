@@ -6681,22 +6681,24 @@
       const feedback = rightContent.querySelector("#billingFeedback");
       const original = btn.textContent;
       btn.disabled = true;
-      btn.textContent = "Creating link...";
-      if (feedback) feedback.textContent = "Creating secure Stripe link...";
+      btn.textContent = "Saving...";
+      if (feedback) feedback.textContent = "Telling the portal to prompt the client...";
       try {
         const payload = await adminFetch(
           "POST",
           { clientId: c.id, action: "request_payment_method" },
           "/api/admin/billing",
         );
-        const url = payload?.url || "";
-        if (!url) throw new Error("Stripe did not return a payment method URL.");
-        window.prompt("Send this secure Stripe link to the client to collect a payment method:", url);
+        if (payload.client) Object.assign(c, payload.client);
         if (feedback) {
           feedback.className = "billing-feedback";
-          feedback.textContent = "Payment method request link created.";
+          feedback.textContent = "The client will see “Add payment method” when they open the portal.";
         }
-        await addSystemNote(c, "client", "Payment method request link generated from Billing Command Center.");
+        await addSystemNote(
+          c,
+          "client",
+          "Payment method collection requested — client can complete it in the portal.",
+        );
       } catch (err) {
         if (feedback) {
           feedback.className = "billing-feedback error";

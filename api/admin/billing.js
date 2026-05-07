@@ -10,7 +10,7 @@
  *   Toggle the Stripe Subscription collection_method.
  *
  * POST  body: { clientId, action: "request_payment_method" }
- *   Create a Stripe-hosted URL the admin can send to the client.
+ *   Sets payment_method_requested_at so the client sees an Add payment method CTA in portal.html.
  */
 
 const SUPABASE_URL =
@@ -369,34 +369,13 @@ async function handlePost(req, res) {
     });
   }
 
-  const origin = originFor(req);
-  const returnUrl = `${origin}/portal.html`;
-  const portalParams = new URLSearchParams({
-    customer: customerId,
-    return_url: returnUrl,
+  const nowIso = new Date().toISOString();
+  const patched = await patchClient(clientId, { payment_method_requested_at: nowIso });
+  return res.status(200).json({
+    ok: true,
+    portal_notified: true,
+    client: patched || { id: clientId, payment_method_requested_at: nowIso },
   });
-
-  try {
-    const session = await stripeRequest("billing_portal/sessions", {
-      method: "POST",
-      params: portalParams,
-      idempotencyKey: `minicrm-payment-method-portal-${clientId}-${Date.now()}`,
-    });
-    return res.status(200).json({ ok: true, type: "billing_portal", url: session.url });
-  } catch (err) {
-    const setupParams = new URLSearchParams({
-      mode: "setup",
-      customer: customerId,
-      success_url: `${returnUrl}?billing=payment_method_added`,
-      cancel_url: `${returnUrl}?billing=payment_method_cancelled`,
-    });
-    const session = await stripeRequest("checkout/sessions", {
-      method: "POST",
-      params: setupParams,
-      idempotencyKey: `minicrm-payment-method-setup-${clientId}-${Date.now()}`,
-    });
-    return res.status(200).json({ ok: true, type: "setup_checkout", url: session.url });
-  }
 }
 
 export default async function handler(req, res) {
