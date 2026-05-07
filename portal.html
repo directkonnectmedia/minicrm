@@ -333,6 +333,13 @@
     .cstatus-viewed   { background: #ede9fe; color: #5b21b6; }
     .cstatus-signed   { background: #d1fae5; color: #065f46; }
     .cstatus-voided   { background: #fee2e2; color: #991b1b; }
+    .invoice-status-paid { background: #d1fae5; color: #065f46; }
+    .invoice-status-open,
+    .invoice-status-due { background: #fef3c7; color: #92400e; }
+    .invoice-status-upcoming { background: #dbeafe; color: #1e40af; }
+    .invoice-status-past_due,
+    .invoice-status-uncollectible { background: #fee2e2; color: #991b1b; }
+    .invoice-status-void { background: #f3f4f6; color: #4b5563; }
 
     .empty-state {
       background: #fff;
@@ -1664,6 +1671,26 @@
       }
     }
 
+    function invoiceStatusInfo(inv) {
+      const raw = String(inv.status || inv.stripe_status || "due").trim().toLowerCase();
+      const safe = raw.replace(/[^a-z0-9_]/g, "_") || "due";
+      const labels = {
+        due: "Due",
+        open: "Open",
+        paid: "Paid",
+        past_due: "Past Due",
+        upcoming: "Upcoming",
+        uncollectible: "Past Due",
+        void: "Void",
+      };
+      return { safe, label: labels[safe] || raw.replace(/_/g, " ") || "Due" };
+    }
+
+    function invoiceStatusBadge(inv) {
+      const info = invoiceStatusInfo(inv);
+      return `<span class="badge invoice-status-${escapeHtml(info.safe)}">${escapeHtml(info.label)}</span>`;
+    }
+
     function invoicePortalMetaLine(inv) {
       const issued = inv.issued_at
         ? new Date(String(inv.issued_at) + "T12:00:00").toLocaleDateString(undefined, {
@@ -1681,10 +1708,16 @@
             minute: "2-digit",
           })
         : "";
-      const payLabel = inv.status === "paid" ? "Paid" : "Due";
+      const due = inv.due_at
+        ? new Date(inv.due_at).toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          })
+        : "";
       const parts = [`<span class="contract-row-meta-label">Issued</span> ${escapeHtml(issued)}`];
+      if (due) parts.push(`<span class="contract-row-meta-label">Due</span> ${escapeHtml(due)}`);
       if (pub) parts.push(`<span class="contract-row-meta-label">In portal</span> ${escapeHtml(pub)}`);
-      parts.push(`<span class="contract-row-meta-label">Payment</span> ${escapeHtml(payLabel)}`);
       return parts.map((p) => `<span>${p}</span>`).join(" ");
     }
 
@@ -1716,6 +1749,7 @@
             <div class="contract-row-main">
               <div class="contract-row-title">
                 <span class="contract-row-name">${escapeHtml(inv.receipt_no || "Invoice")}</span>
+                ${invoiceStatusBadge(inv)}
               </div>
               <div class="contract-row-meta">
                 ${invoicePortalMetaLine(inv)}

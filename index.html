@@ -488,6 +488,64 @@
     .sent-status-signed  { background: #d1fae5; color: #065f46; }
     .sent-status-voided  { background: #fee2e2; color: #991b1b; }
 
+    .billing-command-card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    .billing-command-card.alert {
+      background: #fef2f2;
+      border-color: #fecaca;
+    }
+    .billing-command-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .billing-command-title { font-weight: 700; color: #111827; }
+    .billing-command-sub { color: #6b7280; font-size: 13px; margin-top: 2px; }
+    .billing-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .billing-stat {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .billing-stat-label {
+      font-size: 11px;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 700;
+    }
+    .billing-stat-value { margin-top: 4px; font-weight: 700; color: #111827; }
+    .billing-switch {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .billing-switch button.active {
+      background: #111827;
+      color: #fff;
+      border-color: #111827;
+    }
+    .billing-feedback { font-size: 13px; margin-top: 8px; color: #6b7280; }
+    .billing-feedback.error { color: #991b1b; }
+    .sent-status-active { background: #d1fae5; color: #065f46; }
+    .sent-status-past_due,
+    .sent-status-unpaid { background: #fee2e2; color: #991b1b; }
+    .sent-status-not_configured { background: #f3f4f6; color: #4b5563; }
+
     /* Contract lifecycle stepper (inside Contract Status cards) */
     .contract-stepper {
       display: flex;
@@ -5809,6 +5867,8 @@
     let detailEditingField = null;      // field name being edited (text-field pencil-edit)
     let detailScheduleMode = "view";    // view | menu | edit
     let detailScheduleDraft = null;     // { date, time, type } when in edit mode
+    const billingStateByClientId = new Map();
+    const billingLoadingClientIds = new Set();
 
     function openDetail(id, defaultTab = "info") {
       detailId = id;
@@ -5873,6 +5933,9 @@
       else if (detailRightTab === "web_status") rightContent.innerHTML = renderWebStatusTab(c);
       else if (detailRightTab === "contract_details") rightContent.innerHTML = renderContractDetailsTab(c);
       else rightContent.innerHTML = renderContractStatusTab(c);
+      if (detailRightTab === "contract_status") {
+        queueBillingSyncForProfile(c.id);
+      }
 
       // Auto-focus inline edit input if any
       if (detailEditingField) {
@@ -6339,10 +6402,120 @@
     }
 
     // ---- Contract Status tab ----
+    function billingStatusLabel(status) {
+      const raw = String(status || "not_configured").trim() || "not_configured";
+      return raw.replace(/_/g, " ").replace(/\b\w/g, (ch) => ch.toUpperCase());
+    }
+
+    function billingStatusClass(status) {
+      const safe = String(status || "not_configured").replace(/[^a-z0-9_]/gi, "_").toLowerCase();
+      return safe || "not_configured";
+    }
+
+    function formatBillingAmount(cents) {
+      if (cents === null || cents === undefined || cents === "") return "No upcoming invoice";
+      return fmtMoney(Number(cents) / 100);
+    }
+
+    function formatBillingDate(iso) {
+      if (!iso) return "No date from Stripe";
+      try {
+        return new Date(iso).toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+      } catch {
+        return "No date from Stripe";
+      }
+    }
+
+    function currentBillingSnapshot(c) {
+      const live = billingStateByClientId.get(c.id)?.live || {};
+      const sub = live.subscription || null;
+      const upcoming = live.upcomingInvoice || null;
+      return {
+        configured: !!(c.stripe_customer_id || live.configured),
+        status: sub?.status || c.stripe_subscription_status || "not_configured",
+        mode:
+          sub?.collection_method === "charge_automatically"
+            ? "auto_pay"
+            : sub?.collection_method === "send_invoice"
+              ? "manual"
+              : c.billing_collection_mode || "manual",
+        hasPaymentMethod:
+          live.hasPaymentMethod !== undefined
+            ? !!live.hasPaymentMethod
+            : !!c.stripe_default_payment_method_present,
+        amountCents:
+          upcoming?.amount_due !== undefined
+            ? upcoming.amount_due
+            : c.stripe_next_invoice_amount_cents,
+        nextAt: upcoming?.due_at || c.stripe_next_invoice_at || null,
+        syncedAt: c.stripe_billing_synced_at || null,
+        alert: live.alert || c.stripe_billing_alert || null,
+        subscriptionId: sub?.id || c.stripe_subscription_id || null,
+      };
+    }
+
+    function renderBillingCommandCenter(c) {
+      if (!isAdmin()) return "";
+      const billing = currentBillingSnapshot(c);
+      const isAlert = ["past_due", "unpaid"].includes(String(billing.status)) || !!billing.alert;
+      const syncLabel = billingLoadingClientIds.has(c.id) ? "Syncing..." : "Sync Stripe";
+      const autoDisabled = !billing.subscriptionId;
+      const manualDisabled = !billing.subscriptionId;
+      const missingSub = !billing.subscriptionId
+        ? `<div class="billing-feedback error">No Stripe subscription is linked yet. Create/attach the subscription in Stripe, then sync this client.</div>`
+        : "";
+      const missingCard = billing.subscriptionId && !billing.hasPaymentMethod
+        ? `<div class="billing-feedback error">Auto Pay requires a card on file. Request a payment method before switching.</div>`
+        : "";
+      return `
+        <div class="billing-command-card${isAlert ? " alert" : ""}">
+          <div class="billing-command-head">
+            <div>
+              <div class="billing-command-title">Billing Command Center</div>
+              <div class="billing-command-sub">Admin-only controls. Clients see invoice history only.</div>
+            </div>
+            <button class="ghost" data-action="billing-refresh" data-client-id="${esc(c.id)}" ${billingLoadingClientIds.has(c.id) ? "disabled" : ""}>${syncLabel}</button>
+          </div>
+          <div class="billing-grid">
+            <div class="billing-stat">
+              <div class="billing-stat-label">Live Stripe Sync</div>
+              <div class="billing-stat-value">
+                <span class="sent-status-pill sent-status-${esc(billingStatusClass(billing.status))}">${esc(billingStatusLabel(billing.status))}</span>
+              </div>
+            </div>
+            <div class="billing-stat">
+              <div class="billing-stat-label">Next Upcoming Invoice</div>
+              <div class="billing-stat-value">${esc(formatBillingAmount(billing.amountCents))}</div>
+              <div class="contract-status-meta">${esc(formatBillingDate(billing.nextAt))}</div>
+            </div>
+          </div>
+          <div class="billing-stat">
+            <div class="billing-stat-label">Payment Method</div>
+            <div class="billing-stat-value">${billing.hasPaymentMethod ? "Card on file" : "No card on file"}</div>
+            <div class="billing-switch">
+              <button class="ghost${billing.mode === "auto_pay" ? " active" : ""}" data-action="billing-toggle" data-mode="auto_pay" ${autoDisabled ? "disabled" : ""}>Auto Pay</button>
+              <button class="ghost${billing.mode === "manual" ? " active" : ""}" data-action="billing-toggle" data-mode="manual" ${manualDisabled ? "disabled" : ""}>Manual</button>
+              <button class="ghost" data-action="billing-request-payment-method" ${c.stripe_customer_id ? "" : "disabled"}>Request Payment Method</button>
+            </div>
+            ${missingSub}
+            ${missingCard}
+            ${billing.alert ? `<div class="billing-feedback error">${esc(billing.alert)}</div>` : ""}
+            <div id="billingFeedback" class="billing-feedback">${billing.syncedAt ? `Last synced ${esc(formatDateTime(billing.syncedAt))}` : "Not synced with Stripe yet."}</div>
+          </div>
+        </div>
+      `;
+    }
+
     function renderContractStatusTab(c) {
       const rows = signedContracts.filter((r) => r.client_id === c.id);
+      const billingCard = renderBillingCommandCenter(c);
       if (!rows.length) {
         return `
+          ${billingCard}
           <div class="field-block">
             <div class="field-block-title">Contract Status</div>
             <div class="contract-status-card">
@@ -6353,6 +6526,7 @@
         `;
       }
       return `
+        ${billingCard}
         <div class="field-block">
           <div class="field-block-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
             <span>Contract Status</span>
@@ -6406,6 +6580,133 @@
           }).join("")}
         </div>
       `;
+    }
+
+    function applyBillingPayload(clientId, payload) {
+      if (!clientId || !payload) return;
+      billingStateByClientId.set(clientId, payload);
+      const idx = allClients.findIndex((c) => String(c.id) === String(clientId));
+      if (idx >= 0 && payload.client) {
+        allClients[idx] = { ...allClients[idx], ...payload.client };
+      }
+    }
+
+    async function fetchBillingState(clientId, { force = false } = {}) {
+      if (!clientId || !isAdmin()) return null;
+      if (!force && billingStateByClientId.has(clientId)) return billingStateByClientId.get(clientId);
+      if (billingLoadingClientIds.has(clientId)) return null;
+      billingLoadingClientIds.add(clientId);
+      try {
+        const payload = await adminFetch(
+          "GET",
+          undefined,
+          `/api/admin/billing?clientId=${encodeURIComponent(clientId)}`,
+        );
+        applyBillingPayload(clientId, payload);
+        return payload;
+      } finally {
+        billingLoadingClientIds.delete(clientId);
+      }
+    }
+
+    function queueBillingSyncForProfile(clientId) {
+      if (!clientId || !isAdmin() || billingStateByClientId.has(clientId) || billingLoadingClientIds.has(clientId)) return;
+      setTimeout(async () => {
+        try {
+          await fetchBillingState(clientId);
+          if (detailId === clientId && detailRightTab === "contract_status") renderProfile();
+        } catch (err) {
+          console.warn("Billing sync failed:", err);
+          billingStateByClientId.set(clientId, {
+            live: { alert: err.message || "Stripe billing sync failed." },
+          });
+          if (detailId === clientId && detailRightTab === "contract_status") renderProfile();
+        }
+      }, 0);
+    }
+
+    async function handleBillingRefresh(btn) {
+      const c = getCurrentClient();
+      if (!c) return;
+      btn.disabled = true;
+      btn.textContent = "Syncing...";
+      try {
+        await fetchBillingState(c.id, { force: true });
+        renderProfile();
+      } catch (err) {
+        alert("Stripe sync failed: " + (err.message || String(err)));
+        renderProfile();
+      }
+    }
+
+    async function handleBillingToggle(btn) {
+      const c = getCurrentClient();
+      if (!c) return;
+      const mode = btn.dataset.mode;
+      const feedback = rightContent.querySelector("#billingFeedback");
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Saving...";
+      if (feedback) feedback.textContent = "Updating Stripe...";
+      try {
+        const payload = await adminFetch(
+          "PATCH",
+          { clientId: c.id, mode },
+          "/api/admin/billing",
+        );
+        applyBillingPayload(c.id, payload);
+        await addSystemNote(c, "client", `Billing collection mode changed to ${mode === "auto_pay" ? "Auto Pay" : "Manual"}.`);
+        renderProfile();
+      } catch (err) {
+        if (err?.detail?.code === "payment_method_required") {
+          if (confirm("This client needs a card on file before Auto Pay can be enabled. Create a Request Payment Method link now?")) {
+            const requestBtn = rightContent.querySelector('[data-action="billing-request-payment-method"]');
+            if (requestBtn) await handleBillingRequestPaymentMethod(requestBtn);
+          }
+        } else {
+          alert("Billing update failed: " + (err.message || String(err)));
+        }
+        btn.disabled = false;
+        btn.textContent = original;
+        if (feedback) {
+          feedback.className = "billing-feedback error";
+          feedback.textContent = err.message || "Billing update failed.";
+        }
+      }
+    }
+
+    async function handleBillingRequestPaymentMethod(btn) {
+      const c = getCurrentClient();
+      if (!c) return;
+      const feedback = rightContent.querySelector("#billingFeedback");
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Creating link...";
+      if (feedback) feedback.textContent = "Creating secure Stripe link...";
+      try {
+        const payload = await adminFetch(
+          "POST",
+          { clientId: c.id, action: "request_payment_method" },
+          "/api/admin/billing",
+        );
+        const url = payload?.url || "";
+        if (!url) throw new Error("Stripe did not return a payment method URL.");
+        window.prompt("Send this secure Stripe link to the client to collect a payment method:", url);
+        if (feedback) {
+          feedback.className = "billing-feedback";
+          feedback.textContent = "Payment method request link created.";
+        }
+        await addSystemNote(c, "client", "Payment method request link generated from Billing Command Center.");
+      } catch (err) {
+        if (feedback) {
+          feedback.className = "billing-feedback error";
+          feedback.textContent = err.message || "Could not create payment method request.";
+        }
+        alert("Could not create payment method request: " + (err.message || String(err)));
+      } finally {
+        btn.disabled = false;
+        btn.textContent = original;
+      }
     }
 
     // ============================================================
@@ -14909,6 +15210,12 @@
           btn.disabled = false;
           btn.textContent = original;
         }
+      } else if (action === "billing-refresh") {
+        await handleBillingRefresh(btn);
+      } else if (action === "billing-toggle") {
+        await handleBillingToggle(btn);
+      } else if (action === "billing-request-payment-method") {
+        await handleBillingRequestPaymentMethod(btn);
       } else if (action === "sign-contract") {
         const id = btn.dataset.id;
         const row = signedContracts.find((r) => String(r.id) === String(id));

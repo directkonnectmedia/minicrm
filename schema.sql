@@ -614,6 +614,24 @@ alter table public.invoices add column if not exists stripe_payment_link text;
 alter table public.invoices add column if not exists stripe_payment_intent_id text;
 alter table public.invoices add column if not exists stripe_status text;
 alter table public.invoices add column if not exists paid_at timestamptz;
+alter table public.invoices add column if not exists stripe_invoice_id text;
+alter table public.invoices add column if not exists stripe_subscription_id text;
+alter table public.invoices add column if not exists stripe_hosted_invoice_url text;
+alter table public.invoices add column if not exists stripe_invoice_pdf text;
+alter table public.invoices add column if not exists due_at timestamptz;
+alter table public.invoices add column if not exists amount_due numeric(14, 2);
+alter table public.invoices add column if not exists amount_remaining numeric(14, 2);
+
+alter table public.invoices drop constraint if exists invoices_status_check;
+alter table public.invoices add constraint invoices_status_check
+  check (status in ('due', 'paid', 'open', 'past_due', 'uncollectible', 'void', 'upcoming'));
+
+create unique index if not exists invoices_stripe_invoice_id_uidx
+  on public.invoices (stripe_invoice_id)
+  where stripe_invoice_id is not null;
+create index if not exists invoices_stripe_subscription_id_idx
+  on public.invoices (stripe_subscription_id)
+  where stripe_subscription_id is not null;
 
 -- =============================================================
 -- INVOICE TEMPLATES
@@ -898,6 +916,29 @@ alter table public.clients add column if not exists stripe_customer_id text;
 create unique index if not exists clients_stripe_customer_id_uidx
   on public.clients (stripe_customer_id)
   where stripe_customer_id is not null;
+
+-- Admin Billing Controller: recurring contract billing is managed through
+-- Stripe Billing Subscriptions, while this app stores the agency decision layer
+-- and a cached snapshot for fast admin/client rendering.
+alter table public.clients add column if not exists stripe_subscription_id text;
+alter table public.clients add column if not exists billing_collection_mode text not null default 'manual';
+alter table public.clients add column if not exists stripe_subscription_status text;
+alter table public.clients add column if not exists stripe_default_payment_method_present boolean not null default false;
+alter table public.clients add column if not exists stripe_next_invoice_amount_cents integer;
+alter table public.clients add column if not exists stripe_next_invoice_at timestamptz;
+alter table public.clients add column if not exists stripe_billing_synced_at timestamptz;
+alter table public.clients add column if not exists stripe_billing_alert text;
+
+alter table public.clients drop constraint if exists clients_billing_collection_mode_check;
+alter table public.clients add constraint clients_billing_collection_mode_check
+  check (billing_collection_mode in ('auto_pay', 'manual'));
+
+create unique index if not exists clients_stripe_subscription_id_uidx
+  on public.clients (stripe_subscription_id)
+  where stripe_subscription_id is not null;
+create index if not exists clients_stripe_subscription_status_idx
+  on public.clients (stripe_subscription_status)
+  where stripe_subscription_status is not null;
 
 -- Invoice plan diagnostic — per-client billing runtime (anchor vs shifter, etc.).
 -- Does not modify plan library or invoice templates.

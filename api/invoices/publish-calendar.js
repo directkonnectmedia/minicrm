@@ -286,13 +286,14 @@ export default async function handler(req, res) {
   }
 
   const clientRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/clients?id=eq.${encodeURIComponent(saved.client_id)}&select=id,company_name,email,created_at`,
+    `${SUPABASE_URL}/rest/v1/clients?id=eq.${encodeURIComponent(saved.client_id)}&select=id,company_name,email,created_at,stripe_subscription_id,billing_collection_mode`,
     { headers: restHeaders() },
   );
   const clientJson = await readJson(clientRes);
   const client = clientRes.ok && Array.isArray(clientJson) ? clientJson[0] || null : null;
+  const subscriptionManaged = !!String(client?.stripe_subscription_id || "").trim();
 
-  if (!saved.stripe_payment_link) {
+  if (!saved.stripe_payment_link && !subscriptionManaged) {
     let checkoutSession;
     try {
       checkoutSession = await createStripeCheckoutSession({ invoice: saved, client, req });
@@ -327,6 +328,27 @@ export default async function handler(req, res) {
       });
     }
     const patched = Array.isArray(stripePatchJson) ? stripePatchJson[0] : stripePatchJson;
+    if (patched?.id) saved = patched;
+  } else if (subscriptionManaged && !saved.stripe_status) {
+    const subPatchRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/invoices?id=eq.${encodeURIComponent(saved.id)}`,
+      {
+        method: "PATCH",
+        headers: {
+          ...restHeaders(),
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify({ stripe_status: "subscription_managed" }),
+      },
+    );
+    const subPatchJson = await readJson(subPatchRes);
+    if (!subPatchRes.ok) {
+      return res.status(500).json({
+        error: "invoice saved but subscription-managed marker failed",
+        detail: subPatchJson,
+      });
+    }
+    const patched = Array.isArray(subPatchJson) ? subPatchJson[0] : subPatchJson;
     if (patched?.id) saved = patched;
   }
 
