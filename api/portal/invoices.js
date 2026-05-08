@@ -33,6 +33,35 @@ function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
+/**
+ * PostgREST `in.(...)` filter: UUIDs and values with reserved characters must be
+ * wrapped in double quotes; in URLs use percent-encoded quotes (%22).
+ * @see https://postgrest.org/en/stable/references/api/url_grammar.html
+ */
+function postgrestInListQuoted(ids) {
+  return ids
+    .filter(Boolean)
+    .map((id) => {
+      const s = String(id).trim();
+      const escaped = s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      return `%22${escaped}%22`;
+    })
+    .join(",");
+}
+
+function restErrorPayload(status, body) {
+  const hint =
+    (body && typeof body.message === "string" && body.message.trim()) ||
+    (body && typeof body.error === "string" && body.error.trim()) ||
+    (body && typeof body.hint === "string" && body.hint.trim()) ||
+    null;
+  return {
+    message: hint || `Supabase REST HTTP ${status}`,
+    detail: body,
+    status,
+  };
+}
+
 async function getUserFromJwt(jwt) {
   const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: {
@@ -78,7 +107,11 @@ export default async function handler(req, res) {
   );
   const clientsJson = await readJson(clientsRes);
   if (!clientsRes.ok) {
-    return res.status(500).json({ error: "client lookup failed", detail: clientsJson });
+    const extra = restErrorPayload(clientsRes.status, clientsJson);
+    return res.status(500).json({
+      error: "client lookup failed",
+      ...extra,
+    });
   }
 
   const clients = Array.isArray(clientsJson)
@@ -89,13 +122,18 @@ export default async function handler(req, res) {
     return res.status(200).json({ rows: [], clientIds: [], email, clients: [] });
   }
 
+  const inClause = postgrestInListQuoted(clientIds);
   const invoicesRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/invoices?select=id,client_id,receipt_no,issued_at,due_at,status,portal_published_at,stripe_payment_link,stripe_invoice_id,stripe_status,stripe_hosted_invoice_url,amount_due,amount_remaining,paid_at,rendered_html&client_id=in.(${clientIds.join(",")})&portal_published_at=not.is.null&order=portal_published_at.desc`,
+    `${SUPABASE_URL}/rest/v1/invoices?select=id,client_id,receipt_no,issued_at,due_at,status,portal_published_at,stripe_payment_link,stripe_invoice_id,stripe_status,stripe_hosted_invoice_url,amount_due,amount_remaining,paid_at,rendered_html&client_id=in.(${inClause})&portal_published_at=not.is.null&order=portal_published_at.desc`,
     { headers: restHeaders() },
   );
   const invoicesJson = await readJson(invoicesRes);
   if (!invoicesRes.ok) {
-    return res.status(500).json({ error: "invoice lookup failed", detail: invoicesJson });
+    const extra = restErrorPayload(invoicesRes.status, invoicesJson);
+    return res.status(500).json({
+      error: "invoice lookup failed",
+      ...extra,
+    });
   }
 
   return res.status(200).json({

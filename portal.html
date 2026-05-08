@@ -1759,6 +1759,7 @@
           return {
             rows: [],
             error:
+              json.message ||
               json.error ||
               "Could not load invoices. Refresh the portal or ask your account manager to resend the invoice.",
           };
