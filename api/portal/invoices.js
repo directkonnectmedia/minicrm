@@ -33,21 +33,9 @@ function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
-/**
- * PostgREST `in.(...)` filter: UUIDs and values with reserved characters must be
- * wrapped in double quotes; in URLs use percent-encoded quotes (%22).
- * @see https://postgrest.org/en/stable/references/api/url_grammar.html
- */
-function postgrestInListQuoted(ids) {
-  return ids
-    .filter(Boolean)
-    .map((id) => {
-      const s = String(id).trim();
-      const escaped = s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-      return `%22${escaped}%22`;
-    })
-    .join(",");
-}
+/** Columns returned to the portal (keep in sync with portal UI). */
+const INVOICE_SELECT =
+  "id,client_id,receipt_no,issued_at,due_at,status,portal_published_at,stripe_payment_link,stripe_invoice_id,stripe_status,stripe_hosted_invoice_url,amount_due,amount_remaining,paid_at,rendered_html";
 
 function restErrorPayload(status, body) {
   const hint =
@@ -60,6 +48,43 @@ function restErrorPayload(status, body) {
     detail: body,
     status,
   };
+}
+
+/**
+ * Load invoices per CRM client id using simple `eq` filters (same pattern as
+ * PATCH ...?id=eq.uuid elsewhere). Merge, keep only portal-published rows, sort.
+ * Avoids brittle `in.(...)` + `not.is.null` combinations across PostgREST versions.
+ */
+async function fetchPublishedInvoicesMerged(clientIds) {
+  const merged = [];
+  for (const rawId of clientIds) {
+    const cid = String(rawId || "").trim();
+    if (!cid) continue;
+    const params = new URLSearchParams();
+    params.set("select", INVOICE_SELECT);
+    params.set("client_id", `eq.${encodeURIComponent(cid)}`);
+    const invoicesRes = await fetch(`${SUPABASE_URL}/rest/v1/invoices?${params.toString()}`, {
+      headers: restHeaders(),
+    });
+    const invoicesJson = await readJson(invoicesRes);
+    if (!invoicesRes.ok) {
+      return {
+        ok: false,
+        status: invoicesRes.status,
+        body: invoicesJson,
+      };
+    }
+    if (Array.isArray(invoicesJson)) merged.push(...invoicesJson);
+  }
+
+  const published = merged.filter((row) => row && row.portal_published_at != null);
+  published.sort((a, b) => {
+    const ta = new Date(a.portal_published_at).getTime();
+    const tb = new Date(b.portal_published_at).getTime();
+    return tb - ta;
+  });
+
+  return { ok: true, rows: published };
 }
 
 async function getUserFromJwt(jwt) {
@@ -76,6 +101,7 @@ async function getUserFromJwt(jwt) {
 }
 
 export default async function handler(req, res) {
+  try {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     return res.status(405).json({ error: "method not allowed" });
@@ -122,14 +148,9 @@ export default async function handler(req, res) {
     return res.status(200).json({ rows: [], clientIds: [], email, clients: [] });
   }
 
-  const inClause = postgrestInListQuoted(clientIds);
-  const invoicesRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/invoices?select=id,client_id,receipt_no,issued_at,due_at,status,portal_published_at,stripe_payment_link,stripe_invoice_id,stripe_status,stripe_hosted_invoice_url,amount_due,amount_remaining,paid_at,rendered_html&client_id=in.(${inClause})&portal_published_at=not.is.null&order=portal_published_at.desc`,
-    { headers: restHeaders() },
-  );
-  const invoicesJson = await readJson(invoicesRes);
-  if (!invoicesRes.ok) {
-    const extra = restErrorPayload(invoicesRes.status, invoicesJson);
+  const invoiceResult = await fetchPublishedInvoicesMerged(clientIds);
+  if (!invoiceResult.ok) {
+    const extra = restErrorPayload(invoiceResult.status, invoiceResult.body);
     return res.status(500).json({
       error: "invoice lookup failed",
       ...extra,
@@ -137,9 +158,16 @@ export default async function handler(req, res) {
   }
 
   return res.status(200).json({
-    rows: Array.isArray(invoicesJson) ? invoicesJson : [],
+    rows: invoiceResult.rows,
     clientIds,
     email,
     clients,
   });
+  } catch (err) {
+    console.error("portal/invoices:", err);
+    return res.status(500).json({
+      error: "invoice route failed",
+      message: err?.message || String(err),
+    });
+  }
 }
