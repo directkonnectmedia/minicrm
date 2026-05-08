@@ -6,5 +6,8 @@
   "engines": {
     "node": "22.x"
   },
-  "description": "Direct Konnect mini CRM. Single-page app (index.html) + Vercel serverless functions (api/) backed by Supabase."
+  "description": "Direct Konnect mini CRM. Single-page app (index.html) + Vercel serverless functions (api/) backed by Supabase.",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.4"
+  }
 }
