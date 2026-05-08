@@ -8554,6 +8554,17 @@
       return total;
     }
 
+    function computePlanOneTimePricingTotal(plan) {
+      if (!plan) return 0;
+      let total = 0;
+      const parents = getPlanParentServiceIds(plan);
+      for (const pid of parents) {
+        const cfg = getPlanRowConfig(plan, "one_time", pid);
+        if (cfg.state === "priced") total += Number(cfg.price) || 0;
+      }
+      return total;
+    }
+
     /** Rich read-only breakdown for Client Profile → Contract Details (active tier pill). */
     function renderPlanDetailedBreakdownHTML(plan) {
       if (!plan) return `<div class="muted">Plan data unavailable.</div>`;
@@ -8575,6 +8586,26 @@
         }
       }
       blocks.push(`</ul>`);
+
+      blocks.push(`<div class="field-block-title">One-time payment</div>`);
+      let anyOneTime = false;
+      for (const pid of parents) {
+        const cfg = getPlanRowConfig(plan, "one_time", pid);
+        if (cfg.state === "hidden") continue;
+        anyOneTime = true;
+        const svc = services.find((s) => String(s.id) === String(pid));
+        const title = svc ? svc.name : cfg.label;
+        if (cfg.state === "included") {
+          blocks.push(`<div class="plan-bd-row"><strong>${esc(title)}</strong> — Included</div>`);
+        } else if (cfg.state === "priced") {
+          blocks.push(
+            `<div class="plan-bd-row"><strong>${esc(title)}</strong> — ${esc(fmtCurrency(Number(cfg.price) || 0))}</div>`,
+          );
+        }
+      }
+      if (!anyOneTime) {
+        blocks.push(`<div class="plan-bd-row muted">No one-time lines configured or all hidden.</div>`);
+      }
 
       blocks.push(`<div class="field-block-title">Setup fees</div>`);
       let anySetup = false;
@@ -8639,7 +8670,10 @@
       if (!anySub) blocks.push(`<div class="plan-bd-row muted">No recurring lines configured or all hidden.</div>`);
 
       blocks.push(
-        `<div class="plan-bd-row receipt-subtotal" style="margin-top:12px;padding-top:10px;border-top:1px solid #e5e7eb;"><strong>Setup total (priced lines)</strong> — ${esc(fmtCurrency(computePlanSetupPricingTotal(plan)))}</div>`,
+        `<div class="plan-bd-row receipt-subtotal" style="margin-top:12px;padding-top:10px;border-top:1px solid #e5e7eb;"><strong>One-time total (priced lines)</strong> — ${esc(fmtCurrency(computePlanOneTimePricingTotal(plan)))}</div>`,
+      );
+      blocks.push(
+        `<div class="plan-bd-row receipt-subtotal"><strong>Setup total (priced lines)</strong> — ${esc(fmtCurrency(computePlanSetupPricingTotal(plan)))}</div>`,
       );
       blocks.push(
         `<div class="plan-bd-row receipt-subtotal"><strong>Recurring total (priced lines)</strong> — ${esc(fmtCurrency(computePlanSubscriptionMonthlyTotal(plan)))}</div>`,
@@ -8742,11 +8776,35 @@
       ];
     }
 
+    function expandOneTimeLineToInvoiceRows(plan, cfg, label) {
+      if (cfg.state === "included") {
+        return [
+          {
+            description: `${label} — One-time`,
+            subtitle: "Included — no separate charge.",
+            status_pill: "DUE TODAY",
+            amount: 0,
+          },
+        ];
+      }
+      if (cfg.state !== "priced") return [];
+      const amt = Number(cfg.price) || 0;
+      return [
+        {
+          description: `${label} — One-time`,
+          subtitle: "Single payment for this service line.",
+          status_pill: "DUE TODAY",
+          amount: amt,
+        },
+      ];
+    }
+
     function buildInvoiceTemplateTermsHtmlFromPlan(plan) {
       if (!plan) return INVOICE_DEFAULTS.terms_html;
+      const oneTimeT = computePlanOneTimePricingTotal(plan);
       const setupT = computePlanSetupPricingTotal(plan);
       const subT = computePlanSubscriptionMonthlyTotal(plan);
-      const head = `<p><strong>Plan:</strong> ${esc(plan.name || "")} · <strong>Priced setup subtotal:</strong> ${esc(fmtCurrency(setupT))} · <strong>Priced recurring subtotal (per period):</strong> ${esc(fmtCurrency(subT))}.</p>`;
+      const head = `<p><strong>Plan:</strong> ${esc(plan.name || "")} · <strong>Priced one-time subtotal:</strong> ${esc(fmtCurrency(oneTimeT))} · <strong>Priced setup subtotal:</strong> ${esc(fmtCurrency(setupT))} · <strong>Priced recurring subtotal (per period):</strong> ${esc(fmtCurrency(subT))}.</p>`;
       return `${head}\n${INVOICE_DEFAULTS.terms_html}`;
     }
 
@@ -8755,6 +8813,14 @@
       const parents = getPlanParentServiceIds(plan);
       const addonIds = collectAddonOnlyLineIds(parents);
       const line_items = [];
+
+      for (const pid of parents) {
+        const cfg = getPlanRowConfig(plan, "one_time", pid);
+        if (cfg.state === "hidden") continue;
+        const svc = services.find((s) => String(s.id) === String(pid));
+        const title = svc ? svc.name || cfg.label || "Service" : cfg.label || "Service";
+        line_items.push(...expandOneTimeLineToInvoiceRows(plan, cfg, title));
+      }
 
       for (const pid of parents) {
         const cfg = getPlanRowConfig(plan, "setup", pid);
@@ -8798,9 +8864,20 @@
     function buildDefaultInvoiceLineItemsFromPlan(c) {
       const plan = getEffectivePlanForClient(c);
       if (!plan) return null;
+      const parents = getPlanParentServiceIds(plan);
+      const oneTimeLines = [];
+      for (const pid of parents) {
+        const cfg = getPlanRowConfig(plan, "one_time", pid);
+        if (cfg.state === "hidden") continue;
+        const svc = services.find((s) => String(s.id) === String(pid));
+        const title = svc ? svc.name || cfg.label || "Service" : cfg.label || "Service";
+        oneTimeLines.push(...expandOneTimeLineToInvoiceRows(plan, cfg, title));
+      }
+
       const total = computePlanSetupPricingTotal(plan);
       const pnm = plan.name || "Plan";
       if (!total || total <= 0) {
+        if (oneTimeLines.length > 0) return oneTimeLines;
         return [
           {
             description: "Project — Deposit",
@@ -8817,7 +8894,7 @@
         ];
       }
       const half = total / 2;
-      return [
+      const split = [
         {
           description: "Project — Deposit",
           subtitle: `Initial payment (${pnm} — priced setup total ${fmtCurrency(total)}).`,
@@ -8831,6 +8908,7 @@
           amount: half,
         },
       ];
+      return oneTimeLines.length > 0 ? [...oneTimeLines, ...split] : split;
     }
 
     // Read-only results list rendered under the "Configure" CTA in
@@ -11964,7 +12042,7 @@
       const fp = c ? getEffectivePlanForClient(c) : null;
       if (fp) {
         invWizTierName.textContent = fp.name || "Linked plan";
-        invWizTierMeta.textContent = `${fmtMoney(computePlanSetupPricingTotal(fp))} priced setup, ${fmtMoney(computePlanSubscriptionMonthlyTotal(fp))} priced recurring`;
+        invWizTierMeta.textContent = `${fmtMoney(computePlanOneTimePricingTotal(fp))} priced one-time, ${fmtMoney(computePlanSetupPricingTotal(fp))} priced setup, ${fmtMoney(computePlanSubscriptionMonthlyTotal(fp))} priced recurring`;
       } else {
         const tpl = c ? CONTRACT_TEMPLATE_BY_ID[c.contract_template] : null;
         if (tpl) {
