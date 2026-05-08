@@ -18,6 +18,15 @@ const SUPABASE_URL =
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const MANUAL_DAYS_UNTIL_DUE = Number(process.env.STRIPE_MANUAL_DAYS_UNTIL_DUE || 7);
+const SUBSCRIPTION_INTERVALS = {
+  daily: { interval: "day", interval_count: 1 },
+  weekly: { interval: "week", interval_count: 1 },
+  biweekly: { interval: "week", interval_count: 2 },
+  monthly: { interval: "month", interval_count: 1 },
+  every_3_months: { interval: "month", interval_count: 3 },
+  every_6_months: { interval: "month", interval_count: 6 },
+  yearly: { interval: "year", interval_count: 1 },
+};
 
 function readRoles(user) {
   const meta = user?.user_metadata || {};
@@ -147,6 +156,90 @@ async function patchClient(clientId, patch) {
   return Array.isArray(data) ? data[0] || null : data;
 }
 
+function httpError(status, message, code, detail = null) {
+  const err = new Error(message);
+  err.status = status;
+  err.code = code;
+  err.detail = detail;
+  return err;
+}
+
+async function loadFirstClientPlanId(clientId) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/client_plans?client_id=eq.${encodeURIComponent(clientId)}&select=plan_id&order=created_at.asc&limit=1`,
+    { headers: supabaseHeaders() },
+  );
+  const data = await readJson(res);
+  if (!res.ok) throw new Error(data?.message || `client plan lookup failed (${res.status})`);
+  return Array.isArray(data) ? data[0]?.plan_id || null : null;
+}
+
+async function loadPlan(planId) {
+  if (!planId) return null;
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/plans?id=eq.${encodeURIComponent(planId)}&select=id,name,subscription`,
+    { headers: supabaseHeaders() },
+  );
+  const data = await readJson(res);
+  if (!res.ok) throw new Error(data?.message || `plan lookup failed (${res.status})`);
+  return Array.isArray(data) ? data[0] || null : null;
+}
+
+async function loadBillingPlanForClient(client) {
+  const focusedPlanId = String(client?.focus_plan_id || "").trim();
+  const planId = focusedPlanId || (await loadFirstClientPlanId(client.id));
+  const plan = await loadPlan(planId);
+  if (!plan) {
+    throw httpError(
+      409,
+      "Link a Plan Builder tier with a priced subscription before creating a Stripe subscription.",
+      "plan_required",
+    );
+  }
+  return plan;
+}
+
+function subscriptionFrequencyParts(slug) {
+  return SUBSCRIPTION_INTERVALS[String(slug || "monthly").trim()] || SUBSCRIPTION_INTERVALS.monthly;
+}
+
+function pricedSubscriptionLines(plan) {
+  const subscription = plan?.subscription;
+  if (!subscription || typeof subscription !== "object" || Array.isArray(subscription)) return [];
+  return Object.entries(subscription)
+    .map(([serviceId, cfg]) => {
+      if (!cfg || typeof cfg !== "object" || cfg.state !== "priced") return null;
+      const raw = cfg.subscription_rate != null ? cfg.subscription_rate : cfg.price;
+      const amount = Number(raw);
+      if (!Number.isFinite(amount) || amount <= 0) return null;
+      const frequency = cfg.subscription_frequency || cfg.finance_frequency || "monthly";
+      const parts = subscriptionFrequencyParts(frequency);
+      return {
+        serviceId,
+        label: String(cfg.label || plan.name || "MiniCRM subscription").trim() || "MiniCRM subscription",
+        amountCents: Math.round(amount * 100),
+        frequency,
+        ...parts,
+      };
+    })
+    .filter(Boolean);
+}
+
+function ensureSingleSubscriptionFrequency(lines) {
+  const first = lines[0];
+  const mixed = lines.some(
+    (line) => line.interval !== first.interval || line.interval_count !== first.interval_count,
+  );
+  if (mixed) {
+    throw httpError(
+      409,
+      "This plan has subscription lines with mixed billing frequencies. Use one frequency for now.",
+      "mixed_frequency_not_supported",
+      { lines: lines.map(({ label, frequency }) => ({ label, frequency })) },
+    );
+  }
+}
+
 async function listCustomerPaymentMethods(customerId) {
   const params = new URLSearchParams({ customer: customerId, type: "card", limit: "10" });
   const data = await stripeRequest("payment_methods", { params });
@@ -171,6 +264,7 @@ async function resolveBillingState(client) {
   const defaultPaymentMethod =
     customer?.invoice_settings?.default_payment_method ||
     customer?.default_source ||
+    paymentMethods[0]?.id ||
     null;
   const hasPaymentMethod = !!defaultPaymentMethod || paymentMethods.length > 0;
 
@@ -216,6 +310,7 @@ async function resolveBillingState(client) {
     subscription,
     upcomingInvoice,
     hasPaymentMethod,
+    defaultPaymentMethod,
     alert:
       subscription && ["past_due", "unpaid"].includes(subscription.status)
         ? `Subscription is ${subscription.status.replace("_", " ")}.`
@@ -271,6 +366,7 @@ function publicBillingPayload(client, state) {
     live: {
       configured: !!state.configured,
       hasPaymentMethod: !!state.hasPaymentMethod,
+      defaultPaymentMethod: state.defaultPaymentMethod || null,
       subscription: subscription
         ? {
             id: subscription.id,
@@ -350,12 +446,69 @@ async function handlePatch(req, res) {
   return res.status(200).json(publicBillingPayload(patched || client, nextState));
 }
 
+async function createStripeSubscriptionFromPlan(client, state, plan) {
+  const customerId = String(client.stripe_customer_id || "").trim();
+  if (!customerId) {
+    throw httpError(
+      409,
+      "Create or sync a Stripe customer before creating a subscription.",
+      "customer_required",
+    );
+  }
+  if (state.subscription?.id && !["canceled", "incomplete_expired"].includes(state.subscription.status)) {
+    return state.subscription;
+  }
+
+  const lines = pricedSubscriptionLines(plan);
+  if (!lines.length) {
+    throw httpError(
+      409,
+      "The selected Plan Builder tier does not have any priced subscription lines.",
+      "plan_subscription_required",
+    );
+  }
+  ensureSingleSubscriptionFrequency(lines);
+
+  const params = new URLSearchParams();
+  params.set("customer", customerId);
+  params.set("metadata[client_id]", client.id);
+  params.set("metadata[crm_client_id]", client.id);
+  params.set("metadata[plan_id]", plan.id);
+  params.set("metadata[source]", "minicrm");
+
+  const mode = state.hasPaymentMethod && client.billing_collection_mode === "auto_pay" ? "auto_pay" : "manual";
+  if (mode === "auto_pay") {
+    params.set("collection_method", "charge_automatically");
+    if (state.defaultPaymentMethod) params.set("default_payment_method", state.defaultPaymentMethod);
+  } else {
+    params.set("collection_method", "send_invoice");
+    params.set("days_until_due", String(MANUAL_DAYS_UNTIL_DUE));
+  }
+
+  lines.forEach((line, i) => {
+    params.set(`items[${i}][price_data][currency]`, "usd");
+    params.set(`items[${i}][price_data][unit_amount]`, String(line.amountCents));
+    params.set(`items[${i}][price_data][recurring][interval]`, line.interval);
+    params.set(`items[${i}][price_data][recurring][interval_count]`, String(line.interval_count));
+    params.set(`items[${i}][price_data][product_data][name]`, line.label);
+    params.set(`items[${i}][price_data][product_data][metadata][client_id]`, client.id);
+    params.set(`items[${i}][price_data][product_data][metadata][plan_id]`, plan.id);
+    params.set(`items[${i}][price_data][product_data][metadata][service_id]`, line.serviceId);
+  });
+
+  return stripeRequest("subscriptions", {
+    method: "POST",
+    params,
+    idempotencyKey: `minicrm-create-subscription-${client.id}-${plan.id}`,
+  });
+}
+
 async function handlePost(req, res) {
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
   const clientId = String(body.clientId || "").trim();
   const action = String(body.action || "").trim();
   if (!clientId) return res.status(400).json({ error: "clientId is required" });
-  if (action !== "request_payment_method") {
+  if (!["request_payment_method", "create_subscription"].includes(action)) {
     return res.status(400).json({ error: "unsupported action" });
   }
 
@@ -366,6 +519,23 @@ async function handlePost(req, res) {
     return res.status(409).json({
       error: "Create or sync a Stripe customer before requesting a payment method.",
       code: "customer_required",
+    });
+  }
+
+  if (action === "create_subscription") {
+    const state = await resolveBillingState(client);
+    const plan = await loadBillingPlanForClient(client);
+    const subscription = await createStripeSubscriptionFromPlan(client, state, plan);
+    const nextState = await resolveBillingState({
+      ...client,
+      stripe_subscription_id: subscription.id,
+    });
+    const patched = await syncClientBillingCache(client, nextState);
+    return res.status(200).json({
+      ok: true,
+      created: subscription.id !== state.subscription?.id,
+      plan: { id: plan.id, name: plan.name || null },
+      ...publicBillingPayload(patched || client, nextState),
     });
   }
 
@@ -392,6 +562,7 @@ export default async function handler(req, res) {
     const status = err.status && err.status >= 400 && err.status < 600 ? err.status : 500;
     return res.status(status).json({
       error: err.message || String(err),
+      code: err.code || null,
       detail: err.detail || null,
     });
   }
