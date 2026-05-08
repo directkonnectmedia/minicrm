@@ -5869,6 +5869,7 @@
     let detailScheduleDraft = null;     // { date, time, type } when in edit mode
     const billingStateByClientId = new Map();
     const billingLoadingClientIds = new Set();
+    const billingProvisionLoadingIds = new Set();
 
     function openDetail(id, defaultTab = "info") {
       detailId = id;
@@ -6460,6 +6461,26 @@
 
     function renderBillingCommandCenter(c) {
       if (!isAdmin()) return "";
+      const hasStripeCustomer = !!String(c.stripe_customer_id || "").trim();
+      if (!hasStripeCustomer) {
+        const provBusy = billingProvisionLoadingIds.has(c.id);
+        return `
+        <div class="billing-command-card">
+          <div class="billing-command-head">
+            <div>
+              <div class="billing-command-title">Billing Command Center</div>
+              <div class="billing-command-sub">Admin-only controls. Clients see invoice history only.</div>
+            </div>
+          </div>
+          <p class="billing-command-sub" style="margin-top:8px;line-height:1.45;">
+            Billing controls stay disabled until this profile has a Stripe Customer. Create one below; then you can sync subscription state and request payment methods.
+          </p>
+          <div class="billing-feedback error" style="margin-top:10px;">No Stripe customer linked yet.</div>
+          <div style="margin-top:12px;">
+            <button type="button" class="ghost" data-action="billing-provision-customer" data-client-id="${esc(c.id)}" ${provBusy ? "disabled" : ""}>${provBusy ? "Creating\u2026" : "Create Stripe customer"}</button>
+          </div>
+        </div>`;
+      }
       const billing = currentBillingSnapshot(c);
       const isAlert = ["past_due", "unpaid"].includes(String(billing.status)) || !!billing.alert;
       const syncLabel = billingLoadingClientIds.has(c.id) ? "Syncing..." : "Sync Stripe";
@@ -6611,6 +6632,8 @@
 
     function queueBillingSyncForProfile(clientId) {
       if (!clientId || !isAdmin() || billingStateByClientId.has(clientId) || billingLoadingClientIds.has(clientId)) return;
+      const row = allClients.find((c) => String(c.id) === String(clientId));
+      if (!row || !String(row.stripe_customer_id || "").trim()) return;
       setTimeout(async () => {
         try {
           await fetchBillingState(clientId);
@@ -6623,6 +6646,33 @@
           if (detailId === clientId && detailRightTab === "contract_status") renderProfile();
         }
       }, 0);
+    }
+
+    async function handleBillingProvisionCustomer(btn) {
+      const c = getCurrentClient();
+      if (!c || !btn) return;
+      const cid = c.id;
+      btn.disabled = true;
+      billingProvisionLoadingIds.add(cid);
+      const original = btn.textContent;
+      btn.textContent = "Creating\u2026";
+      try {
+        const payload = await adminFetch("POST", { clientId: cid }, "/api/admin/provision-stripe-customer");
+        const idx = allClients.findIndex((x) => String(x.id) === String(cid));
+        if (idx >= 0 && payload.client) allClients[idx] = { ...allClients[idx], ...payload.client };
+        billingStateByClientId.delete(cid);
+        await fetchBillingState(cid, { force: true });
+        const updated = getCurrentClient();
+        if (updated && !payload.alreadyLinked) await addSystemNote(updated, "client", "Stripe customer linked from Billing Command Center.");
+        renderProfile();
+      } catch (err) {
+        alert("Could not create Stripe customer: " + (err.message || String(err)));
+        renderProfile();
+      } finally {
+        billingProvisionLoadingIds.delete(cid);
+        btn.disabled = false;
+        btn.textContent = original;
+      }
     }
 
     async function handleBillingRefresh(btn) {
@@ -15336,6 +15386,8 @@
           btn.disabled = false;
           btn.textContent = original;
         }
+      } else if (action === "billing-provision-customer") {
+        await handleBillingProvisionCustomer(btn);
       } else if (action === "billing-refresh") {
         await handleBillingRefresh(btn);
       } else if (action === "billing-toggle") {
