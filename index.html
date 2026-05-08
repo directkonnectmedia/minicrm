@@ -7221,13 +7221,11 @@
     ];
 
     // ---- Per-tab editor registry ----
-    // Each tab gets its own modal "Configure ..." wizard. Only Setup
-    // Fee is fully wired this round; the other 4 tabs render a
-    // "Coming soon" placeholder so the UI shape is consistent and
-    // we can promote them by flipping `placeholder: false` and
-    // adding their per-tab field schema later.
+    // Each tab gets its own modal "Configure ..." wizard. Financing
+    // still uses a "Coming soon" placeholder until wired; other tabs
+    // use full editors or simple row UIs (one_time uses renderTabEditorRow).
     const PLAN_TAB_EDITORS = {
-      one_time:     { title: "One-Time Payment", ctaLabel: "Configure One-Time",     placeholder: true },
+      one_time:     { title: "One-Time Payment", ctaLabel: "Configure One-Time",     placeholder: false },
       setup:        { title: "Setup Fee",        ctaLabel: "Configure Setup Fee",    placeholder: false },
       subscription: { title: "Subscription",     ctaLabel: "Configure Subscription", placeholder: false },
       addon_setup:       { title: "Add-on Setup",        ctaLabel: "Configure Add-on Setup",        placeholder: false },
@@ -8452,6 +8450,30 @@
           payment_trigger_type: trig.payment_trigger_type,
           due_date_value: trig.due_date_value,
           is_down_payment_active_for_service: isDownSvcActive,
+        };
+      }
+
+      if (tabKey === "one_time") {
+        const tabObj =
+          plan && plan.one_time && typeof plan.one_time === "object" && !Array.isArray(plan.one_time)
+            ? plan.one_time
+            : {};
+        const cfg = tabObj[key];
+        if (!cfg || typeof cfg !== "object") {
+          return {
+            state: "hidden",
+            price: 0,
+            label: labelDefault,
+          };
+        }
+        const st =
+          cfg.state === "included" || cfg.state === "priced" || cfg.state === "hidden" ? cfg.state : "hidden";
+        const pr = cfg.price != null ? Number(cfg.price) : 0;
+        const price = Number.isFinite(pr) && pr >= 0 ? pr : 0;
+        return {
+          state: st,
+          price,
+          label: typeof cfg.label === "string" && cfg.label ? cfg.label : labelDefault,
         };
       }
 
@@ -10086,6 +10108,30 @@
             copy.price = 0;
           }
           cleaned[k] = copy;
+        }
+        nextTab = cleaned;
+      }
+      if (tabKey === "one_time") {
+        const cleaned = {};
+        for (const k of Object.keys(nextTab)) {
+          const row = nextTab[k];
+          if (!row || typeof row !== "object") {
+            cleaned[k] = row;
+            continue;
+          }
+          const st =
+            row.state === "included" || row.state === "priced" || row.state === "hidden"
+              ? row.state
+              : "hidden";
+          const priceRaw = row.price != null ? Number(row.price) : 0;
+          const price = Number.isFinite(priceRaw) && priceRaw >= 0 ? priceRaw : 0;
+          const lbl =
+            typeof row.label === "string" && row.label.trim() ? row.label.trim() : getDefaultPlanRowLabel(k);
+          cleaned[k] = {
+            state: st,
+            price: st === "priced" ? price : 0,
+            label: lbl,
+          };
         }
         nextTab = cleaned;
       }
