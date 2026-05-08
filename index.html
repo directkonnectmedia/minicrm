@@ -5870,6 +5870,7 @@
     const billingStateByClientId = new Map();
     const billingLoadingClientIds = new Set();
     const billingProvisionLoadingIds = new Set();
+    let billingSyncAllStripeBusy = false;
 
     function openDetail(id, defaultTab = "info") {
       detailId = id;
@@ -6471,13 +6472,14 @@
               <div class="billing-command-title">Billing Command Center</div>
               <div class="billing-command-sub">Admin-only controls. Clients see invoice history only.</div>
             </div>
+            <button type="button" class="ghost" data-action="billing-sync-all-customers"${provBusy || billingSyncAllStripeBusy ? " disabled" : ""}>${billingSyncAllStripeBusy ? "Syncing all\u2026" : "Sync all clients to Stripe"}</button>
           </div>
           <p class="billing-command-sub" style="margin-top:8px;line-height:1.45;">
             Billing controls stay disabled until this profile has a Stripe Customer. Create one below; then you can sync subscription state and request payment methods.
           </p>
           <div class="billing-feedback error" style="margin-top:10px;">No Stripe customer linked yet.</div>
           <div style="margin-top:12px;">
-            <button type="button" class="ghost" data-action="billing-provision-customer" data-client-id="${esc(c.id)}" ${provBusy ? "disabled" : ""}>${provBusy ? "Creating\u2026" : "Create Stripe customer"}</button>
+            <button type="button" class="ghost" data-action="billing-provision-customer" data-client-id="${esc(c.id)}" ${provBusy || billingSyncAllStripeBusy ? "disabled" : ""}>${provBusy ? "Creating\u2026" : "Create Stripe customer"}</button>
           </div>
         </div>`;
       }
@@ -6499,7 +6501,10 @@
               <div class="billing-command-title">Billing Command Center</div>
               <div class="billing-command-sub">Admin-only controls. Clients see invoice history only.</div>
             </div>
-            <button class="ghost" data-action="billing-refresh" data-client-id="${esc(c.id)}" ${billingLoadingClientIds.has(c.id) ? "disabled" : ""}>${syncLabel}</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <button type="button" class="ghost" data-action="billing-sync-all-customers"${billingLoadingClientIds.has(c.id) || billingSyncAllStripeBusy ? " disabled" : ""}>${billingSyncAllStripeBusy ? "Syncing all\u2026" : "Sync all clients to Stripe"}</button>
+              <button class="ghost" data-action="billing-refresh" data-client-id="${esc(c.id)}" ${billingLoadingClientIds.has(c.id) || billingSyncAllStripeBusy ? "disabled" : ""}>${syncLabel}</button>
+            </div>
           </div>
           <div class="billing-grid">
             <div class="billing-stat">
@@ -6646,6 +6651,44 @@
           if (detailId === clientId && detailRightTab === "contract_status") renderProfile();
         }
       }, 0);
+    }
+
+    async function handleBillingSyncAllStripeCustomers() {
+      if (!isAdmin()) return;
+      if (
+        !confirm(
+          "Create Stripe customers for every CRM profile that is missing one? Profiles that already have a Stripe customer are skipped.",
+        )
+      ) {
+        return;
+      }
+      billingSyncAllStripeBusy = true;
+      renderProfile();
+      try {
+        const summary = await adminFetch("POST", {}, "/api/admin/sync-stripe-customers");
+        const created = Number(summary.created) || 0;
+        const skipped = Number(summary.skipped_already_linked) || 0;
+        const errs = Array.isArray(summary.errors) ? summary.errors : [];
+        let msg = `Stripe bulk sync finished.\n\nCreated: ${created}\nAlready linked (skipped): ${skipped}`;
+        if (errs.length) {
+          msg += `\n\nErrors: ${errs.length}`;
+          msg += `\nFirst: ${errs[0].message || JSON.stringify(errs[0])}`;
+        }
+        alert(msg);
+        billingStateByClientId.clear();
+        await load();
+        const openId = detailId;
+        if (openId) {
+          try {
+            await fetchBillingState(openId, { force: true });
+          } catch (_) {}
+        }
+      } catch (err) {
+        alert("Bulk Stripe sync failed: " + (err.message || String(err)));
+      } finally {
+        billingSyncAllStripeBusy = false;
+        renderProfile();
+      }
     }
 
     async function handleBillingProvisionCustomer(btn) {
@@ -15388,6 +15431,8 @@
         }
       } else if (action === "billing-provision-customer") {
         await handleBillingProvisionCustomer(btn);
+      } else if (action === "billing-sync-all-customers") {
+        await handleBillingSyncAllStripeCustomers();
       } else if (action === "billing-refresh") {
         await handleBillingRefresh(btn);
       } else if (action === "billing-toggle") {
