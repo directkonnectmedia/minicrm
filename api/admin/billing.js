@@ -176,6 +176,33 @@ async function stripeRequest(path, { method = "GET", params, idempotencyKey } = 
   return data;
 }
 
+/** Stripe idempotency keys: unreserved chars; keep segments short. */
+function idempotencySegment(segment) {
+  return String(segment || "x")
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .slice(0, 72);
+}
+
+/** Subscriptions items.price_data requires `product` (Product id); inline product_data is no longer accepted. */
+async function ensureStripeProductForSubscriptionLine(client, plan, line) {
+  const params = new URLSearchParams();
+  const name = String(line.label || plan.name || "MiniCRM subscription").trim().slice(0, 250);
+  params.set("name", name || "MiniCRM subscription");
+  params.set("metadata[client_id]", client.id);
+  params.set("metadata[plan_id]", plan.id);
+  params.set("metadata[service_id]", String(line.serviceId));
+  params.set("metadata[source]", "minicrm");
+  const idem = `minicrm-prod-${idempotencySegment(client.id)}-${idempotencySegment(plan.id)}-${idempotencySegment(line.serviceId)}`;
+  const product = await stripeRequest("products", {
+    method: "POST",
+    params,
+    idempotencyKey: idem.slice(0, 255),
+  });
+  const productId = product?.id;
+  if (!productId) throw new Error("Stripe product create returned no id");
+  return productId;
+}
+
 function httpError(status, message, code, detail = null) {
   const err = new Error(message);
   err.status = status;
@@ -685,16 +712,15 @@ async function createStripeSubscriptionFromPlan(client, state, plan, fallbackUse
     params.set("days_until_due", String(MANUAL_DAYS_UNTIL_DUE));
   }
 
-  lines.forEach((line, i) => {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const productId = await ensureStripeProductForSubscriptionLine(client, plan, line);
     params.set(`items[${i}][price_data][currency]`, "usd");
     params.set(`items[${i}][price_data][unit_amount]`, String(line.amountCents));
+    params.set(`items[${i}][price_data][product]`, productId);
     params.set(`items[${i}][price_data][recurring][interval]`, line.interval);
     params.set(`items[${i}][price_data][recurring][interval_count]`, String(line.interval_count));
-    params.set(`items[${i}][price_data][product_data][name]`, line.label);
-    params.set(`items[${i}][price_data][product_data][metadata][client_id]`, client.id);
-    params.set(`items[${i}][price_data][product_data][metadata][plan_id]`, plan.id);
-    params.set(`items[${i}][price_data][product_data][metadata][service_id]`, line.serviceId);
-  });
+  }
 
   const anchorBucket = wr.anchorUnix != null ? String(wr.anchorUnix) : "immediate";
   const rtPart = (wr.redTime || "").replace(/:/g, "");
