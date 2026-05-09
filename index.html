@@ -6747,6 +6747,9 @@
           { clientId: cid, action: "create_subscription" },
           "/api/admin/billing",
         );
+        if (payload?.resolvedPlan) {
+          console.info("[billing create_subscription] resolvedPlan audit snapshot:", payload.resolvedPlan);
+        }
         applyBillingPayload(cid, payload);
         billingStateByClientId.delete(cid);
         await fetchBillingState(cid, { force: true });
@@ -6793,7 +6796,7 @@
           }
           alert("Could not create Stripe subscription: " + (err.message || String(err)) + suffix);
         }
-        console.warn("[billing create_subscription]", err?.status, err?.detail);
+        console.warn("[billing create_subscription]", err?.status, err?.detail, err?.detail?.resolvedPlan || null);
         renderProfile();
       } finally {
         billingSubscriptionLoadingIds.delete(cid);

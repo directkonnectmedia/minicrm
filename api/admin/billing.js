@@ -203,8 +203,9 @@ async function loadPlan(planId) {
   return Array.isArray(data) ? data[0] || null : null;
 }
 
-async function loadBillingPlanForClient(client) {
+async function resolveBillingPlanForClient(client) {
   const focusedPlanId = String(client?.focus_plan_id || "").trim();
+  const fallbackUsed = !focusedPlanId;
   const planId = focusedPlanId || (await loadFirstClientPlanId(client.id));
   const plan = await loadPlan(planId);
   if (!plan) {
@@ -214,7 +215,7 @@ async function loadBillingPlanForClient(client) {
       "plan_required",
     );
   }
-  return plan;
+  return { plan, fallbackUsed };
 }
 
 function subscriptionFrequencyParts(slug) {
@@ -300,6 +301,38 @@ function wizardRedBillingAnchor(client) {
     return { anchorUnix: null, redDate, redTime };
   }
   return { anchorUnix, redDate, redTime };
+}
+
+function buildResolvedPlanAudit(client, plan, lines, wr, fallbackUsed, state, extra = {}) {
+  const hasPm = !!state?.hasPaymentMethod;
+  const collMode = client.billing_collection_mode === "auto_pay" && hasPm ? "auto_pay" : "manual";
+  return {
+    client_id: client.id,
+    clients_focus_plan_id: client.focus_plan_id || null,
+    resolved_plan_id: plan.id,
+    resolved_plan_name: plan.name || null,
+    plan_fallback_used: fallbackUsed,
+    stripe_customer_linked: !!String(client.stripe_customer_id || "").trim(),
+    priced_line_count: lines.length,
+    priced_lines: lines.map((l) => ({
+      service_id: l.serviceId,
+      label: l.label,
+      amount_dollars: Math.round(l.amountCents) / 100,
+      frequency: l.frequency,
+      interval: l.interval,
+      interval_count: l.interval_count,
+    })),
+    wizard_dispatcher_context_present: !!dispatcherContextFromClient(client),
+    wizard_red_date: wr.redDate || null,
+    wizard_red_time: wr.redTime || null,
+    billing_cycle_anchor_unix: wr.anchorUnix,
+    billing_cycle_anchor_will_apply: wr.anchorUnix != null,
+    stripe_subscription_create_collection_mode: collMode,
+    existing_subscription_before_create: state.subscription?.id
+      ? { id: state.subscription.id, status: state.subscription.status }
+      : null,
+    ...extra,
+  };
 }
 
 async function listCustomerPaymentMethods(customerId) {
@@ -531,8 +564,11 @@ async function handlePatch(req, res) {
   return res.status(200).json(publicBillingPayload(patched || client, nextState));
 }
 
-async function createStripeSubscriptionFromPlan(client, state, plan) {
+async function createStripeSubscriptionFromPlan(client, state, plan, fallbackUsed) {
   const customerId = String(client.stripe_customer_id || "").trim();
+  const wr = wizardRedBillingAnchor(client);
+  const lines = pricedSubscriptionLines(plan);
+
   if (!customerId) {
     throw httpError(
       409,
@@ -540,21 +576,52 @@ async function createStripeSubscriptionFromPlan(client, state, plan) {
       "customer_required",
     );
   }
+
   if (state.subscription?.id && !["canceled", "incomplete_expired"].includes(state.subscription.status)) {
-    return state.subscription;
+    const auditLines = [...lines];
+    if (auditLines.length) {
+      try {
+        ensureSingleSubscriptionFrequency(auditLines);
+      } catch (freqErr) {
+        freqErr.resolvedPlanAudit = buildResolvedPlanAudit(client, plan, auditLines, wr, fallbackUsed, state, {
+          reused_existing_stripe_subscription: true,
+          frequency_validation_failed: true,
+        });
+        throw freqErr;
+      }
+    }
+    const resolvedPlanAudit = buildResolvedPlanAudit(client, plan, auditLines, wr, fallbackUsed, state, {
+      reused_existing_stripe_subscription: true,
+      reused_subscription_id: state.subscription.id,
+      reused_subscription_status: state.subscription.status,
+    });
+    console.info("[admin/billing] create_subscription resolved (reuse existing)", resolvedPlanAudit);
+    return { subscription: state.subscription, resolvedPlanAudit };
   }
 
-  const lines = pricedSubscriptionLines(plan);
   if (!lines.length) {
-    throw httpError(
+    const err = httpError(
       409,
       "The selected Plan Builder tier does not have any priced subscription lines.",
       "plan_subscription_required",
     );
+    err.resolvedPlanAudit = buildResolvedPlanAudit(client, plan, [], wr, fallbackUsed, state, {
+      priced_lines_missing: true,
+    });
+    throw err;
   }
-  ensureSingleSubscriptionFrequency(lines);
 
-  const wr = wizardRedBillingAnchor(client);
+  try {
+    ensureSingleSubscriptionFrequency(lines);
+  } catch (freqErr) {
+    freqErr.resolvedPlanAudit = buildResolvedPlanAudit(client, plan, lines, wr, fallbackUsed, state, {});
+    throw freqErr;
+  }
+
+  const resolvedPlanAudit = buildResolvedPlanAudit(client, plan, lines, wr, fallbackUsed, state, {
+    reused_existing_stripe_subscription: false,
+  });
+  console.info("[admin/billing] create_subscription resolved", resolvedPlanAudit);
 
   const params = new URLSearchParams();
   params.set("customer", customerId);
@@ -596,11 +663,17 @@ async function createStripeSubscriptionFromPlan(client, state, plan) {
   const rtPart = (wr.redTime || "").replace(/:/g, "");
   const idempotencyKey = `minicrm-create-sub-${client.id}-${plan.id}-${wr.redDate || "na"}-${rtPart || "na"}-${anchorBucket}`;
 
-  return stripeRequest("subscriptions", {
-    method: "POST",
-    params,
-    idempotencyKey,
-  });
+  try {
+    const subscription = await stripeRequest("subscriptions", {
+      method: "POST",
+      params,
+      idempotencyKey,
+    });
+    return { subscription, resolvedPlanAudit };
+  } catch (stripeErr) {
+    stripeErr.resolvedPlanAudit = resolvedPlanAudit;
+    throw stripeErr;
+  }
 }
 
 async function handlePost(req, res) {
@@ -624,8 +697,13 @@ async function handlePost(req, res) {
 
   if (action === "create_subscription") {
     const state = await resolveBillingState(client);
-    const plan = await loadBillingPlanForClient(client);
-    const subscription = await createStripeSubscriptionFromPlan(client, state, plan);
+    const { plan, fallbackUsed } = await resolveBillingPlanForClient(client);
+    const { subscription, resolvedPlanAudit } = await createStripeSubscriptionFromPlan(
+      client,
+      state,
+      plan,
+      fallbackUsed,
+    );
     const clientWithSub = { ...client, stripe_subscription_id: subscription.id };
     try {
       const nextState = await resolveBillingState(clientWithSub);
@@ -634,6 +712,7 @@ async function handlePost(req, res) {
         ok: true,
         created: subscription.id !== state.subscription?.id,
         plan: { id: plan.id, name: plan.name || null },
+        resolvedPlan: resolvedPlanAudit,
         ...publicBillingPayload(patched || client, nextState),
       });
     } catch (syncErr) {
@@ -649,6 +728,7 @@ async function handlePost(req, res) {
           "Stripe subscription was created but MiniCRM could not save billing state to the database.",
         code: "client_cache_sync_failed",
         stripe_subscription_id: subscription.id,
+        resolvedPlan: resolvedPlanAudit,
         detail: syncErr.detail ?? null,
         stripe_message: stripeBody?.message || null,
       });
@@ -685,6 +765,7 @@ export default async function handler(req, res) {
       code: err.code || stripeCode || null,
       detail: err.detail || null,
       stripe_message: stripeMessage,
+      resolvedPlan: err.resolvedPlanAudit || null,
     });
   }
 }
