@@ -61,6 +61,43 @@ function stripeId(value) {
   return null;
 }
 
+/** Ensures API responses stay JSON-serializable (Stripe/Supabase error blobs can break res.json). */
+function safeDetailForResponse(detail) {
+  if (detail == null) return null;
+  if (typeof detail !== "object" || Array.isArray(detail)) {
+    return { preview: String(detail).slice(0, 500) };
+  }
+  if (typeof detail.step === "string" && Number.isFinite(detail.httpStatus)) {
+    const body = detail.body;
+    let compactBody = null;
+    if (body && typeof body === "object" && !Array.isArray(body)) {
+      compactBody = {
+        message: typeof body.message === "string" ? body.message : null,
+        hint: typeof body.hint === "string" ? body.hint : null,
+        code: typeof body.code === "string" ? body.code : null,
+      };
+    }
+    return { step: detail.step, httpStatus: detail.httpStatus, body: compactBody };
+  }
+  const e = detail.error;
+  if (e && typeof e === "object" && !Array.isArray(e)) {
+    return {
+      stripe_error: {
+        type: typeof e.type === "string" ? e.type : null,
+        code: typeof e.code === "string" ? e.code : null,
+        message: typeof e.message === "string" ? e.message : null,
+        param: typeof e.param === "string" ? e.param : null,
+      },
+    };
+  }
+  try {
+    JSON.stringify(detail);
+    return detail;
+  } catch {
+    return { error: "detail omitted (not JSON-serializable)" };
+  }
+}
+
 function supabaseHeaders(extra = {}) {
   return {
     apikey: SERVICE_ROLE_KEY,
@@ -729,7 +766,7 @@ async function handlePost(req, res) {
         code: "client_cache_sync_failed",
         stripe_subscription_id: subscription.id,
         resolvedPlan: resolvedPlanAudit,
-        detail: syncErr.detail ?? null,
+        detail: safeDetailForResponse(syncErr.detail),
         stripe_message: stripeBody?.message || null,
       });
     }
@@ -749,9 +786,9 @@ export default async function handler(req, res) {
   if (!caller) return;
 
   try {
-    if (req.method === "GET") return handleGet(req, res);
-    if (req.method === "PATCH") return handlePatch(req, res);
-    if (req.method === "POST") return handlePost(req, res);
+    if (req.method === "GET") return await handleGet(req, res);
+    if (req.method === "PATCH") return await handlePatch(req, res);
+    if (req.method === "POST") return await handlePost(req, res);
     res.setHeader("Allow", "GET, PATCH, POST");
     return res.status(405).json({ error: "method not allowed" });
   } catch (err) {
@@ -760,12 +797,22 @@ export default async function handler(req, res) {
     const stripeBody = err.detail?.error && typeof err.detail.error === "object" ? err.detail.error : null;
     const stripeMessage = stripeBody?.message || null;
     const stripeCode = stripeBody?.code || null;
-    return res.status(status).json({
-      error: err.message || String(err),
-      code: err.code || stripeCode || null,
-      detail: err.detail || null,
-      stripe_message: stripeMessage,
-      resolvedPlan: err.resolvedPlanAudit || null,
-    });
+    try {
+      return res.status(status).json({
+        error: err.message || String(err),
+        code: err.code || stripeCode || null,
+        detail: safeDetailForResponse(err.detail),
+        stripe_message: stripeMessage,
+        resolvedPlan: err.resolvedPlanAudit || null,
+      });
+    } catch (jsonErr) {
+      console.error("[admin/billing] res.json failed in catch", jsonErr?.message || jsonErr);
+      const minimal = JSON.stringify({
+        error: err.message || String(err),
+        code: err.code || stripeCode || null,
+        stripe_message: stripeMessage,
+      });
+      return res.status(status).type("application/json").send(minimal);
+    }
   }
 }
