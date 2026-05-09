@@ -54,6 +54,13 @@ async function readJson(res) {
   }
 }
 
+function stripeId(value) {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && typeof value.id === "string") return value.id;
+  return null;
+}
+
 function supabaseHeaders(extra = {}) {
   return {
     apikey: SERVICE_ROLE_KEY,
@@ -240,6 +247,50 @@ function ensureSingleSubscriptionFrequency(lines) {
   }
 }
 
+function dispatcherContextFromClient(client) {
+  let bp = client?.billing_philosophy;
+  if (typeof bp === "string") {
+    try {
+      bp = JSON.parse(bp);
+    } catch {
+      bp = null;
+    }
+  }
+  if (!bp || typeof bp !== "object" || Array.isArray(bp)) return null;
+  const dc = bp.dispatcherContext;
+  if (!dc || typeof dc !== "object") return null;
+  return dc;
+}
+
+function normalizeWizardRedTimeHm(v) {
+  const s = String(v ?? "").trim();
+  return /^\d{2}:\d{2}$/.test(s) ? s : "09:00";
+}
+
+/** Stripe billing_cycle_anchor (unix sec) from wizard red phase, or null if missing / not in the future. */
+function wizardRedBillingAnchor(client) {
+  const dc = dispatcherContextFromClient(client);
+  if (!dc) {
+    return { anchorUnix: null, redDate: null, redTime: null };
+  }
+  const sd = dc.start_dates || dc.startDates;
+  const st = dc.start_times || dc.startTimes;
+  const redDate = sd?.red != null ? String(sd.red).slice(0, 10) : null;
+  if (!redDate || !/^\d{4}-\d{2}-\d{2}$/.test(redDate)) {
+    return { anchorUnix: null, redDate: null, redTime: null };
+  }
+  const redTime = normalizeWizardRedTimeHm(st?.red);
+  const [y, m, day] = redDate.split("-").map((x) => parseInt(x, 10));
+  const [hh, mi] = redTime.split(":").map((x) => parseInt(x, 10));
+  const dt = new Date(y, m - 1, day, Number.isFinite(hh) ? hh : 9, Number.isFinite(mi) ? mi : 0, 0, 0);
+  const anchorUnix = Math.floor(dt.getTime() / 1000);
+  const nowUnix = Math.floor(Date.now() / 1000);
+  if (anchorUnix <= nowUnix) {
+    return { anchorUnix: null, redDate, redTime };
+  }
+  return { anchorUnix, redDate, redTime };
+}
+
 async function listCustomerPaymentMethods(customerId) {
   const params = new URLSearchParams({ customer: customerId, type: "card", limit: "10" });
   const data = await stripeRequest("payment_methods", { params });
@@ -262,9 +313,9 @@ async function resolveBillingState(client) {
   const customer = await stripeRequest(`customers/${encodeURIComponent(customerId)}`);
   const paymentMethods = await listCustomerPaymentMethods(customerId);
   const defaultPaymentMethod =
-    customer?.invoice_settings?.default_payment_method ||
-    customer?.default_source ||
-    paymentMethods[0]?.id ||
+    stripeId(customer?.invoice_settings?.default_payment_method) ||
+    stripeId(customer?.default_source) ||
+    stripeId(paymentMethods[0]) ||
     null;
   const hasPaymentMethod = !!defaultPaymentMethod || paymentMethods.length > 0;
 
@@ -469,17 +520,28 @@ async function createStripeSubscriptionFromPlan(client, state, plan) {
   }
   ensureSingleSubscriptionFrequency(lines);
 
+  const wr = wizardRedBillingAnchor(client);
+
   const params = new URLSearchParams();
   params.set("customer", customerId);
   params.set("metadata[client_id]", client.id);
   params.set("metadata[crm_client_id]", client.id);
   params.set("metadata[plan_id]", plan.id);
   params.set("metadata[source]", "minicrm");
+  if (wr.redDate) {
+    params.set("metadata[source_runtime]", "invoice_plan_wizard");
+    params.set("metadata[red_start_date]", wr.redDate);
+    params.set("metadata[red_start_time]", wr.redTime || "09:00");
+  }
+  if (wr.anchorUnix != null) {
+    params.set("billing_cycle_anchor", String(wr.anchorUnix));
+  }
 
   const mode = state.hasPaymentMethod && client.billing_collection_mode === "auto_pay" ? "auto_pay" : "manual";
   if (mode === "auto_pay") {
     params.set("collection_method", "charge_automatically");
-    if (state.defaultPaymentMethod) params.set("default_payment_method", state.defaultPaymentMethod);
+    const dpm = stripeId(state.defaultPaymentMethod);
+    if (dpm) params.set("default_payment_method", dpm);
   } else {
     params.set("collection_method", "send_invoice");
     params.set("days_until_due", String(MANUAL_DAYS_UNTIL_DUE));
@@ -496,10 +558,14 @@ async function createStripeSubscriptionFromPlan(client, state, plan) {
     params.set(`items[${i}][price_data][product_data][metadata][service_id]`, line.serviceId);
   });
 
+  const anchorBucket = wr.anchorUnix != null ? String(wr.anchorUnix) : "immediate";
+  const rtPart = (wr.redTime || "").replace(/:/g, "");
+  const idempotencyKey = `minicrm-create-sub-${client.id}-${plan.id}-${wr.redDate || "na"}-${rtPart || "na"}-${anchorBucket}`;
+
   return stripeRequest("subscriptions", {
     method: "POST",
     params,
-    idempotencyKey: `minicrm-create-subscription-${client.id}-${plan.id}`,
+    idempotencyKey,
   });
 }
 
@@ -559,11 +625,16 @@ export default async function handler(req, res) {
     res.setHeader("Allow", "GET, PATCH, POST");
     return res.status(405).json({ error: "method not allowed" });
   } catch (err) {
+    console.error("[admin/billing]", req.method, req.url || "", err?.message || err);
     const status = err.status && err.status >= 400 && err.status < 600 ? err.status : 500;
+    const stripeBody = err.detail?.error && typeof err.detail.error === "object" ? err.detail.error : null;
+    const stripeMessage = stripeBody?.message || null;
+    const stripeCode = stripeBody?.code || null;
     return res.status(status).json({
       error: err.message || String(err),
-      code: err.code || null,
+      code: err.code || stripeCode || null,
       detail: err.detail || null,
+      stripe_message: stripeMessage,
     });
   }
 }

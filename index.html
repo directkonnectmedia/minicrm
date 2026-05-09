@@ -6762,7 +6762,8 @@
         } else if (code === "customer_required") {
           alert("Create subscription failed: create or sync the Stripe customer first.");
         } else {
-          alert("Could not create Stripe subscription: " + (err.message || String(err)));
+          const stripeHint = err.detail?.stripe_message ? ` (${err.detail.stripe_message})` : "";
+          alert("Could not create Stripe subscription: " + (err.message || String(err)) + stripeHint);
         }
         renderProfile();
       } finally {
@@ -14159,29 +14160,6 @@
     /** Browser-local wall time for schedule UI; document if you add org-wide TZ. */
     const CRM_DISPATCH_TZ_LABEL = "your local time zone";
 
-    function calendarEventDateCategory(scheduledDateYmd) {
-      const sd = String(scheduledDateYmd || "").slice(0, 10);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(sd)) return "future";
-      const [yy, mm, dd] = sd.split("-").map((x) => parseInt(x, 10));
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const ev = new Date(yy, mm - 1, dd);
-      const t0 = today.getTime();
-      const e0 = ev.getTime();
-      if (e0 < t0) return "past";
-      if (e0 === t0) return "today";
-      return "future";
-    }
-
-    function combineLocalDateAndTimeToIso(dateYmd, timeHm) {
-      const d = String(dateYmd || "").slice(0, 10);
-      const t = String(timeHm || "09:00").trim() || "09:00";
-      const [hh, mi] = t.split(":").map((x) => parseInt(x, 10));
-      const [y, m, day] = d.split("-").map((x) => parseInt(x, 10));
-      const dt = new Date(y, m - 1, day, Number.isFinite(hh) ? hh : 9, Number.isFinite(mi) ? mi : 0, 0, 0);
-      return dt.toISOString();
-    }
-
     function chargesToInvoiceLineItems(charges) {
       const arr = Array.isArray(charges) ? charges : [];
       return arr.map((c) => {
@@ -14599,44 +14577,42 @@
           : "";
 
       const phil = billingPhilosophySnippet(p.billing_philosophy);
-      const dateCat = calendarEventDateCategory(p.scheduled_date);
       const phase = p.dispatchPhase || "unset";
-      const sendDisabled = hasPortalPayload ? "" : " disabled";
+      const dispatchIsoRaw =
+        (inv && inv.scheduled_dispatch_time) || raw.scheduled_dispatch_time || null;
+      const dispatchWhenLabel = dispatchIsoRaw ? fmtDate(dispatchIsoRaw) : "—";
 
       let actionHtml = "";
       if (phase === "pushed") {
-        actionHtml = `<p class="muted" style="margin-top:12px;">This invoice is already visible in the <strong>Client Portal</strong>.</p>`;
-      } else if (dateCat === "past") {
-        actionHtml = `<p class="muted" style="margin-top:12px;">This date is in the past. Use the Invoice Builder on the client profile if you still need to publish an invoice.</p>`;
-      } else if (dateCat === "today") {
-        actionHtml = `
-          <div class="inv-cal-dispatch-actions" style="margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb;">
-            <button type="button" class="primary" id="invCalBtnSendNow"${sendDisabled}>Send to Portal Now</button>
-            <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
-              <label style="font-size:13px;color:#374151;">Schedule for later today <span class="muted">(${esc(CRM_DISPATCH_TZ_LABEL)})</span></label>
-              <input type="time" id="invCalTimeInput" value="17:00" style="padding:8px 10px;border-radius:8px;border:1px solid #d1d5db;" />
-              <button type="button" class="ghost" id="invCalBtnLaterToday"${sendDisabled}>Schedule</button>
-            </div>
-            ${
-              !hasPortalPayload
-                ? `<p class="muted" style="margin-top:10px;font-size:13px;">Portal send stays disabled until a draft invoice record exists for this date.</p>`
-                : ""
-            }
-          </div>`;
+        actionHtml = `<div class="inv-cal-dispatch-readonly" style="margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb;">
+          <p class="muted" style="margin:0 0 8px;">This invoice is already visible in the <strong>Client Portal</strong>.</p>
+          ${
+            dispatchIsoRaw
+              ? `<p style="margin:0;font-size:13px;color:#374151;">Originally queued / scheduled for: <strong>${esc(dispatchWhenLabel)}</strong> <span class="muted">(${esc(CRM_DISPATCH_TZ_LABEL)})</span></p>`
+              : ""
+          }
+        </div>`;
+      } else if (phase === "queued") {
+        actionHtml = `<div class="inv-cal-dispatch-readonly" style="margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0 0 6px;font-size:13px;color:#374151;">Portal dispatch is <strong>queued</strong>.</p>
+          <p style="margin:0;font-size:13px;color:#374151;">Scheduled dispatch: <strong>${esc(dispatchWhenLabel)}</strong> <span class="muted">(${esc(CRM_DISPATCH_TZ_LABEL)})</span></p>
+          <p class="muted" style="margin-top:10px;font-size:12px;">Dispatch timing is controlled by <strong>Finalize &amp; Launch</strong> in the Invoice Plan wizard (not editable here).</p>
+        </div>`;
       } else {
-        actionHtml = `
-          <div class="inv-cal-dispatch-actions" style="margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb;">
-            <label style="display:block;font-weight:600;margin-bottom:8px;color:#374151;">Schedule Portal Dispatch Time <span class="muted">(${esc(CRM_DISPATCH_TZ_LABEL)})</span></label>
-            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
-              <input type="time" id="invCalTimeInput" value="10:00" style="padding:8px 10px;border-radius:8px;border:1px solid #d1d5db;" />
-              <button type="button" class="primary" id="invCalBtnFutureQueue"${sendDisabled}>Queue for portal</button>
-            </div>
-            ${
-              !hasPortalPayload
-                ? `<p class="muted" style="margin-top:10px;font-size:13px;">Portal queue stays disabled until a draft invoice record exists for this date.</p>`
-                : ""
-            }
-          </div>`;
+        actionHtml = `<div class="inv-cal-dispatch-readonly" style="margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb;">
+          <p class="muted" style="margin:0;">No portal queue on this event yet.</p>
+          ${
+            dispatchIsoRaw
+              ? `<p style="margin-top:8px;font-size:13px;color:#374151;">Recorded dispatch time: <strong>${esc(dispatchWhenLabel)}</strong></p>`
+              : ""
+          }
+          <p class="muted" style="margin-top:10px;font-size:13px;">Run <strong>Finalize &amp; Launch</strong> from the Invoice Plan wizard to set queued portal timing.</p>
+          ${
+            !hasPortalPayload
+              ? `<p class="muted" style="margin-top:8px;font-size:13px;">Draft invoice data may still be loading — refresh the calendar or finalize again if status looks wrong.</p>`
+              : ""
+          }
+        </div>`;
       }
 
       body.innerHTML = `
@@ -14651,36 +14627,6 @@
         ${breakdownRows || '<p class="muted">No line items.</p>'}
         ${previewSection}
         ${actionHtml}`;
-
-      const sendNow = document.getElementById("invCalBtnSendNow");
-      if (sendNow && hasPortalPayload) {
-        sendNow.addEventListener("click", () => {
-          void persistInvoiceCalendarPortalDispatch({ publishNow: true, dispatchAtIso: null });
-        });
-      }
-      const laterToday = document.getElementById("invCalBtnLaterToday");
-      if (laterToday && hasPortalPayload) {
-        laterToday.addEventListener("click", () => {
-          const inp = document.getElementById("invCalTimeInput");
-          const hm = inp && inp.value ? inp.value : "17:00";
-          const iso = combineLocalDateAndTimeToIso(String(p.scheduled_date).slice(0, 10), hm);
-          const t = new Date(iso).getTime();
-          if (t <= Date.now()) {
-            showInvoiceBuilderPlaceholderToast("Pick a time later than now for today.");
-            return;
-          }
-          void persistInvoiceCalendarPortalDispatch({ publishNow: false, dispatchAtIso: iso });
-        });
-      }
-      const fut = document.getElementById("invCalBtnFutureQueue");
-      if (fut && hasPortalPayload) {
-        fut.addEventListener("click", () => {
-          const inp = document.getElementById("invCalTimeInput");
-          const hm = inp && inp.value ? inp.value : "10:00";
-          const iso = combineLocalDateAndTimeToIso(String(p.scheduled_date).slice(0, 10), hm);
-          void persistInvoiceCalendarPortalDispatch({ publishNow: false, dispatchAtIso: iso });
-        });
-      }
 
       ov.classList.add("open");
     }
