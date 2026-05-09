@@ -6437,6 +6437,10 @@
       const live = billingStateByClientId.get(c.id)?.live || {};
       const sub = live.subscription || null;
       const upcoming = live.upcomingInvoice || null;
+      const nextAt =
+        upcoming?.due_at || c.stripe_next_invoice_at || sub?.current_period_end || null;
+      const nextAtIsPeriodEstimate =
+        !upcoming && !!sub?.current_period_end && !c.stripe_next_invoice_at;
       return {
         configured: !!(c.stripe_customer_id || live.configured),
         status: sub?.status || c.stripe_subscription_status || "not_configured",
@@ -6454,7 +6458,8 @@
           upcoming?.amount_due !== undefined
             ? upcoming.amount_due
             : c.stripe_next_invoice_amount_cents,
-        nextAt: upcoming?.due_at || c.stripe_next_invoice_at || null,
+        nextAt,
+        nextAtIsPeriodEstimate,
         syncedAt: c.stripe_billing_synced_at || null,
         alert: live.alert || c.stripe_billing_alert || null,
         subscriptionId: sub?.id || c.stripe_subscription_id || null,
@@ -6525,6 +6530,11 @@
               <div class="billing-stat-label">Next Upcoming Invoice</div>
               <div class="billing-stat-value">${esc(formatBillingAmount(billing.amountCents))}</div>
               <div class="contract-status-meta">${esc(formatBillingDate(billing.nextAt))}</div>
+              ${
+                billing.nextAtIsPeriodEstimate
+                  ? `<div class="contract-status-meta" style="font-size:12px;color:#6b7280;margin-top:4px;line-height:1.4;">Estimate from subscription period — Stripe did not return an invoice preview.</div>`
+                  : ""
+              }
             </div>
           </div>
           <div class="billing-stat">

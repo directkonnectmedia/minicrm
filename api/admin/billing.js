@@ -464,6 +464,14 @@ async function resolveBillingState(client) {
       if (err.status !== 404) throw err;
     }
   }
+  if (!upcomingInvoice && customerId) {
+    const fallbackParams = new URLSearchParams({ customer: customerId });
+    try {
+      upcomingInvoice = await stripeRequest("invoices/upcoming", { params: fallbackParams });
+    } catch (err) {
+      if (err.status !== 404) throw err;
+    }
+  }
 
   return {
     configured: true,
@@ -487,8 +495,19 @@ function invoiceAmountCents(invoice) {
 }
 
 function invoiceDateIso(invoice) {
-  const unix = invoice?.next_payment_attempt || invoice?.due_date || invoice?.created;
-  return unix ? new Date(unix * 1000).toISOString() : null;
+  if (!invoice || typeof invoice !== "object") return null;
+  const lines = invoice.lines?.data;
+  const linePeriodEnd =
+    Array.isArray(lines) && lines.length ? lines[0]?.period?.end : null;
+  const raw =
+    invoice.next_payment_attempt ||
+    invoice.due_date ||
+    invoice.period_end ||
+    linePeriodEnd ||
+    invoice.period_start ||
+    invoice.created;
+  const unix = Number(raw);
+  return Number.isFinite(unix) ? new Date(unix * 1000).toISOString() : null;
 }
 
 async function syncClientBillingCache(client, state) {
