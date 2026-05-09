@@ -139,13 +139,31 @@ async function stripeRequest(path, { method = "GET", params, idempotencyKey } = 
   return data;
 }
 
+function httpError(status, message, code, detail = null) {
+  const err = new Error(message);
+  err.status = status;
+  err.code = code;
+  err.detail = detail;
+  return err;
+}
+
+function throwSupabaseFailure(step, httpStatus, data, fallbackMsg) {
+  const msg =
+    (typeof data?.message === "string" && data.message) ||
+    (typeof data?.hint === "string" && data.hint) ||
+    fallbackMsg ||
+    `Supabase request failed (${httpStatus})`;
+  const status = httpStatus >= 500 || httpStatus === 429 ? 503 : 502;
+  throw httpError(status, msg, "supabase_error", { step, httpStatus, body: data });
+}
+
 async function loadClient(clientId) {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=*`,
     { headers: supabaseHeaders() },
   );
   const data = await readJson(res);
-  if (!res.ok) throw new Error(data?.message || `client lookup failed (${res.status})`);
+  if (!res.ok) throwSupabaseFailure("load_client", res.status, data, `client lookup failed (${res.status})`);
   return Array.isArray(data) ? data[0] || null : null;
 }
 
@@ -159,16 +177,8 @@ async function patchClient(clientId, patch) {
     },
   );
   const data = await readJson(res);
-  if (!res.ok) throw new Error(data?.message || `client update failed (${res.status})`);
+  if (!res.ok) throwSupabaseFailure("patch_client", res.status, data, `client update failed (${res.status})`);
   return Array.isArray(data) ? data[0] || null : data;
-}
-
-function httpError(status, message, code, detail = null) {
-  const err = new Error(message);
-  err.status = status;
-  err.code = code;
-  err.detail = detail;
-  return err;
 }
 
 async function loadFirstClientPlanId(clientId) {
@@ -177,7 +187,8 @@ async function loadFirstClientPlanId(clientId) {
     { headers: supabaseHeaders() },
   );
   const data = await readJson(res);
-  if (!res.ok) throw new Error(data?.message || `client plan lookup failed (${res.status})`);
+  if (!res.ok)
+    throwSupabaseFailure("load_client_plans", res.status, data, `client plan lookup failed (${res.status})`);
   return Array.isArray(data) ? data[0]?.plan_id || null : null;
 }
 
@@ -188,7 +199,7 @@ async function loadPlan(planId) {
     { headers: supabaseHeaders() },
   );
   const data = await readJson(res);
-  if (!res.ok) throw new Error(data?.message || `plan lookup failed (${res.status})`);
+  if (!res.ok) throwSupabaseFailure("load_plan", res.status, data, `plan lookup failed (${res.status})`);
   return Array.isArray(data) ? data[0] || null : null;
 }
 
@@ -441,6 +452,29 @@ function publicBillingPayload(client, state) {
   };
 }
 
+function parseRequestBody(req, label) {
+  const raw = req.body;
+  if (raw == null || raw === "") return {};
+  const isBuf = typeof Buffer !== "undefined" && Buffer.isBuffer(raw);
+  if (typeof raw === "object" && raw !== null && !isBuf) return raw;
+  if (isBuf) {
+    const str = raw.toString("utf8");
+    try {
+      return str ? JSON.parse(str) : {};
+    } catch {
+      throw httpError(400, `Invalid JSON in ${label}`, "invalid_json");
+    }
+  }
+  if (typeof raw === "string") {
+    try {
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      throw httpError(400, `Invalid JSON in ${label}`, "invalid_json");
+    }
+  }
+  return {};
+}
+
 async function handleGet(req, res) {
   const clientId = String(req.query?.clientId || "").trim();
   if (!clientId) return res.status(400).json({ error: "clientId is required" });
@@ -453,7 +487,7 @@ async function handleGet(req, res) {
 }
 
 async function handlePatch(req, res) {
-  const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
+  const body = parseRequestBody(req, "PATCH body");
   const clientId = String(body.clientId || "").trim();
   const mode = String(body.mode || "").trim();
   if (!clientId) return res.status(400).json({ error: "clientId is required" });
@@ -570,7 +604,7 @@ async function createStripeSubscriptionFromPlan(client, state, plan) {
 }
 
 async function handlePost(req, res) {
-  const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
+  const body = parseRequestBody(req, "POST body");
   const clientId = String(body.clientId || "").trim();
   const action = String(body.action || "").trim();
   if (!clientId) return res.status(400).json({ error: "clientId is required" });
@@ -592,17 +626,33 @@ async function handlePost(req, res) {
     const state = await resolveBillingState(client);
     const plan = await loadBillingPlanForClient(client);
     const subscription = await createStripeSubscriptionFromPlan(client, state, plan);
-    const nextState = await resolveBillingState({
-      ...client,
-      stripe_subscription_id: subscription.id,
-    });
-    const patched = await syncClientBillingCache(client, nextState);
-    return res.status(200).json({
-      ok: true,
-      created: subscription.id !== state.subscription?.id,
-      plan: { id: plan.id, name: plan.name || null },
-      ...publicBillingPayload(patched || client, nextState),
-    });
+    const clientWithSub = { ...client, stripe_subscription_id: subscription.id };
+    try {
+      const nextState = await resolveBillingState(clientWithSub);
+      const patched = await syncClientBillingCache(client, nextState);
+      return res.status(200).json({
+        ok: true,
+        created: subscription.id !== state.subscription?.id,
+        plan: { id: plan.id, name: plan.name || null },
+        ...publicBillingPayload(patched || client, nextState),
+      });
+    } catch (syncErr) {
+      console.error("[admin/billing] sync after subscription create", syncErr?.stack || syncErr);
+      const stripeBody =
+        syncErr.detail?.error && typeof syncErr.detail.error === "object"
+          ? syncErr.detail.error
+          : null;
+      return res.status(502).json({
+        ok: false,
+        error:
+          syncErr.message ||
+          "Stripe subscription was created but MiniCRM could not save billing state to the database.",
+        code: "client_cache_sync_failed",
+        stripe_subscription_id: subscription.id,
+        detail: syncErr.detail ?? null,
+        stripe_message: stripeBody?.message || null,
+      });
+    }
   }
 
   const nowIso = new Date().toISOString();
@@ -625,7 +675,7 @@ export default async function handler(req, res) {
     res.setHeader("Allow", "GET, PATCH, POST");
     return res.status(405).json({ error: "method not allowed" });
   } catch (err) {
-    console.error("[admin/billing]", req.method, req.url || "", err?.message || err);
+    console.error("[admin/billing]", req.method, req.url || "", err?.message || err, err?.stack || "");
     const status = err.status && err.status >= 400 && err.status < 600 ? err.status : 500;
     const stripeBody = err.detail?.error && typeof err.detail.error === "object" ? err.detail.error : null;
     const stripeMessage = stripeBody?.message || null;

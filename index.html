@@ -6754,17 +6754,46 @@
         if (updated) await addSystemNote(updated, "client", "Stripe subscription created from Billing Command Center.");
         renderProfile();
       } catch (err) {
-        const code = err?.detail?.code || err?.code;
+        const detail = err?.detail || {};
+        const code = detail.code || err?.code;
+        const httpStatus = err?.status;
         if (code === "plan_required" || code === "plan_subscription_required") {
           alert("Create subscription failed: link a Plan Builder tier with at least one priced subscription line first.");
         } else if (code === "mixed_frequency_not_supported") {
           alert("Create subscription failed: this plan has subscription lines with different billing frequencies. Use one frequency for now.");
         } else if (code === "customer_required") {
           alert("Create subscription failed: create or sync the Stripe customer first.");
+        } else if (code === "client_cache_sync_failed") {
+          const subId = detail.stripe_subscription_id || "(see Network tab)";
+          alert(
+            `Stripe likely created subscription ${subId}, but saving CRM billing cache failed. Check Supabase constraints/migrations and Vercel logs, then refresh billing.`,
+          );
+        } else if (code === "supabase_error") {
+          const step = detail.detail?.step;
+          alert(
+            "Create subscription failed (database): " +
+              (err.message || "Supabase error") +
+              (step ? ` [step: ${step}]` : ""),
+          );
         } else {
-          const stripeHint = err.detail?.stripe_message ? ` (${err.detail.stripe_message})` : "";
-          alert("Could not create Stripe subscription: " + (err.message || String(err)) + stripeHint);
+          let suffix = "";
+          if (detail.stripe_message) suffix += ` (${detail.stripe_message})`;
+          if (httpStatus >= 500) {
+            if (detail.code) suffix += ` [${detail.code}]`;
+            const nested = detail.detail;
+            const step = nested?.step;
+            const hint =
+              nested?.body?.message ||
+              nested?.body?.hint ||
+              (typeof nested?.body === "object" && nested.body?.code
+                ? String(nested.body.code)
+                : "");
+            if (step) suffix += ` (${step})`;
+            if (hint) suffix += ` — ${String(hint).slice(0, 220)}`;
+          }
+          alert("Could not create Stripe subscription: " + (err.message || String(err)) + suffix);
         }
+        console.warn("[billing create_subscription]", err?.status, err?.detail);
         renderProfile();
       } finally {
         billingSubscriptionLoadingIds.delete(cid);
