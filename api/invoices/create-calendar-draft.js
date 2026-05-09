@@ -84,13 +84,20 @@ function isDuplicateReceiptError(status, detail) {
   return code === "23505" || msg.includes("duplicate key") || msg.includes("receipt_no");
 }
 
+function normalizeDispatchStatus(invoice) {
+  const status = String(invoice?.portal_dispatch_status || "").trim();
+  const hasDispatchTime = !!String(invoice?.scheduled_dispatch_time || "").trim();
+  return status === "queued" && hasDispatchTime ? "queued" : "pending_time";
+}
+
 function withReceiptNo(invoice, oldReceiptNo, receiptNo) {
+  const dispatchStatus = normalizeDispatchStatus(invoice);
   const next = {
     ...invoice,
     receipt_no: receiptNo,
-    portal_dispatch_status: "pending_time",
+    portal_dispatch_status: dispatchStatus,
     portal_published_at: null,
-    scheduled_dispatch_time: null,
+    scheduled_dispatch_time: dispatchStatus === "queued" ? invoice.scheduled_dispatch_time : null,
   };
   if (
     next.rendered_html &&

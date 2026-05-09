@@ -13541,12 +13541,47 @@
       return { todayIso: formatIsoLocalFromDate(t), endIso: formatIsoLocalFromDate(end) };
     }
 
-    function billingSimLedgerAdd(ledger, iso, color, label, amount, todayIso, endIso) {
+    const DEFAULT_INVOICE_DISPATCH_TIME = "09:00";
+
+    function normalizeWizardDispatchTime(value) {
+      const raw = String(value || "").trim();
+      return /^\d{2}:\d{2}$/.test(raw) ? raw : DEFAULT_INVOICE_DISPATCH_TIME;
+    }
+
+    function startTimesFromDispatcherContext(dc) {
+      const st = dc && (dc.start_times || dc.startTimes);
+      return {
+        blue: normalizeWizardDispatchTime(st?.blue),
+        yellow: normalizeWizardDispatchTime(st?.yellow),
+        red: normalizeWizardDispatchTime(st?.red),
+      };
+    }
+
+    function dispatchIsoForLocalDateTime(dateIso, timeStr) {
+      if (!dateIso) return null;
+      return combineDateTime(String(dateIso).slice(0, 10), normalizeWizardDispatchTime(timeStr));
+    }
+
+    function wizardDispatchTimeForPhase(session, phase) {
+      const key = dispatcherPhaseToStartDateKey(phase);
+      if (!session.startTimes) session.startTimes = startTimesFromDispatcherContext(null);
+      const input = document.getElementById("invDiagDateTimeInput");
+      return normalizeWizardDispatchTime(
+        input?.value || session.dispatcherPendingTime || (key ? session.startTimes[key] : null),
+      );
+    }
+
+    function billingSimLedgerAdd(ledger, iso, color, label, amount, todayIso, endIso, dispatchTime) {
       const n = Number(amount) || 0;
       if (!iso || !(n > 0)) return;
       if (iso < todayIso || iso > endIso) return;
       if (!ledger[iso]) ledger[iso] = { charges: [] };
-      ledger[iso].charges.push({ color, label, amount: n });
+      ledger[iso].charges.push({
+        color,
+        label,
+        amount: n,
+        dispatch_time: normalizeWizardDispatchTime(dispatchTime),
+      });
     }
 
     function buildBillingSimulationLedger(session, horizonMonths) {
@@ -13554,13 +13589,23 @@
       const line_items = session?.analyzedTemplate?.line_items || [];
       const amt = extractSimulatorAmountsFromLineItems(line_items);
       const sd = session?.startDates || {};
+      const st = session?.startTimes || {};
       const yt = sd.yellow_timing;
       const rhythmRule = session?.rhythmRule || {};
       const hm = horizonMonths != null ? horizonMonths : BILLING_SIM_UI_MONTHS;
       const { todayIso, endIso } = getBillingSimHorizonBounds(hm);
 
       if (sd.blue && amt.blue > 0) {
-        billingSimLedgerAdd(ledger, sd.blue, "blue", "Setup / due today", amt.blue, todayIso, endIso);
+        billingSimLedgerAdd(
+          ledger,
+          sd.blue,
+          "blue",
+          "Setup / due today",
+          amt.blue,
+          todayIso,
+          endIso,
+          st.blue,
+        );
       }
 
       const yellowInstallmentMode =
@@ -13595,6 +13640,7 @@
               yf.firstInstallmentAmount,
               todayIso,
               endIso,
+              st.yellow,
             );
             const nextRhythmIso = advanceBillingRhythmStep(sd.yellow, detail);
             const futureDates = nextRhythmIso
@@ -13610,6 +13656,7 @@
                 Number(amounts[idx]) || 0,
                 todayIso,
                 endIso,
+                st.yellow,
               );
             });
           } else {
@@ -13624,19 +13671,29 @@
                 Number(amounts[idx]) || 0,
                 todayIso,
                 endIso,
+                st.yellow,
               );
             });
           }
         }
       } else if (sd.yellow && amt.yellow > 0) {
-        billingSimLedgerAdd(ledger, sd.yellow, "yellow", "Financing (balance)", amt.yellow, todayIso, endIso);
+        billingSimLedgerAdd(
+          ledger,
+          sd.yellow,
+          "yellow",
+          "Financing (balance)",
+          amt.yellow,
+          todayIso,
+          endIso,
+          st.yellow,
+        );
       }
 
       if (sd.red && amt.redTotal > 0) {
         const detail = rhythmDetailForRedFilter(rhythmRule);
         const dates = detail ? pushBillingOccurrencesInRange(sd.red, detail, todayIso, endIso, null) : [];
         dates.forEach((iso) => {
-          billingSimLedgerAdd(ledger, iso, "red", "Subscription", amt.redTotal, todayIso, endIso);
+          billingSimLedgerAdd(ledger, iso, "red", "Subscription", amt.redTotal, todayIso, endIso, st.red);
         });
       }
 
@@ -13821,9 +13878,8 @@
           .from("invoices")
           .delete()
           .eq("id", iid)
-          .eq("portal_dispatch_status", "pending_time")
-          .is("portal_published_at", null)
-          .is("scheduled_dispatch_time", null);
+          .in("portal_dispatch_status", ["pending_time", "queued"])
+          .is("portal_published_at", null);
         if (error) console.warn("orphan plan-wizard draft delete:", error);
       }
     }
@@ -13839,19 +13895,28 @@
       for (const iso of Object.keys(ledger).sort()) {
         const entry = ledger[iso];
         if (!entry?.charges?.length) continue;
-        const total = entry.charges.reduce((a, c) => a + (Number(c.amount) || 0), 0);
-        if (!(total > 0)) continue;
-        rows.push({
-          client_id: session.clientId,
-          scheduled_date: iso,
-          status: "scheduled",
-          total_amount: total,
-          charges: entry.charges,
-          billing_philosophy: billingPhilosophyDoc,
-          template_name: session.analyzedTemplate?.name || null,
-          source: "plan_wizard",
-          commit_batch_id: batchId,
-        });
+        const byTime = new Map();
+        for (const charge of entry.charges) {
+          const time = normalizeWizardDispatchTime(charge.dispatch_time);
+          if (!byTime.has(time)) byTime.set(time, []);
+          byTime.get(time).push(charge);
+        }
+        for (const [time, charges] of byTime.entries()) {
+          const total = charges.reduce((a, c) => a + (Number(c.amount) || 0), 0);
+          if (!(total > 0)) continue;
+          rows.push({
+            client_id: session.clientId,
+            scheduled_date: iso,
+            scheduled_dispatch_time: dispatchIsoForLocalDateTime(iso, time),
+            status: "scheduled",
+            total_amount: total,
+            charges,
+            billing_philosophy: billingPhilosophyDoc,
+            template_name: session.analyzedTemplate?.name || null,
+            source: "plan_wizard",
+            commit_batch_id: batchId,
+          });
+        }
       }
 
       const { data: prevEvRows } = await sb
@@ -13875,7 +13940,7 @@
           const { data: insertedCal, error: insErr } = await sb
             .from("invoice_calendar_events")
             .insert(chunk)
-            .select("id, client_id, scheduled_date, charges, total_amount");
+            .select("id, client_id, scheduled_date, scheduled_dispatch_time, charges, total_amount");
           if (insErr) return { error: insErr };
           const calRows = insertedCal || [];
           for (const calRow of calRows) {
@@ -14010,15 +14075,21 @@
         analysisFacts: extractInvoiceTemplateDiagnosticFacts(line_items),
         rhythmRule: rhythmRuleFromDispatcherContext(dc),
         startDates: startDatesFromDispatcherContext(dc),
+        startTimes: startTimesFromDispatcherContext(dc),
       };
 
       const rawBp = bpRaw && typeof bpRaw === "object" ? bpRaw : {};
       const baseBp = { ...rawBp };
-      const newPreview = buildDispatcherPreviewPayload(synth.rhythmRule, synth.startDates, {
-        client_id: synth.clientId,
-        client_name: synth.clientName,
-        template_name: synth.analyzedTemplate?.name || null,
-      });
+      const newPreview = buildDispatcherPreviewPayload(
+        synth.rhythmRule,
+        synth.startDates,
+        synth.startTimes,
+        {
+          client_id: synth.clientId,
+          client_name: synth.clientName,
+          template_name: synth.analyzedTemplate?.name || null,
+        },
+      );
       baseBp.dispatcherContext = newPreview;
       baseBp.savedAt = new Date().toISOString();
 
@@ -14298,7 +14369,7 @@
 
     /**
      * Persist a draft invoice row for a plan-wizard calendar event and link invoice_id.
-     * Drafts use portal_dispatch_status pending_time until the team queues portal dispatch.
+     * Wizard-created drafts are queued when the calendar row has a dispatch timestamp.
      */
     async function createDraftInvoiceForCalendarEvent(calRow, client) {
       if (!calRow?.id || !client?.id) return { error: new Error("missing calendar row or client") };
@@ -14312,6 +14383,7 @@
       const receiptNo = await nextReceiptNoForIssuedDate(String(calRow.scheduled_date || "").slice(0, 10));
       const data = buildInvoiceDataFromCalendarRow(calRow, client, receiptNo);
       const renderedHtml = renderInvoiceHTML(data);
+      const dispatchAt = calRow.scheduled_dispatch_time || null;
       const row = {
         client_id: client.id,
         receipt_no: data.receipt_no,
@@ -14326,9 +14398,9 @@
         status: "due",
         stripe_payment_link: null,
         rendered_html: renderedHtml,
-        portal_dispatch_status: "pending_time",
+        portal_dispatch_status: dispatchAt ? "queued" : "pending_time",
         portal_published_at: null,
-        scheduled_dispatch_time: null,
+        scheduled_dispatch_time: dispatchAt,
       };
 
       try {
@@ -14730,18 +14802,24 @@
 </div>`;
     }
 
-    function buildDispatcherPreviewPayload(rhythmRule, startDates, meta) {
+    function buildDispatcherPreviewPayload(rhythmRule, startDates, startTimes, meta) {
       const rr = rhythmRule && typeof rhythmRule === "object" ? rhythmRule : {};
       const sd =
         startDates && typeof startDates === "object"
           ? startDates
           : { blue: null, yellow: null, red: null, yellow_timing: null };
+      const st = {
+        blue: normalizeWizardDispatchTime(startTimes?.blue),
+        yellow: normalizeWizardDispatchTime(startTimes?.yellow),
+        red: normalizeWizardDispatchTime(startTimes?.red),
+      };
       const m = meta && typeof meta === "object" ? meta : {};
       return {
         Rhythm_Rule: rr,
         yellow_anchor: rr.yellow_anchor ?? null,
         red_anchor: rr.red_anchor ?? null,
         start_dates: { ...sd },
+        start_times: st,
         billing_simulation: {
           horizon_months: 6,
           preview_only: true,
@@ -14763,11 +14841,17 @@
         red: null,
         yellow_timing: null,
       };
-      session.dispatcherPreviewPayload = buildDispatcherPreviewPayload(rhythmRule, startDates, {
-        client_id: session.clientId || null,
-        client_name: session.clientName || null,
-        template_name: session.analyzedTemplate?.name || null,
-      });
+      const startTimes = session.startTimes || startTimesFromDispatcherContext(null);
+      session.dispatcherPreviewPayload = buildDispatcherPreviewPayload(
+        rhythmRule,
+        startDates,
+        startTimes,
+        {
+          client_id: session.clientId || null,
+          client_name: session.clientName || null,
+          template_name: session.analyzedTemplate?.name || null,
+        },
+      );
       renderBillingSimulator();
     }
 
@@ -14797,6 +14881,7 @@
         mount.innerHTML = "";
         return;
       }
+      if (!session.startTimes) session.startTimes = startTimesFromDispatcherContext(null);
 
       let titleHtml = "";
       let filterDetail = null;
@@ -14862,12 +14947,29 @@
         return dateSelectableForRhythmFilter(iso, filterDetail);
       };
 
-      mount.innerHTML = buildDispatcherCalendarHtml(calY, calM, {
+      const key = dispatcherPhaseToStartDateKey(phase);
+      const phaseTime = normalizeWizardDispatchTime(
+        session.dispatcherPendingTime || (key ? session.startTimes[key] : null),
+      );
+      const phaseLabel = phase === "blue" ? "Blue" : phase === "yellow" ? "Yellow" : "Red";
+      mount.innerHTML = `${buildDispatcherCalendarHtml(calY, calM, {
         selectableFn,
         selectedIso: session.dispatcherPendingIso,
-      });
+      })}
+<div class="inv-diag-box" style="margin-top:12px;">
+  <label for="invDiagDateTimeInput" style="display:block;font-size:13px;font-weight:700;color:#111827;margin-bottom:6px;">${esc(phaseLabel)} dispatch time</label>
+  <input type="time" id="invDiagDateTimeInput" value="${esc(phaseTime)}" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font:inherit;" />
+  <p class="muted" style="margin:6px 0 0;font-size:12px;">This is when MiniCRM will queue the invoice to the Client Portal for this ${esc(phaseLabel.toLowerCase())} phase.</p>
+</div>`;
 
       nextBtn.textContent = idx + 1 >= phases.length ? "Continue to confirmation" : "Next";
+
+      const timeInput = mount.querySelector("#invDiagDateTimeInput");
+      if (timeInput) {
+        timeInput.addEventListener("change", () => {
+          session.dispatcherPendingTime = normalizeWizardDispatchTime(timeInput.value);
+        });
+      }
 
       mount.querySelectorAll(".inv-diag-cal-nav button[data-dir]").forEach((btn) => {
         btn.addEventListener("click", (ev) => {
@@ -14935,7 +15037,9 @@
       session.Rhythm_Rule = rhythmRule;
       session.rhythmRule = rhythmRule;
       session.startDates = { blue: null, yellow: null, red: null, yellow_timing: null };
+      session.startTimes = startTimesFromDispatcherContext(null);
       session.dispatcherPendingIso = null;
+      session.dispatcherPendingTime = null;
       session.dispatcherCalYM = null;
       session.dispatcherPhases = buildDispatcherDatePhases(session);
       session.dispatcherPhaseIndex = 0;
@@ -15075,6 +15179,7 @@
           const landPhase = session.dispatcherPhases[session.dispatcherPhaseIndex];
           const key = dispatcherPhaseToStartDateKey(landPhase);
           session.dispatcherPendingIso = key ? session.startDates[key] : null;
+          session.dispatcherPendingTime = key ? session.startTimes?.[key] : null;
           session.dispatcherCalYM = null;
           renderDispatcherDateStage();
           return;
@@ -15101,6 +15206,7 @@
           getPlanSingleFinanceBalanceTiming(plan)?.trigger === SETUP_PAYMENT_TRIGGER_MILESTONE;
 
         if (!yellowSingleMilestone && !session.dispatcherPendingIso) return;
+        const selectedTime = wizardDispatchTimeForPhase(session, phase);
 
         if (phase === "yellow") {
           const yMode = classifyYellowDatePickerMode(line_items, facts);
@@ -15111,18 +15217,24 @@
               session.startDates.yellow_timing = "milestone";
             } else {
               session.startDates.yellow = session.dispatcherPendingIso;
+              session.startTimes.yellow = selectedTime;
               session.startDates.yellow_timing = "calendar_date";
             }
           } else {
             session.startDates.yellow = session.dispatcherPendingIso;
+            session.startTimes.yellow = selectedTime;
             session.startDates.yellow_timing = "installment_rhythm";
           }
         } else {
           const key = dispatcherPhaseToStartDateKey(phase);
-          if (key) session.startDates[key] = session.dispatcherPendingIso;
+          if (key) {
+            session.startDates[key] = session.dispatcherPendingIso;
+            session.startTimes[key] = selectedTime;
+          }
         }
 
         session.dispatcherPendingIso = null;
+        session.dispatcherPendingTime = null;
         session.dispatcherCalYM = null;
         if (idx + 1 >= phases.length) {
           finalizeDispatcherConfirmation();
@@ -15146,8 +15258,10 @@
           const key = dispatcherPhaseToStartDateKey(lastPhase);
           session.dispatcherPhaseIndex = lastIdx;
           session.dispatcherPendingIso = key ? session.startDates[key] : null;
+          session.dispatcherPendingTime = key ? session.startTimes?.[key] : null;
           if (key) {
             session.startDates[key] = null;
+            session.startTimes[key] = DEFAULT_INVOICE_DISPATCH_TIME;
             if (key === "yellow") session.startDates.yellow_timing = null;
           }
           session.dispatcherCalYM = null;
