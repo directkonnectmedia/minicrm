@@ -9,8 +9,10 @@
  * PATCH body: { clientId, mode: "auto_pay" | "manual" }
  *   Toggle the Stripe Subscription collection_method.
  *
- * POST  body: { clientId, action: "request_payment_method" }
- *   Sets payment_method_requested_at so the client sees an Add payment method CTA in portal.html.
+ * POST  body: { clientId, action: "request_payment_method" | "create_subscription" | "sync_wizard_to_stripe" }
+ *   request_payment_method — Sets payment_method_requested_at for portal CTA.
+ *   create_subscription — Creates Stripe subscription from Plan Builder pricing + wizard anchor when applicable.
+ *   sync_wizard_to_stripe — Updates existing Stripe subscription metadata / billing_cycle_anchor from billing_philosophy (Finalize & Launch).
  */
 
 const SUPABASE_URL =
@@ -739,12 +741,81 @@ async function createStripeSubscriptionFromPlan(client, state, plan, fallbackUse
   }
 }
 
+/**
+ * Push Invoice Plan wizard red timing onto an existing Stripe subscription (CRM as source of truth).
+ * Stripe may reject billing_cycle_anchor changes — callers surface stripe_message.
+ */
+async function applyWizardTimingToStripeSubscription(client, state) {
+  const subscription = state.subscription;
+  if (!subscription?.id) {
+    throw httpError(
+      409,
+      "No Stripe subscription is linked for this client. Create one from Billing Command Center first.",
+      "subscription_required",
+    );
+  }
+  if (["canceled", "incomplete_expired"].includes(subscription.status)) {
+    throw httpError(
+      409,
+      `Stripe subscription is ${subscription.status}; cannot sync wizard timing.`,
+      "subscription_inactive",
+    );
+  }
+
+  const wr = wizardRedBillingAnchor(client);
+  const hasAnchor = wr.anchorUnix != null;
+  const hasWizardMeta = !!wr.redDate;
+
+  const resolvedPlanAudit = {
+    sync_kind: "wizard_to_stripe",
+    client_id: client.id,
+    stripe_subscription_id: subscription.id,
+    wizard_red_date: wr.redDate || null,
+    wizard_red_time: wr.redTime || null,
+    billing_cycle_anchor_unix: wr.anchorUnix,
+    billing_cycle_anchor_applied: hasAnchor,
+    wizard_dispatcher_context_present: !!dispatcherContextFromClient(client),
+  };
+
+  if (!hasAnchor && !hasWizardMeta) {
+    return { subscription, resolvedPlanAudit: { ...resolvedPlanAudit, skipped: true, reason: "no_wizard_red_timing" } };
+  }
+
+  const params = new URLSearchParams();
+  params.set("metadata[client_id]", client.id);
+  params.set("metadata[crm_client_id]", client.id);
+  params.set("metadata[source]", "minicrm");
+  if (wr.redDate) {
+    params.set("metadata[source_runtime]", "invoice_plan_wizard");
+    params.set("metadata[red_start_date]", wr.redDate);
+    params.set("metadata[red_start_time]", wr.redTime || "09:00");
+  }
+  if (hasAnchor) {
+    params.set("billing_cycle_anchor", String(wr.anchorUnix));
+    params.set("proration_behavior", "none");
+  }
+
+  const idempotencyKey = `minicrm-sync-wizard-${client.id}-${wr.redDate || "na"}-${hasAnchor ? wr.anchorUnix : "meta"}`;
+
+  try {
+    const updated = await stripeRequest(`subscriptions/${encodeURIComponent(subscription.id)}`, {
+      method: "POST",
+      params,
+      idempotencyKey: idempotencyKey.slice(0, 255),
+    });
+    return { subscription: updated, resolvedPlanAudit };
+  } catch (stripeErr) {
+    stripeErr.resolvedPlanAudit = resolvedPlanAudit;
+    throw stripeErr;
+  }
+}
+
 async function handlePost(req, res) {
   const body = parseRequestBody(req, "POST body");
   const clientId = String(body.clientId || "").trim();
   const action = String(body.action || "").trim();
   if (!clientId) return res.status(400).json({ error: "clientId is required" });
-  if (!["request_payment_method", "create_subscription"].includes(action)) {
+  if (!["request_payment_method", "create_subscription", "sync_wizard_to_stripe"].includes(action)) {
     return res.status(400).json({ error: "unsupported action" });
   }
 
@@ -789,6 +860,46 @@ async function handlePost(req, res) {
         error:
           syncErr.message ||
           "Stripe subscription was created but MiniCRM could not save billing state to the database.",
+        code: "client_cache_sync_failed",
+        stripe_subscription_id: subscription.id,
+        resolvedPlan: resolvedPlanAudit,
+        detail: safeDetailForResponse(syncErr.detail),
+        stripe_message: stripeBody?.message || null,
+      });
+    }
+  }
+
+  if (action === "sync_wizard_to_stripe") {
+    if (!String(client.stripe_subscription_id || "").trim()) {
+      return res.status(409).json({
+        error:
+          "No Stripe subscription is linked on this client record. Create or link a subscription before syncing wizard timing.",
+        code: "subscription_required",
+      });
+    }
+    const state = await resolveBillingState(client);
+    const { subscription, resolvedPlanAudit } = await applyWizardTimingToStripeSubscription(client, state);
+    const clientWithSub = { ...client, stripe_subscription_id: subscription.id };
+    try {
+      const nextState = await resolveBillingState(clientWithSub);
+      const patched = await syncClientBillingCache(client, nextState);
+      return res.status(200).json({
+        ok: true,
+        skipped: !!resolvedPlanAudit.skipped,
+        resolvedPlan: resolvedPlanAudit,
+        ...publicBillingPayload(patched || client, nextState),
+      });
+    } catch (syncErr) {
+      console.error("[admin/billing] sync after wizard_to_stripe", syncErr?.stack || syncErr);
+      const stripeBody =
+        syncErr.detail?.error && typeof syncErr.detail.error === "object"
+          ? syncErr.detail.error
+          : null;
+      return res.status(502).json({
+        ok: false,
+        error:
+          syncErr.message ||
+          "Stripe subscription was updated but MiniCRM could not save billing cache.",
         code: "client_cache_sync_failed",
         stripe_subscription_id: subscription.id,
         resolvedPlan: resolvedPlanAudit,

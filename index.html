@@ -14731,7 +14731,29 @@
       const idx = allClients.findIndex((c) => String(c.id) === String(session.clientId));
       if (idx >= 0) allClients[idx] = { ...allClients[idx], billing_philosophy };
 
-      showInvoiceBuilderPlaceholderToast("Scheduled invoices saved — opening Invoice Calendar.");
+      let stripeSyncHint = "";
+      if (isAdmin() && idx >= 0 && String(allClients[idx]?.stripe_subscription_id || "").trim()) {
+        try {
+          await adminFetch(
+            "POST",
+            { clientId: session.clientId, action: "sync_wizard_to_stripe" },
+            "/api/admin/billing",
+          );
+          stripeSyncHint = " Stripe billing schedule synced.";
+        } catch (syncErr) {
+          const sm =
+            syncErr.detail?.stripe_message ||
+            syncErr.detail?.error ||
+            syncErr.message ||
+            String(syncErr);
+          stripeSyncHint = ` Stripe sync: ${sm}`.slice(0, 220);
+          console.warn("[finalize launch] sync_wizard_to_stripe:", syncErr?.detail || syncErr);
+        }
+      }
+
+      showInvoiceBuilderPlaceholderToast(
+        "Scheduled invoices saved — opening Invoice Calendar." + stripeSyncHint,
+      );
       const gotoIso = firstScheduledIsoFromLedger(commitLedger);
       closeInvoiceDiagnosticWizard();
       switchTab("calendar");
